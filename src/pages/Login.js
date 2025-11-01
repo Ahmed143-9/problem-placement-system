@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -14,13 +14,13 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
-    if (!email || !password) {
+    if (!username || !password) {
       toast.error('Please fill in all fields');
       setLoading(false);
       return;
     }
 
-    const result = await login(email, password);
+    const result = await login(username, password);
     
     if (result.success) {
       toast.success('Login successful!');
@@ -39,41 +39,49 @@ export default function Login() {
           <div className="card shadow-lg">
             <div className="card-body p-5">
               <div className="text-center mb-4">
-                <h2 className="fw-bold">Login</h2>
-                <p className="text-muted">Welcome back! Please login to your account.</p>
+                <h2 className="fw-bold">Problem Management System</h2>
+                <p className="text-muted">Login to your account</p>
               </div>
               
-              <div className="mb-3">
-                <label className="form-label">Email Address</label>
-                <input
-                  type="email"
-                  className="form-control form-control-lg"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
+              <form onSubmit={handleSubmit}>
+                <div className="mb-3">
+                  <label className="form-label">Username</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-lg"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your username"
+                    required
+                  />
+                </div>
 
-              <div className="mb-4">
-                <label className="form-label">Password</label>
-                <input
-                  type="password"
-                  className="form-control form-control-lg"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
+                <div className="mb-4">
+                  <label className="form-label">Password</label>
+                  <input
+                    type="password"
+                    className="form-control form-control-lg"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                  />
+                </div>
 
-              <button
-                onClick={handleSubmit}
-                className="btn btn-primary btn-lg w-100"
-                disabled={loading}
-              >
-                {loading ? 'Logging in...' : 'Login'}
-              </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-lg w-100"
+                  disabled={loading}
+                >
+                  {loading ? 'Logging in...' : 'Login'}
+                </button>
+              </form>
+
+              <div className="alert alert-info mt-4 mb-0">
+                <small>
+                  <strong>Note:</strong> If this is your first login, please wait for admin approval before accessing the system.
+                </small>
+              </div>
             </div>
           </div>
         </div>

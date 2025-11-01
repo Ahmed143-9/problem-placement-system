@@ -20,10 +20,26 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (username, password) => {
     try {
-      const response = await api.post('/login', { email, password });
-      const { token, user } = response.data;
+      const response = await api.post('/login', { username, password });
+      const { token, user, message } = response.data;
+      
+      // Check if this is first login (pending approval)
+      if (user.status === 'pending') {
+        return { 
+          success: false, 
+          error: message || 'Your first login attempt has been recorded. Please wait for admin approval before you can access the system.' 
+        };
+      }
+      
+      // Check if user is active
+      if (user.status !== 'active') {
+        return { 
+          success: false, 
+          error: 'Your account has been deactivated. Please contact administrator.' 
+        };
+      }
       
       // Save to localStorage
       localStorage.setItem('token', token);
@@ -38,7 +54,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Login failed' 
+        error: error.response?.data?.message || 'Login failed. Please check your credentials.' 
       };
     }
   };
