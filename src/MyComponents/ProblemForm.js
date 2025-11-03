@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
-
+import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function ProblemForm() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { notifyNewProblem } = useNotifications();
   const [formData, setFormData] = useState({
     department: '',
     priority: '',
@@ -31,7 +34,7 @@ export default function ProblemForm() {
         id: problems.length + 1,
         ...formData,
         status: 'pending',
-        createdBy: 'Admin',
+        createdBy: user?.name || 'Admin',
         assignedTo: null,
         createdAt: new Date().toISOString(),
         comments: []
@@ -43,7 +46,10 @@ export default function ProblemForm() {
       // Save to localStorage
       localStorage.setItem('problems', JSON.stringify(problems));
       
-      toast.success('Problem submitted successfully!');
+      // Send notification to admin
+      notifyNewProblem(newProblem.id, newProblem.createdBy, newProblem.department);
+      
+      toast.success('Problem submitted successfully! Admin has been notified.');
       setFormData({ department: '', priority: '', statement: '' });
       
       // Navigate to problems list
@@ -67,9 +73,13 @@ export default function ProblemForm() {
             <h3 className="mb-0">Submit a Problem Ticket</h3>
           </div>
           <div className="card-body">
+            <div className="alert alert-info">
+              <strong>Note:</strong> When you submit this problem, the admin will be notified immediately. 🔔
+            </div>
+            
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label className="form-label">Department</label>
+                <label className="form-label">Department *</label>
                 <select
                   className="form-control"
                   name="department"
@@ -85,7 +95,7 @@ export default function ProblemForm() {
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Priority</label>
+                <label className="form-label">Priority *</label>
                 <select
                   className="form-control"
                   name="priority"
@@ -94,40 +104,70 @@ export default function ProblemForm() {
                   required
                 >
                   <option value="">Select Priority</option>
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
+                  <option value="Low">Low - Can wait</option>
+                  <option value="Medium">Medium - Important</option>
+                  <option value="High">High - Urgent</option>
                 </select>
               </div>
 
               <div className="mb-3">
-                <label className="form-label">Problem Statement</label>
+                <label className="form-label">Problem Statement *</label>
                 <textarea
                   className="form-control"
                   name="statement"
                   rows="5"
                   value={formData.statement}
                   onChange={handleChange}
-                  placeholder="Describe the problem in detail..."
+                  placeholder="Describe the problem in detail...&#10;&#10;Example: The printer on the 2nd floor is not working. It shows 'Paper Jam' error but there's no paper stuck inside."
                   required
                 ></textarea>
+                <small className="text-muted">
+                  Be as detailed as possible to help us understand and solve the problem quickly.
+                </small>
               </div>
 
-              <button 
-                type="submit" 
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                {loading ? 'Submitting...' : 'Submit Problem'}
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-secondary ms-2"
-                onClick={() => navigate('/dashboard')}
-              >
-                Cancel
-              </button>
+              <div className="d-flex gap-2">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      📨 Submit Problem
+                    </>
+                  )}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary"
+                  onClick={() => navigate(-1)}
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+              </div>
             </form>
+          </div>
+        </div>
+
+        {/* Help Section */}
+        <div className="card mt-4">
+          <div className="card-header bg-light">
+            <h5 className="mb-0">💡 Tips for submitting a good problem report</h5>
+          </div>
+          <div className="card-body">
+            <ul>
+              <li><strong>Be specific:</strong> Include details like location, device, error messages</li>
+              <li><strong>Choose correct priority:</strong> High for urgent issues affecting work</li>
+              <li><strong>Include steps:</strong> What you were doing when the problem occurred</li>
+              <li><strong>Expected vs Actual:</strong> What should happen vs what's happening</li>
+            </ul>
           </div>
         </div>
       </div>
