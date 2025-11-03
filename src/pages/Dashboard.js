@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);

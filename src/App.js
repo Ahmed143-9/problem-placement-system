@@ -15,6 +15,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 
 function App() {
+  console.log({ Login, Dashboard, AdminPanel, ProtectedRoute, AdminRoute });
+
   return (
     <AuthProvider>
       <Router>

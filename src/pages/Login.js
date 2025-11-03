@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -7,8 +7,15 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,16 +27,21 @@ export default function Login() {
       return;
     }
 
-    const result = await login(username, password);
-    
-    if (result.success) {
-      toast.success('Login successful!');
-      navigate('/dashboard');
-    } else {
-      toast.error(result.error || 'Login failed');
+    try {
+      const result = await login(username, password);
+      
+      if (result.success) {
+        toast.success('Login successful!');
+        navigate('/dashboard');
+      } else {
+        toast.error(result.error || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('An error occurred during login');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (
@@ -52,6 +64,8 @@ export default function Login() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter your username"
+                    autoComplete="username"
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -64,6 +78,8 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
+                    autoComplete="current-password"
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -73,11 +89,26 @@ export default function Login() {
                   className="btn btn-primary btn-lg w-100"
                   disabled={loading}
                 >
-                  {loading ? 'Logging in...' : 'Login'}
+                  {loading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Logging in...
+                    </>
+                  ) : (
+                    'Login'
+                  )}
                 </button>
               </form>
 
               <div className="alert alert-info mt-4 mb-0">
+                <small>
+                  <strong>Test Credentials:</strong><br />
+                  Username: <code>Admin</code><br />
+                  Password: <code>Admin123</code>
+                </small>
+              </div>
+
+              <div className="alert alert-warning mt-2 mb-0">
                 <small>
                   <strong>Note:</strong> If this is your first login, please wait for admin approval before accessing the system.
                 </small>
