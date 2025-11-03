@@ -430,6 +430,23 @@ export default function Dashboard() {
             </div>
           </div> */}
 
+          {/* Admin Panel Access - Only for Admin */}
+{/* {user?.role === 'admin' && (
+  <div className="mt-4">
+    <div className="card shadow-sm border-0 bg-gradient-danger text-white">
+      <div className="card-body text-center py-4">
+        <FaUsersCog className="fs-1 mb-3" />
+        <h4 className="fw-bold mb-2">Admin Panel</h4>
+        <p className="mb-3">Manage users, add Team Leaders, and control system access</p>
+        <Link to="/admin" className="btn btn-light btn-lg px-5">
+          <FaUsersCog className="me-2" />
+          Go to Admin Panel
+        </Link>
+      </div>
+    </div>
+  </div>
+)} */}
+
           {/* Admin/Team Leader Section */}
           {(user?.role === 'admin' || user?.role === 'team_leader') && (
             <>

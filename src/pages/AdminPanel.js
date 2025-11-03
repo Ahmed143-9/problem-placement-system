@@ -1,369 +1,466 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import api from '../services/api';
-import Navbar from '../components/Navbar';
-import { useAuth } from '../context/AuthContext';
+import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey } from 'react-icons/fa';
 
-
-export default function AdminPanel() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('users');
+export default function AdminPanelUserManagement() {
   const [users, setUsers] = useState([]);
-  const [problems, setProblems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedProblem, setSelectedProblem] = useState(null);
-  const [assignUser, setAssignUser] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    role: 'user',
+    department: '',
+    status: 'active'
+  });
 
   useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+    loadUsers();
+  }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const loadUsers = () => {
     try {
-      if (activeTab === 'users') {
-        const response = await api.get('/admin/users');
-        setUsers(response.data);
-      } else if (activeTab === 'problems') {
-        const response = await api.get('/problems');
-        setProblems(response.data);
+      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const filteredUsers = storedUsers.filter(u => u.username !== 'Admin');
+      setUsers(filteredUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveUser = () => {
+    if (!formData.name || !formData.username || !formData.email) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    if (!editingUser && !formData.password) {
+      toast.error('Password is required');
+      return;
+    }
+
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      
+      if (editingUser) {
+        const updatedUsers = storedUsers.map(u => {
+          if (u.id === editingUser.id) {
+            return {
+              ...u,
+              name: formData.name,
+              username: formData.username,
+              email: formData.email,
+              ...(formData.password && { password: formData.password }),
+              role: formData.role,
+              department: formData.department,
+              status: formData.status
+            };
+          }
+          return u;
+        });
+        localStorage.setItem('system_users', JSON.stringify(updatedUsers));
+        toast.success('User updated successfully!');
+      } else {
+        if (storedUsers.some(u => u.username === formData.username)) {
+          toast.error('Username already exists!');
+          return;
+        }
+
+        const newUser = {
+          id: Date.now(),
+          ...formData,
+          createdAt: new Date().toISOString(),
+          createdBy: 'Admin'
+        };
+
+        storedUsers.push(newUser);
+        localStorage.setItem('system_users', JSON.stringify(storedUsers));
+        toast.success(`${formData.role === 'team_leader' ? 'Team Leader' : 'User'} added successfully!`);
       }
+      
+      setFormData({
+        name: '',
+        username: '',
+        email: '',
+        password: '',
+        role: 'user',
+        department: '',
+        status: 'active'
+      });
+      
+      setShowAddModal(false);
+      setEditingUser(null);
+      loadUsers();
     } catch (error) {
-      toast.error('Failed to fetch data');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApproveUser = async (userId) => {
-    try {
-      await api.put(`/admin/users/${userId}/approve`);
-      toast.success('User approved successfully!');
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to approve user');
-      console.error(error);
-    }
-  };
-
-  const handleToggleUserStatus = async (userId, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    try {
-      await api.put(`/admin/users/${userId}/status`, { status: newStatus });
-      toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to update user status');
+      toast.error('Failed to save user');
       console.error(error);
     }
   };
 
-  const handleDeleteUser = async (userId) => {
+  const handleEditUser = (userId) => {
+    const userToEdit = users.find(u => u.id === userId);
+    if (userToEdit) {
+      setEditingUser(userToEdit);
+      setFormData({
+        name: userToEdit.name,
+        username: userToEdit.username,
+        email: userToEdit.email,
+        password: '',
+        role: userToEdit.role,
+        department: userToEdit.department,
+        status: userToEdit.status
+      });
+      setShowAddModal(true);
+    }
+  };
+
+  const handleDeleteUser = (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) {
       return;
     }
+
     try {
-      await api.delete(`/admin/users/${userId}`);
+      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const updatedUsers = storedUsers.filter(u => u.id !== userId);
+      localStorage.setItem('system_users', JSON.stringify(updatedUsers));
+      
       toast.success('User deleted successfully!');
-      fetchData();
+      loadUsers();
     } catch (error) {
       toast.error('Failed to delete user');
       console.error(error);
     }
   };
 
-  const handleAssignProblem = async () => {
-    if (!assignUser || !selectedProblem) {
-      toast.error('Please select a user to assign');
-      return;
-    }
-
+  const handleToggleStatus = (userId) => {
     try {
-      await api.put(`/problems/${selectedProblem.id}/assign`, { user_id: assignUser });
-      toast.success('Problem assigned successfully!');
-      setSelectedProblem(null);
-      setAssignUser('');
-      fetchData();
+      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const updatedUsers = storedUsers.map(u => {
+        if (u.id === userId) {
+          return { ...u, status: u.status === 'active' ? 'inactive' : 'active' };
+        }
+        return u;
+      });
+      
+      localStorage.setItem('system_users', JSON.stringify(updatedUsers));
+      toast.success('User status updated!');
+      loadUsers();
     } catch (error) {
-      toast.error('Failed to assign problem');
+      toast.error('Failed to update status');
       console.error(error);
     }
-  };
-
-  const getUserStatusBadge = (status) => {
-    const badges = {
-      active: 'bg-success',
-      pending: 'bg-warning text-dark',
-      inactive: 'bg-secondary'
-    };
-    return badges[status] || 'bg-secondary';
   };
 
   const getRoleBadge = (role) => {
     const badges = {
       admin: 'bg-danger',
       team_leader: 'bg-primary',
-      employee: 'bg-info'
+      user: 'bg-info'
     };
     return badges[role] || 'bg-secondary';
   };
 
+  const getStatusBadge = (status) => {
+    return status === 'active' ? 'bg-success' : 'bg-secondary';
+  };
+
   return (
-    <div>
-      <Navbar />
-      <div className="container mt-4">
-        <div className="card shadow">
-          <div className="card-header bg-danger text-white">
-            <h3 className="mb-0">Admin Panel</h3>
+    <div className="container-fluid p-4">
+      <div className="card shadow-sm border-0">
+        <div className="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+          <div>
+            <h4 className="mb-0">
+              <FaUsers className="me-2" />
+              User Management Panel
+            </h4>
+            <small>Add and manage Team Leaders and Users</small>
           </div>
-          <div className="card-body">
-            {/* Tabs */}
-            <ul className="nav nav-tabs mb-4">
-              <li className="nav-item">
-                <button
-                  className={`nav-link ${activeTab === 'users' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('users')}
-                >
-                  User Management
-                </button>
-              </li>
-              <li className="nav-item">
-                <button
-                  className={`nav-link ${activeTab === 'problems' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('problems')}
-                >
-                  Problem Assignment
-                </button>
-              </li>
-            </ul>
+          <button 
+            className="btn btn-light"
+            onClick={() => {
+              setEditingUser(null);
+              setFormData({
+                name: '',
+                username: '',
+                email: '',
+                password: '',
+                role: 'user',
+                department: '',
+                status: 'active'
+              });
+              setShowAddModal(true);
+            }}
+          >
+            <FaUserPlus className="me-2" />
+            Add New User
+          </button>
+        </div>
 
-            {loading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
+        <div className="card-body">
+          <div className="row mb-4">
+            <div className="col-md-4">
+              <div className="card border-primary">
+                <div className="card-body text-center">
+                  <h3 className="text-primary mb-0">
+                    {users.filter(u => u.role === 'team_leader').length}
+                  </h3>
+                  <small className="text-muted">Team Leaders</small>
                 </div>
               </div>
-            ) : (
-              <>
-                {/* User Management Tab */}
-                {activeTab === 'users' && (
-                  <div>
-                    <h5 className="mb-3">All Users</h5>
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
-                          <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Department</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {users.length === 0 ? (
-                            <tr>
-                              <td colSpan="8" className="text-center py-4">
-                                <p className="text-muted mb-0">No users found</p>
-                              </td>
-                            </tr>
-                          ) : (
-                            users.map((u) => (
-                              <tr key={u.id}>
-                                <td>{u.id}</td>
-                                <td>{u.name}</td>
-                                <td>{u.username}</td>
-                                <td>{u.email}</td>
-                                <td>
-                                  <span className={`badge ${getRoleBadge(u.role)}`}>
-                                    {u.role.replace('_', ' ').toUpperCase()}
-                                  </span>
-                                </td>
-                                <td>{u.department}</td>
-                                <td>
-                                  <span className={`badge ${getUserStatusBadge(u.status)}`}>
-                                    {u.status.toUpperCase()}
-                                  </span>
-                                </td>
-                                <td>
-                                  {u.status === 'pending' && (
-                                    <button
-                                      className="btn btn-success btn-sm me-1"
-                                      onClick={() => handleApproveUser(u.id)}
-                                    >
-                                      Approve
-                                    </button>
-                                  )}
-                                  {u.status !== 'pending' && u.id !== user?.id && (
-                                    <>
-                                      <button
-                                        className={`btn btn-sm me-1 ${
-                                          u.status === 'active' ? 'btn-warning' : 'btn-success'
-                                        }`}
-                                        onClick={() => handleToggleUserStatus(u.id, u.status)}
-                                      >
-                                        {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                                      </button>
-                                      <button
-                                        className="btn btn-danger btn-sm"
-                                        onClick={() => handleDeleteUser(u.id)}
-                                      >
-                                        Delete
-                                      </button>
-                                    </>
-                                  )}
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+            </div>
+            <div className="col-md-4">
+              <div className="card border-info">
+                <div className="card-body text-center">
+                  <h3 className="text-info mb-0">
+                    {users.filter(u => u.role === 'user').length}
+                  </h3>
+                  <small className="text-muted">Users</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="card border-success">
+                <div className="card-body text-center">
+                  <h3 className="text-success mb-0">
+                    {users.filter(u => u.status === 'active').length}
+                  </h3>
+                  <small className="text-muted">Active Users</small>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                {/* Problem Assignment Tab */}
-                {activeTab === 'problems' && (
-                  <div>
-                    <h5 className="mb-3">Assign Problems</h5>
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
-                          <tr>
-                            <th>ID</th>
-                            <th>Department</th>
-                            <th>Priority</th>
-                            <th>Statement</th>
-                            <th>Status</th>
-                            <th>Created By</th>
-                            <th>Assigned To</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {problems.length === 0 ? (
-                            <tr>
-                              <td colSpan="8" className="text-center py-4">
-                                <p className="text-muted mb-0">No problems found</p>
-                              </td>
-                            </tr>
-                          ) : (
-                            problems.map((p) => (
-                              <tr key={p.id}>
-                                <td>#{p.id}</td>
-                                <td>{p.department}</td>
-                                <td>
-                                  <span className={`badge ${
-                                    p.priority === 'High' ? 'bg-danger' :
-                                    p.priority === 'Medium' ? 'bg-warning text-dark' :
-                                    'bg-success'
-                                  }`}>
-                                    {p.priority}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {p.statement}
-                                  </div>
-                                </td>
-                                <td>
-                                  <span className={`badge ${
-                                    p.status === 'pending' ? 'bg-warning text-dark' :
-                                    p.status === 'in_progress' ? 'bg-info' :
-                                    'bg-success'
-                                  }`}>
-                                    {p.status.replace('_', ' ').toUpperCase()}
-                                  </span>
-                                </td>
-                                <td>{p.created_by?.name}</td>
-                                <td>
-                                  {p.assigned_to ? (
-                                    <span className="badge bg-info">{p.assigned_to.name}</span>
-                                  ) : (
-                                    <span className="badge bg-secondary">Unassigned</span>
-                                  )}
-                                </td>
-                                <td>
-                                  <button
-                                    className="btn btn-primary btn-sm"
-                                    onClick={() => {
-                                      setSelectedProblem(p);
-                                      setAssignUser(p.assigned_to?.id || '');
-                                    }}
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#assignModal"
-                                  >
-                                    {p.assigned_to ? 'Reassign' : 'Assign'}
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+          <div className="table-responsive">
+            <table className="table table-hover">
+              <thead className="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Created By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="text-center py-5">
+                      <FaUsers className="fs-1 text-muted mb-3 d-block mx-auto" />
+                      <p className="text-muted mb-3">No users found. Add your first user!</p>
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => setShowAddModal(true)}
+                      >
+                        <FaUserPlus className="me-2" />
+                        Add User
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  users.map(u => (
+                    <tr key={u.id}>
+                      <td className="fw-semibold">{u.name}</td>
+                      <td>
+                        <code className="bg-light px-2 py-1 rounded">{u.username}</code>
+                      </td>
+                      <td>{u.email}</td>
+                      <td>
+                        <span className={`badge ${getRoleBadge(u.role)}`}>
+                          {u.role === 'team_leader' ? 'Team Leader' : 'User'}
+                        </span>
+                      </td>
+                      <td>{u.department}</td>
+                      <td>
+                        <span className={`badge ${getStatusBadge(u.status)}`}>
+                          {u.status}
+                        </span>
+                      </td>
+                      <td>
+                        <small className="text-muted">{u.createdBy}</small>
+                      </td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => handleEditUser(u.id)}
+                            title="Edit"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            className={`btn btn-outline-${u.status === 'active' ? 'warning' : 'success'}`}
+                            onClick={() => handleToggleStatus(u.id)}
+                            title={u.status === 'active' ? 'Deactivate' : 'Activate'}
+                          >
+                            {u.status === 'active' ? '⏸' : '▶'}
+                          </button>
+                          <button
+                            className="btn btn-outline-danger"
+                            onClick={() => handleDeleteUser(u.id)}
+                            title="Delete"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </>
-            )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      {/* Assign Problem Modal */}
-      <div className="modal fade" id="assignModal" tabIndex="-1">
-        <div className="modal-dialog">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">
-                Assign Problem #{selectedProblem?.id}
-              </h5>
-              <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div className="modal-body">
-              <div className="mb-3">
-                <label className="form-label">Select User</label>
-                <select
-                  className="form-control"
-                  value={assignUser}
-                  onChange={(e) => setAssignUser(e.target.value)}
-                >
-                  <option value="">-- Select User --</option>
-                  {users
-                    .filter((u) => u.status === 'active' && u.role !== 'admin')
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} - {u.department} ({u.role})
-                      </option>
-                    ))}
-                </select>
+      {showAddModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">
+                  <FaUserPlus className="me-2" />
+                  {editingUser ? 'Edit User' : 'Add New User'}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingUser(null);
+                  }}
+                ></button>
               </div>
-              {selectedProblem && (
-                <div className="alert alert-info">
-                  <strong>Problem:</strong> {selectedProblem.statement}
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label">Full Name *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="John Doe"
+                  />
                 </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleAssignProblem}
-                data-bs-dismiss="modal"
-              >
-                Assign
-              </button>
+
+                <div className="mb-3">
+                  <label className="form-label">Username *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    placeholder="johndoe"
+                  />
+                  <small className="text-muted">User will use this to login</small>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Email *</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="john@example.com"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">
+                    <FaKey className="me-2" />
+                    Password * {editingUser && <small className="text-muted">(Leave blank to keep current)</small>}
+                  </label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="Enter password"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Role *</label>
+                  <select
+                    className="form-control"
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                  >
+                    <option value="user">User (Employee)</option>
+                    <option value="team_leader">Team Leader</option>
+                  </select>
+                  <small className="text-muted">
+                    {formData.role === 'team_leader' 
+                      ? 'Can monitor team and assign problems' 
+                      : 'Can raise and solve problems'}
+                  </small>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Department *</label>
+                  <select
+                    className="form-control"
+                    name="department"
+                    value={formData.department}
+                    onChange={handleInputChange}
+                  >
+                    <option value="">Select Department</option>
+                    <option value="Tech">Tech</option>
+                    <option value="Business">Business</option>
+                    <option value="Accounts">Accounts</option>
+                  </select>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Status</label>
+                  <select
+                    className="form-control"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="d-flex gap-2">
+                  <button 
+                    className="btn btn-primary flex-grow-1"
+                    onClick={handleSaveUser}
+                  >
+                    {editingUser ? 'Update User' : 'Add User'}
+                  </button>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setEditingUser(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
