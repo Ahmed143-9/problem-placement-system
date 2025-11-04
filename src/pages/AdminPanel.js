@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
 
 export default function AdminPanelUserManagement() {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -15,6 +17,9 @@ export default function AdminPanelUserManagement() {
     department: '',
     status: 'active'
   });
+
+  // Check if current user is Admin
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadUsers();
@@ -36,6 +41,11 @@ export default function AdminPanelUserManagement() {
   };
 
   const handleSaveUser = () => {
+    if (!isAdmin) {
+      toast.error('Only Admin can add or edit users!');
+      return;
+    }
+
     if (!formData.name || !formData.username || !formData.email) {
       toast.error('Please fill all required fields');
       return;
@@ -77,7 +87,7 @@ export default function AdminPanelUserManagement() {
           id: Date.now(),
           ...formData,
           createdAt: new Date().toISOString(),
-          createdBy: 'Admin'
+          createdBy: user?.name || 'Admin'
         };
 
         storedUsers.push(newUser);
@@ -105,6 +115,11 @@ export default function AdminPanelUserManagement() {
   };
 
   const handleEditUser = (userId) => {
+    if (!isAdmin) {
+      toast.error('Only Admin can edit users!');
+      return;
+    }
+
     const userToEdit = users.find(u => u.id === userId);
     if (userToEdit) {
       setEditingUser(userToEdit);
@@ -122,6 +137,11 @@ export default function AdminPanelUserManagement() {
   };
 
   const handleDeleteUser = (userId) => {
+    if (!isAdmin) {
+      toast.error('Only Admin can delete users!');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this user?')) {
       return;
     }
@@ -140,6 +160,11 @@ export default function AdminPanelUserManagement() {
   };
 
   const handleToggleStatus = (userId) => {
+    if (!isAdmin) {
+      toast.error('Only Admin can change user status!');
+      return;
+    }
+
     try {
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
       const updatedUsers = storedUsers.map(u => {
@@ -180,30 +205,43 @@ export default function AdminPanelUserManagement() {
               <FaUsers className="me-2" />
               User Management Panel
             </h4>
-            <small>Add and manage Team Leaders and Users</small>
+            <small>
+              {isAdmin 
+                ? 'Add and manage Team Leaders and Users' 
+                : 'View team members (Read-only access)'}
+            </small>
           </div>
-          <button 
-            className="btn btn-light"
-            onClick={() => {
-              setEditingUser(null);
-              setFormData({
-                name: '',
-                username: '',
-                email: '',
-                password: '',
-                role: 'user',
-                department: '',
-                status: 'active'
-              });
-              setShowAddModal(true);
-            }}
-          >
-            <FaUserPlus className="me-2" />
-            Add New User
-          </button>
+          {isAdmin && (
+            <button 
+              className="btn btn-light"
+              onClick={() => {
+                setEditingUser(null);
+                setFormData({
+                  name: '',
+                  username: '',
+                  email: '',
+                  password: '',
+                  role: 'user',
+                  department: '',
+                  status: 'active'
+                });
+                setShowAddModal(true);
+              }}
+            >
+              <FaUserPlus className="me-2" />
+              Add New User
+            </button>
+          )}
         </div>
 
         <div className="card-body">
+          {!isAdmin && (
+            <div className="alert alert-info mb-4">
+              <strong>Note:</strong> As a Team Leader, you can view all users but cannot add, edit, or delete them. 
+              Only Admin has full user management permissions.
+            </div>
+          )}
+
           <div className="row mb-4">
             <div className="col-md-4">
               <div className="card border-primary">
@@ -256,14 +294,16 @@ export default function AdminPanelUserManagement() {
                   <tr>
                     <td colSpan="8" className="text-center py-5">
                       <FaUsers className="fs-1 text-muted mb-3 d-block mx-auto" />
-                      <p className="text-muted mb-3">No users found. Add your first user!</p>
-                      <button 
-                        className="btn btn-primary"
-                        onClick={() => setShowAddModal(true)}
-                      >
-                        <FaUserPlus className="me-2" />
-                        Add User
-                      </button>
+                      <p className="text-muted mb-3">No users found.</p>
+                      {isAdmin && (
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => setShowAddModal(true)}
+                        >
+                          <FaUserPlus className="me-2" />
+                          Add User
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -289,29 +329,33 @@ export default function AdminPanelUserManagement() {
                         <small className="text-muted">{u.createdBy}</small>
                       </td>
                       <td>
-                        <div className="btn-group btn-group-sm">
-                          <button
-                            className="btn btn-outline-primary"
-                            onClick={() => handleEditUser(u.id)}
-                            title="Edit"
-                          >
-                            <FaEdit />
-                          </button>
-                          <button
-                            className={`btn btn-outline-${u.status === 'active' ? 'warning' : 'success'}`}
-                            onClick={() => handleToggleStatus(u.id)}
-                            title={u.status === 'active' ? 'Deactivate' : 'Activate'}
-                          >
-                            {u.status === 'active' ? '⏸' : '▶'}
-                          </button>
-                          <button
-                            className="btn btn-outline-danger"
-                            onClick={() => handleDeleteUser(u.id)}
-                            title="Delete"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
+                        {isAdmin ? (
+                          <div className="btn-group btn-group-sm">
+                            <button
+                              className="btn btn-outline-primary"
+                              onClick={() => handleEditUser(u.id)}
+                              title="Edit"
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              className={`btn btn-outline-${u.status === 'active' ? 'warning' : 'success'}`}
+                              onClick={() => handleToggleStatus(u.id)}
+                              title={u.status === 'active' ? 'Deactivate' : 'Activate'}
+                            >
+                              {u.status === 'active' ? '⏸' : '▶'}
+                            </button>
+                            <button
+                              className="btn btn-outline-danger"
+                              onClick={() => handleDeleteUser(u.id)}
+                              title="Delete"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="badge bg-secondary">View Only</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -322,7 +366,8 @@ export default function AdminPanelUserManagement() {
         </div>
       </div>
 
-      {showAddModal && (
+      {/* Add/Edit Modal - Only for Admin */}
+      {showAddModal && isAdmin && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
@@ -406,7 +451,7 @@ export default function AdminPanelUserManagement() {
                   </select>
                   <small className="text-muted">
                     {formData.role === 'team_leader' 
-                      ? 'Can monitor team and assign problems' 
+                      ? 'Can monitor team and approve problems (cannot add/delete users)' 
                       : 'Can raise and solve problems'}
                   </small>
                 </div>

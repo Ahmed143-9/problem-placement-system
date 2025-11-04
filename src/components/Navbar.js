@@ -90,7 +90,7 @@ export default function Navbar() {
             {/* {isAdminOrLeader && (
               <li className="nav-item">
                 <Link className="nav-link" to="/admin">
-                  Admin Panel
+                  Admin Panel {user?.role === 'team_leader' && <small>(View)</small>}
                 </Link>
               </li>
             )} */}
@@ -244,6 +244,14 @@ export default function Navbar() {
                       {user?.role === 'admin' ? 'Administrator' : 
                        user?.role === 'team_leader' ? 'Team Leader' : 'Employee'}
                     </small>
+                    {user?.role === 'team_leader' && (
+                      <>
+                        {/* <br />
+                        <small className="text-info">
+                          ℹ️ Can assign & monitor only
+                        </small> */}
+                      </>
+                    )}
                   </span>
                 </li>
                 <li><hr className="dropdown-divider" /></li>

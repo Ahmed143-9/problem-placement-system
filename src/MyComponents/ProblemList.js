@@ -349,48 +349,48 @@ export default function ProblemList() {
 
                             {/* Admin/Leader Actions - Hide if problem is done */}
                             {canAssign() && problem.status !== 'done' && (
-                              <div className="btn-group" role="group">
-                                <button
-                                  className="btn btn-sm btn-outline-success dropdown-toggle"
-                                  data-bs-toggle="dropdown"
-                                  title="Assign/Transfer"
-                                >
-                                  Assign
-                                </button>
-                                <ul className="dropdown-menu">
-                                  <li>
-                                    <button
-                                      className="dropdown-item"
-                                      onClick={() => openAssignModal(problem, false)}
-                                    >
-                                      {problem.assignedTo ? '↻ Reassign' : '→ Assign to Member'}
-                                    </button>
-                                  </li>
-                                  {problem.assignedTo && canTransfer(problem) && (
+                              <>
+                                <div className="btn-group" role="group">
+                                  <button
+                                    className="btn btn-sm btn-outline-success dropdown-toggle"
+                                    data-bs-toggle="dropdown"
+                                    title="Assign/Transfer"
+                                  >
+                                    Assign
+                                  </button>
+                                  <ul className="dropdown-menu">
                                     <li>
                                       <button
                                         className="dropdown-item"
-                                        onClick={() => openAssignModal(problem, true)}
+                                        onClick={() => openAssignModal(problem, false)}
                                       >
-                                        ⇄ Transfer to Another
+                                        {problem.assignedTo ? '↻ Reassign' : '→ Assign to Member'}
                                       </button>
                                     </li>
-                                  )}
-                                  {user?.role === 'admin' && (
-                                    <>
-                                      <li><hr className="dropdown-divider" /></li>
+                                    {problem.assignedTo && canTransfer(problem) && (
                                       <li>
                                         <button
-                                          className="dropdown-item text-danger"
-                                          onClick={() => handleDelete(problem.id)}
+                                          className="dropdown-item"
+                                          onClick={() => openAssignModal(problem, true)}
                                         >
-                                          🗑 Delete Problem
+                                          ⇄ Transfer to Another
                                         </button>
                                       </li>
-                                    </>
-                                  )}
-                                </ul>
-                              </div>
+                                    )}
+                                  </ul>
+                                </div>
+                                
+                                {/* Delete button - Only for Admin */}
+                                {user?.role === 'admin' && (
+                                  <button
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => handleDelete(problem.id)}
+                                    title="Delete Problem (Admin Only)"
+                                  >
+                                    <i className="bi bi-trash"></i>
+                                  </button>
+                                )}
+                              </>
                             )}
 
                             {/* Transfer for Assigned User - Only if not done */}
