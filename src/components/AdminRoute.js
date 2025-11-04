@@ -2,9 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-
-
-export default function AdminRoute({ children }) {
+export default function AdminRoute({ children, requireFullAdmin = false }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -20,6 +18,18 @@ export default function AdminRoute({ children }) {
   // Check if user is logged in
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // If requireFullAdmin is true, only allow actual admin
+  if (requireFullAdmin && user.role !== 'admin') {
+    return (
+      <div className="container mt-5">
+        <div className="alert alert-danger">
+          <h4>Access Denied</h4>
+          <p>This feature requires full Admin access only.</p>
+        </div>
+      </div>
+    );
   }
 
   // Check if user has admin or team_leader role

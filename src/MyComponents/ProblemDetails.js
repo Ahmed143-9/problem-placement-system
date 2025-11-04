@@ -21,7 +21,6 @@ export default function ProblemDetails() {
 
   const fetchProblemDetails = () => {
     try {
-      // Load from localStorage
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       const foundProblem = problems.find(p => p.id === parseInt(id));
       
@@ -39,6 +38,13 @@ export default function ProblemDetails() {
   };
 
   const handleStatusChange = (newStatus) => {
+    // Check if user is trying to mark as done
+    if (newStatus === 'done' && !canApprove()) {
+      // Assigned user marks as pending_approval instead of done
+      handleStatusChange('pending_approval');
+      return;
+    }
+
     try {
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       const updatedProblems = problems.map(p =>
@@ -51,15 +57,73 @@ export default function ProblemDetails() {
         notifyStatusChange(problem.id, newStatus, user?.name, problem.assignedTo);
       }
       
-      // If marked as done, notify admin
-      if (newStatus === 'done') {
+      // If approved as done by admin/leader, notify completion
+      if (newStatus === 'done' && canApprove()) {
         notifyCompletion(problem.id, user?.name);
       }
       
-      toast.success('Status updated successfully!');
+      const statusMsg = newStatus === 'pending_approval' 
+        ? 'Submitted for approval! Admin/Team Leader will review.'
+        : 'Status updated successfully!';
+      
+      toast.success(statusMsg);
       fetchProblemDetails();
     } catch (error) {
       toast.error('Failed to update status');
+      console.error(error);
+    }
+  };
+
+  const handleApproveCompletion = () => {
+    if (!window.confirm('Are you sure this problem is resolved?')) {
+      return;
+    }
+
+    try {
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      const updatedProblems = problems.map(p =>
+        p.id === parseInt(id) ? { 
+          ...p, 
+          status: 'done',
+          approvedBy: user?.name,
+          approvedAt: new Date().toISOString()
+        } : p
+      );
+      localStorage.setItem('problems', JSON.stringify(updatedProblems));
+      
+      notifyCompletion(problem.id, user?.name);
+      toast.success('Problem marked as completed!');
+      fetchProblemDetails();
+    } catch (error) {
+      toast.error('Failed to approve completion');
+      console.error(error);
+    }
+  };
+
+  const handleRejectCompletion = () => {
+    const reason = prompt('Reason for rejection (optional):');
+    
+    try {
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      const updatedProblems = problems.map(p =>
+        p.id === parseInt(id) ? { 
+          ...p, 
+          status: 'in_progress',
+          rejectionReason: reason || 'Needs more work',
+          rejectedBy: user?.name,
+          rejectedAt: new Date().toISOString()
+        } : p
+      );
+      localStorage.setItem('problems', JSON.stringify(updatedProblems));
+      
+      if (problem.assignedTo) {
+        notifyStatusChange(problem.id, 'in_progress', user?.name, problem.assignedTo);
+      }
+      
+      toast.warning('Completion rejected. Status changed to In Progress.');
+      fetchProblemDetails();
+    } catch (error) {
+      toast.error('Failed to reject completion');
       console.error(error);
     }
   };
@@ -113,11 +177,12 @@ export default function ProblemDetails() {
     );
   };
 
+  const canApprove = () => {
+    return user?.role === 'admin' || user?.role === 'team_leader';
+  };
+
   const canDelete = () => {
-    return (
-      user?.role === 'admin' ||
-      problem?.createdBy === user?.name
-    );
+    return user?.role === 'admin' || problem?.createdBy === user?.name;
   };
 
   const handleDelete = () => {
@@ -141,7 +206,8 @@ export default function ProblemDetails() {
     const badges = {
       pending: 'bg-warning text-dark',
       in_progress: 'bg-info',
-      done: 'bg-success'
+      done: 'bg-success',
+      pending_approval: 'bg-secondary'
     };
     return badges[status] || 'bg-secondary';
   };
@@ -208,6 +274,27 @@ export default function ProblemDetails() {
                 )}
               </div>
               <div className="card-body">
+                {/* Pending Approval Alert */}
+                {problem.status === 'pending_approval' && (
+                  <div className="alert alert-warning mb-4">
+                    <h5 className="alert-heading">⏳ Waiting for Approval</h5>
+                    <p className="mb-0">
+                      {canApprove() 
+                        ? 'This problem has been marked as complete. Please review and approve or reject.'
+                        : 'Your completion request is pending Admin/Team Leader approval.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Rejection Notice */}
+                {problem.rejectionReason && problem.status === 'in_progress' && (
+                  <div className="alert alert-danger mb-4">
+                    <h6>❌ Completion Rejected</h6>
+                    <p className="mb-1"><strong>Reason:</strong> {problem.rejectionReason}</p>
+                    <small>Rejected by {problem.rejectedBy} on {new Date(problem.rejectedAt).toLocaleString()}</small>
+                  </div>
+                )}
+
                 {/* Basic Info */}
                 <div className="row mb-3">
                   <div className="col-md-6">
@@ -221,7 +308,7 @@ export default function ProblemDetails() {
                   <div className="col-md-6">
                     <p><strong>Status:</strong> 
                       <span className={`badge ms-2 ${getStatusBadge(problem.status)}`}>
-                        {problem.status.replace('_', ' ').toUpperCase()}
+                        {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
                       </span>
                     </p>
                     <p><strong>Created:</strong> {new Date(problem.createdAt).toLocaleString()}</p>
@@ -249,6 +336,72 @@ export default function ProblemDetails() {
                     </p>
                   </div>
                 </div>
+
+                {/* Approval/Rejection Section for Admin/Team Leader */}
+                {problem.status === 'pending_approval' && canApprove() && (
+                  <div className="mb-4">
+                    <h5>Review Completion</h5>
+                    <div className="d-flex gap-2">
+                      <button 
+                        className="btn btn-success"
+                        onClick={handleApproveCompletion}
+                      >
+                        ✓ Approve Completion
+                      </button>
+                      <button 
+                        className="btn btn-danger"
+                        onClick={handleRejectCompletion}
+                      >
+                        ✗ Reject & Send Back
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Change Buttons for Assigned User */}
+                {canChangeStatus() && problem.status !== 'pending_approval' && (
+                  <div className="mb-3">
+                    <h5>Update Status</h5>
+                    <div className="btn-group" role="group">
+                      <button
+                        className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
+                        onClick={() => handleStatusChange('pending')}
+                        disabled={problem.status === 'pending'}
+                      >
+                        Pending
+                      </button>
+                      <button
+                        className={`btn ${problem.status === 'in_progress' ? 'btn-info' : 'btn-outline-info'}`}
+                        onClick={() => handleStatusChange('in_progress')}
+                        disabled={problem.status === 'in_progress'}
+                      >
+                        In Progress
+                      </button>
+                      {canApprove() ? (
+                        <button
+                          className={`btn ${problem.status === 'done' ? 'btn-success' : 'btn-outline-success'}`}
+                          onClick={() => handleStatusChange('done')}
+                          disabled={problem.status === 'done'}
+                        >
+                          ✓ Mark as Done
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-outline-success"
+                          onClick={() => handleStatusChange('done')}
+                          title="Submit for approval"
+                        >
+                          ✓ Submit for Approval
+                        </button>
+                      )}
+                    </div>
+                    {!canApprove() && (
+                      <small className="text-muted d-block mt-2">
+                        Note: When you mark as "Done", it will be sent to Admin/Team Leader for approval.
+                      </small>
+                    )}
+                  </div>
+                )}
 
                 {/* Assignment History */}
                 {problem.transferHistory && problem.transferHistory.length > 0 && (
@@ -283,41 +436,10 @@ export default function ProblemDetails() {
                   </div>
                 )}
 
-                {/* Status Change Buttons */}
-                {canChangeStatus() && (
-                  <div className="mb-3">
-                    <h5>Update Status</h5>
-                    <div className="btn-group" role="group">
-                      <button
-                        className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
-                        onClick={() => handleStatusChange('pending')}
-                        disabled={problem.status === 'pending'}
-                      >
-                        Pending
-                      </button>
-                      <button
-                        className={`btn ${problem.status === 'in_progress' ? 'btn-info' : 'btn-outline-info'}`}
-                        onClick={() => handleStatusChange('in_progress')}
-                        disabled={problem.status === 'in_progress'}
-                      >
-                        In Progress
-                      </button>
-                      <button
-                        className={`btn ${problem.status === 'done' ? 'btn-success' : 'btn-outline-success'}`}
-                        onClick={() => handleStatusChange('done')}
-                        disabled={problem.status === 'done'}
-                      >
-                        ✓ Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {/* Comments Section */}
                 <div className="mt-4">
                   <h5>Comments ({problem.comments?.length || 0})</h5>
                   
-                  {/* Add Comment Form */}
                   <form onSubmit={handleAddComment} className="mb-3">
                     <div className="mb-2">
                       <textarea
@@ -337,7 +459,6 @@ export default function ProblemDetails() {
                     </button>
                   </form>
 
-                  {/* Display Comments */}
                   <div>
                     {problem.comments && problem.comments.length > 0 ? (
                       problem.comments.map((c) => (
@@ -364,7 +485,6 @@ export default function ProblemDetails() {
 
           {/* Sidebar */}
           <div className="col-lg-4">
-            {/* Quick Info */}
             <div className="card shadow mb-4">
               <div className="card-header bg-info text-white">
                 <h5 className="mb-0">Quick Info</h5>
@@ -386,18 +506,23 @@ export default function ProblemDetails() {
                   <li className="mb-2">
                     <strong>Current Status:</strong> 
                     <span className={`badge ms-2 ${getStatusBadge(problem.status)}`}>
-                      {problem.status.replace('_', ' ').toUpperCase()}
+                      {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
                     </span>
                   </li>
                   <li className="mb-2">
                     <strong>Created:</strong><br />
                     <small>{new Date(problem.createdAt).toLocaleString()}</small>
                   </li>
+                  {problem.approvedBy && (
+                    <li className="mb-2">
+                      <strong>Approved By:</strong> {problem.approvedBy}<br />
+                      <small>{new Date(problem.approvedAt).toLocaleString()}</small>
+                    </li>
+                  )}
                 </ul>
               </div>
             </div>
 
-            {/* Activity Log */}
             <div className="card shadow">
               <div className="card-header bg-secondary text-white">
                 <h5 className="mb-0">Activity</h5>

@@ -7,16 +7,25 @@ import { useNotifications } from '../context/NotificationContext';
 
 export default function ProblemList() {
   const { user } = useAuth();
+  const { notifyAssignment, notifyTransfer } = useNotifications();
   const navigate = useNavigate();
   const [problems, setProblems] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal states
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedProblem, setSelectedProblem] = useState(null);
+  const [selectedMember, setSelectedMember] = useState('');
+  const [isTransfer, setIsTransfer] = useState(false);
 
   useEffect(() => {
     fetchProblems();
+    fetchTeamMembers();
   }, []);
 
   const fetchProblems = () => {
@@ -31,6 +40,19 @@ export default function ProblemList() {
     }
   };
 
+  const fetchTeamMembers = () => {
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      // Filter out admin and get only active users
+      const members = storedUsers.filter(u => 
+        u.username !== 'Admin' && u.status === 'active'
+      );
+      setTeamMembers(members);
+    } catch (error) {
+      console.error('Failed to fetch team members:', error);
+    }
+  };
+
   const handleStatusChange = (problemId, newStatus) => {
     try {
       const updatedProblems = problems.map(p => 
@@ -38,61 +60,70 @@ export default function ProblemList() {
       );
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       setProblems(updatedProblems);
-      toast.success(`Problem #${problemId} status updated to ${newStatus.replace('_', ' ').toUpperCase()}!`);
+      toast.success(`Problem #${problemId} status updated!`);
     } catch (error) {
       toast.error('Failed to update status');
       console.error(error);
     }
   };
 
-  const handleAssign = (problemId) => {
-    const problem = problems.find(p => p.id === problemId);
-    const assignTo = prompt(`Assign Problem #${problemId} to:\n\nEnter username:`);
-    
-    if (assignTo && assignTo.trim()) {
-      try {
-        const updatedProblems = problems.map(p => 
-          p.id === problemId ? { ...p, assignedTo: assignTo.trim() } : p
-        );
-        localStorage.setItem('problems', JSON.stringify(updatedProblems));
-        setProblems(updatedProblems);
-        toast.success(`Problem #${problemId} assigned to ${assignTo.trim()}!`);
-      } catch (error) {
-        toast.error('Failed to assign problem');
-        console.error(error);
-      }
-    }
+  const openAssignModal = (problem, transfer = false) => {
+    setSelectedProblem(problem);
+    setIsTransfer(transfer);
+    setSelectedMember('');
+    setShowAssignModal(true);
   };
 
-  const handleTransfer = (problemId, currentAssignee) => {
-    const transferTo = prompt(
-      `Transfer Problem #${problemId} from ${currentAssignee}\n\nTransfer to (username):`
-    );
-    
-    if (transferTo && transferTo.trim()) {
-      try {
-        const updatedProblems = problems.map(p => 
-          p.id === problemId ? { 
-            ...p, 
-            assignedTo: transferTo.trim(),
-            transferHistory: [
+  const handleAssignSubmit = () => {
+    if (!selectedMember) {
+      toast.error('Please select a team member');
+      return;
+    }
+
+    try {
+      const updatedProblems = problems.map(p => {
+        if (p.id === selectedProblem.id) {
+          const updatedProblem = { ...p, assignedTo: selectedMember };
+          
+          // If it's a transfer, add to transfer history
+          if (isTransfer && p.assignedTo) {
+            updatedProblem.transferHistory = [
               ...(p.transferHistory || []),
               {
-                from: currentAssignee,
-                to: transferTo.trim(),
+                from: p.assignedTo,
+                to: selectedMember,
                 date: new Date().toISOString(),
                 by: user?.name || 'Admin'
               }
-            ]
-          } : p
-        );
-        localStorage.setItem('problems', JSON.stringify(updatedProblems));
-        setProblems(updatedProblems);
-        toast.success(`Problem #${problemId} transferred to ${transferTo.trim()}!`);
-      } catch (error) {
-        toast.error('Failed to transfer problem');
-        console.error(error);
-      }
+            ];
+            
+            // Send transfer notification
+            notifyTransfer(p.id, p.assignedTo, selectedMember, user?.name);
+          } else {
+            // Send assignment notification
+            notifyAssignment(p.id, selectedMember, user?.name);
+          }
+          
+          return updatedProblem;
+        }
+        return p;
+      });
+      
+      localStorage.setItem('problems', JSON.stringify(updatedProblems));
+      setProblems(updatedProblems);
+      
+      toast.success(
+        isTransfer 
+          ? `Problem #${selectedProblem.id} transferred to ${selectedMember}!`
+          : `Problem #${selectedProblem.id} assigned to ${selectedMember}!`
+      );
+      
+      setShowAssignModal(false);
+      setSelectedProblem(null);
+      setSelectedMember('');
+    } catch (error) {
+      toast.error('Failed to assign problem');
+      console.error(error);
     }
   };
 
@@ -114,7 +145,8 @@ export default function ProblemList() {
     const badges = {
       pending: 'bg-warning text-dark',
       in_progress: 'bg-info',
-      done: 'bg-success'
+      done: 'bg-success',
+      pending_approval: 'bg-secondary'
     };
     return badges[status] || 'bg-secondary';
   };
@@ -128,14 +160,17 @@ export default function ProblemList() {
     return badges[priority] || 'bg-secondary';
   };
 
-  // Check if user can modify problem
   const canModify = (problem) => {
     return user?.role === 'admin' || 
+           user?.role === 'team_leader' ||
            user?.name === problem.assignedTo ||
            user?.name === problem.createdBy;
   };
 
-  // Filter problems
+  const canAssign = () => {
+    return user?.role === 'admin' || user?.role === 'team_leader';
+  };
+
   const filteredProblems = problems.filter(problem => {
     const matchesStatus = filterStatus === 'all' || problem.status === filterStatus;
     const matchesDepartment = filterDepartment === 'all' || problem.department === filterDepartment;
@@ -196,6 +231,7 @@ export default function ProblemList() {
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
                   <option value="done">Done</option>
+                  <option value="pending_approval">Pending Approval</option>
                 </select>
               </div>
               <div className="col-md-3 mb-2">
@@ -224,7 +260,6 @@ export default function ProblemList() {
               </div>
             </div>
 
-            {/* Results Count */}
             <div className="mb-3">
               <small className="text-muted">
                 Showing {filteredProblems.length} of {problems.length} problems
@@ -260,9 +295,7 @@ export default function ProblemList() {
                   ) : (
                     filteredProblems.slice().reverse().map((problem) => (
                       <tr key={problem.id}>
-                        <td>
-                          <strong>#{problem.id}</strong>
-                        </td>
+                        <td><strong>#{problem.id}</strong></td>
                         <td>{problem.department}</td>
                         <td>
                           <span className={`badge ${getPriorityBadge(problem.priority)}`}>
@@ -284,7 +317,7 @@ export default function ProblemList() {
                         </td>
                         <td>
                           <span className={`badge ${getStatusBadge(problem.status)}`}>
-                            {problem.status.replace('_', ' ').toUpperCase()}
+                            {problem.status === 'pending_approval' ? 'Pending Approval' : problem.status.replace('_', ' ').toUpperCase()}
                           </span>
                         </td>
                         <td>{problem.createdBy}</td>
@@ -297,67 +330,21 @@ export default function ProblemList() {
                         </td>
                         <td>
                           <div className="btn-group" role="group">
-                            {/* View Details */}
                             <button
                               className="btn btn-sm btn-outline-primary"
                               onClick={() => navigate(`/problem/${problem.id}`)}
                               title="View Details"
                             >
-                              <i className="bi bi-eye"></i> Details
+                              <i className="bi bi-eye"></i> View
                             </button>
 
-                            {/* Status Switch Dropdown */}
-                            {canModify(problem) && (
+                            {/* Admin/Leader Actions */}
+                            {canAssign() && (
                               <div className="btn-group" role="group">
                                 <button
-                                  className="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                  className="btn btn-sm btn-outline-success dropdown-toggle"
                                   data-bs-toggle="dropdown"
-                                  title="Change Status"
-                                >
-                                  Status
-                                </button>
-                                <ul className="dropdown-menu">
-                                  <li>
-                                    <button
-                                      className="dropdown-item"
-                                      onClick={() => handleStatusChange(problem.id, 'pending')}
-                                      disabled={problem.status === 'pending'}
-                                    >
-                                      <span className="badge bg-warning text-dark me-2">●</span>
-                                      Pending
-                                    </button>
-                                  </li>
-                                  <li>
-                                    <button
-                                      className="dropdown-item"
-                                      onClick={() => handleStatusChange(problem.id, 'in_progress')}
-                                      disabled={problem.status === 'in_progress'}
-                                    >
-                                      <span className="badge bg-info me-2">●</span>
-                                      In Progress
-                                    </button>
-                                  </li>
-                                  <li>
-                                    <button
-                                      className="dropdown-item"
-                                      onClick={() => handleStatusChange(problem.id, 'done')}
-                                      disabled={problem.status === 'done'}
-                                    >
-                                      <span className="badge bg-success me-2">●</span>
-                                      Done
-                                    </button>
-                                  </li>
-                                </ul>
-                              </div>
-                            )}
-
-                            {/* Admin Actions Dropdown */}
-                            {user?.role === 'admin' && (
-                              <div className="btn-group" role="group">
-                                <button
-                                  className="btn btn-sm btn-outline-danger dropdown-toggle"
-                                  data-bs-toggle="dropdown"
-                                  title="Admin Actions"
+                                  title="Assign/Transfer"
                                 >
                                   Assign
                                 </button>
@@ -365,39 +352,43 @@ export default function ProblemList() {
                                   <li>
                                     <button
                                       className="dropdown-item"
-                                      onClick={() => handleAssign(problem.id)}
+                                      onClick={() => openAssignModal(problem, false)}
                                     >
-                                      {problem.assignedTo ? '↻ Reassign' : '→ Assign'}
+                                      {problem.assignedTo ? '↻ Reassign' : '→ Assign to Member'}
                                     </button>
                                   </li>
                                   {problem.assignedTo && (
                                     <li>
                                       <button
                                         className="dropdown-item"
-                                        onClick={() => handleTransfer(problem.id, problem.assignedTo)}
+                                        onClick={() => openAssignModal(problem, true)}
                                       >
-                                        ⇄ Transfer
+                                        ⇄ Transfer to Another
                                       </button>
                                     </li>
                                   )}
-                                  <li><hr className="dropdown-divider" /></li>
-                                  <li>
-                                    <button
-                                      className="dropdown-item text-danger"
-                                      onClick={() => handleDelete(problem.id)}
-                                    >
-                                      🗑 Delete
-                                    </button>
-                                  </li>
+                                  {user?.role === 'admin' && (
+                                    <>
+                                      <li><hr className="dropdown-divider" /></li>
+                                      <li>
+                                        <button
+                                          className="dropdown-item text-danger"
+                                          onClick={() => handleDelete(problem.id)}
+                                        >
+                                          🗑 Delete Problem
+                                        </button>
+                                      </li>
+                                    </>
+                                  )}
                                 </ul>
                               </div>
                             )}
 
                             {/* Transfer for Assigned User */}
-                            {user?.role !== 'admin' && user?.name === problem.assignedTo && (
+                            {!canAssign() && user?.name === problem.assignedTo && (
                               <button
                                 className="btn btn-sm btn-outline-warning"
-                                onClick={() => handleTransfer(problem.id, problem.assignedTo)}
+                                onClick={() => openAssignModal(problem, true)}
                                 title="Transfer to someone else"
                               >
                                 Transfer
@@ -457,20 +448,84 @@ export default function ProblemList() {
                 </div>
               </div>
             )}
-
-            {/* Legend */}
-            <div className="alert alert-info mt-4 mb-0">
-              <strong>Actions Guide:</strong>
-              <ul className="mb-0 mt-2">
-                <li><strong>View:</strong> See full problem details</li>
-                <li><strong>Switch:</strong> Change problem status (Pending/In Progress/Done)</li>
-                <li><strong>Admin:</strong> Assign, Transfer, or Delete (Admin only)</li>
-                <li><strong>Transfer:</strong> Transfer work to another person (if assigned to you)</li>
-              </ul>
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Assign/Transfer Modal */}
+      {showAssignModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-success text-white">
+                <h5 className="modal-title">
+                  {isTransfer ? '⇄ Transfer Problem' : '→ Assign Problem'}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowAssignModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <p className="text-muted">
+                    Problem #{selectedProblem?.id} - {selectedProblem?.department}
+                  </p>
+                  {isTransfer && selectedProblem?.assignedTo && (
+                    <p className="text-info">
+                      <strong>Currently assigned to:</strong> {selectedProblem.assignedTo}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">
+                    {isTransfer ? 'Transfer to:' : 'Assign to:'} *
+                  </label>
+                  <select
+                    className="form-control"
+                    value={selectedMember}
+                    onChange={(e) => setSelectedMember(e.target.value)}
+                  >
+                    <option value="">-- Select Team Member --</option>
+                    {teamMembers.map(member => (
+                      <option 
+                        key={member.id} 
+                        value={member.name}
+                        disabled={member.name === selectedProblem?.assignedTo}
+                      >
+                        {member.name} ({member.role === 'team_leader' ? 'Team Leader' : 'User'}) - {member.department}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-muted">
+                    {teamMembers.length === 0 
+                      ? 'No team members available. Please add members in Admin Panel.'
+                      : `${teamMembers.length} team member(s) available`}
+                  </small>
+                </div>
+
+                <div className="d-flex gap-2">
+                  <button 
+                    className="btn btn-success flex-grow-1"
+                    onClick={handleAssignSubmit}
+                    disabled={!selectedMember}
+                  >
+                    {isTransfer ? 'Transfer' : 'Assign'}
+                  </button>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => setShowAssignModal(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

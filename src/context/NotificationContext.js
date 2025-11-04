@@ -8,7 +8,6 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Load notifications from localStorage
   useEffect(() => {
     if (user) {
       loadNotifications();
@@ -18,10 +17,18 @@ export const NotificationProvider = ({ children }) => {
   const loadNotifications = () => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      // Filter notifications for current user
-      const userNotifications = allNotifications.filter(
-        n => n.userId === user?.id || n.userId === 'all' || (user?.role === 'admin' && n.forAdmin)
-      );
+      
+      // Filter notifications based on user role
+      const userNotifications = allNotifications.filter(n => {
+        // Admin and Team Leader see all notifications
+        if (user?.role === 'admin' || user?.role === 'team_leader') {
+          return n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name;
+        }
+        
+        // Regular users only see notifications specifically for them
+        return n.userId === user?.id || n.targetUsername === user?.name;
+      });
+      
       setNotifications(userNotifications);
       setUnreadCount(userNotifications.filter(n => !n.read).length);
     } catch (error) {
@@ -29,7 +36,6 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Add new notification
   const addNotification = (notification) => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
@@ -47,7 +53,6 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Mark notification as read
   const markAsRead = (notificationId) => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
@@ -61,11 +66,20 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Mark all as read
   const markAllAsRead = () => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const updatedNotifications = allNotifications.map(n => ({ ...n, read: true }));
+      const updatedNotifications = allNotifications.map(n => {
+        // Only mark as read if it's for current user
+        if (user?.role === 'admin' || user?.role === 'team_leader') {
+          if (n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name) {
+            return { ...n, read: true };
+          }
+        } else if (n.userId === user?.id || n.targetUsername === user?.name) {
+          return { ...n, read: true };
+        }
+        return n;
+      });
       localStorage.setItem('notifications', JSON.stringify(updatedNotifications));
       loadNotifications();
     } catch (error) {
@@ -73,13 +87,15 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Clear all notifications
   const clearNotifications = () => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const otherUserNotifications = allNotifications.filter(
-        n => n.userId !== user?.id && n.userId !== 'all' && !(user?.role === 'admin' && n.forAdmin)
-      );
+      const otherUserNotifications = allNotifications.filter(n => {
+        if (user?.role === 'admin' || user?.role === 'team_leader') {
+          return !(n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name);
+        }
+        return !(n.userId === user?.id || n.targetUsername === user?.name);
+      });
       localStorage.setItem('notifications', JSON.stringify(otherUserNotifications));
       setNotifications([]);
       setUnreadCount(0);
@@ -88,74 +104,100 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  // Get user ID by username
+  const getUserIdByUsername = (username) => {
+    try {
+      const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const foundUser = users.find(u => u.name === username);
+      return foundUser?.id;
+    } catch (error) {
+      return null;
+    }
+  };
+
   // Notification helpers
   const notifyNewProblem = (problemId, createdBy, department) => {
+    // Only notify Admin and Team Leaders
     addNotification({
       type: 'new_problem',
       title: 'New Problem Raised',
       message: `${createdBy} raised a new problem (#${problemId}) in ${department} department`,
       problemId,
-      forAdmin: true,
+      forAdminOrLeader: true,
       icon: '🆕',
       color: 'primary'
     });
   };
 
-  const notifyAssignment = (problemId, assignedTo, assignedBy) => {
+  const notifyAssignment = (problemId, assignedToUsername, assignedBy) => {
+    // Only notify the specific person assigned
+    const userId = getUserIdByUsername(assignedToUsername);
+    
     addNotification({
       type: 'assignment',
       title: 'Problem Assigned',
       message: `You have been assigned problem #${problemId} by ${assignedBy}`,
       problemId,
-      userId: assignedTo,
+      targetUsername: assignedToUsername,
+      userId: userId,
       icon: '📌',
       color: 'info'
     });
   };
 
-  const notifyStatusChange = (problemId, newStatus, changedBy, assignedTo) => {
-    addNotification({
-      type: 'status_change',
-      title: 'Status Updated',
-      message: `Problem #${problemId} status changed to ${newStatus.replace('_', ' ').toUpperCase()} by ${changedBy}`,
-      problemId,
-      userId: assignedTo,
-      icon: '🔄',
-      color: 'warning'
-    });
+  const notifyStatusChange = (problemId, newStatus, changedBy, assignedToUsername) => {
+    // Notify the assigned person
+    if (assignedToUsername) {
+      const userId = getUserIdByUsername(assignedToUsername);
+      
+      addNotification({
+        type: 'status_change',
+        title: 'Status Updated',
+        message: `Problem #${problemId} status changed to ${newStatus.replace('_', ' ').toUpperCase()} by ${changedBy}`,
+        problemId,
+        targetUsername: assignedToUsername,
+        userId: userId,
+        icon: '🔄',
+        color: 'warning'
+      });
+    }
   };
 
-  const notifyTransfer = (problemId, from, to, transferredBy) => {
+  const notifyTransfer = (problemId, fromUsername, toUsername, transferredBy) => {
     // Notify the new assignee
+    const toUserId = getUserIdByUsername(toUsername);
+    
     addNotification({
       type: 'transfer',
       title: 'Problem Transferred to You',
-      message: `Problem #${problemId} has been transferred to you from ${from} by ${transferredBy}`,
+      message: `Problem #${problemId} has been transferred to you from ${fromUsername} by ${transferredBy}`,
       problemId,
-      userId: to,
+      targetUsername: toUsername,
+      userId: toUserId,
       icon: '⇄',
       color: 'warning'
     });
 
-    // Notify admin
+    // Notify admin and team leaders
     addNotification({
       type: 'transfer',
       title: 'Problem Transferred',
-      message: `Problem #${problemId} transferred from ${from} to ${to}`,
+      message: `Problem #${problemId} transferred from ${fromUsername} to ${toUsername}`,
       problemId,
-      forAdmin: true,
+      forAdminOrLeader: true,
       icon: '⇄',
       color: 'secondary'
     });
   };
 
   const notifyCompletion = (problemId, completedBy) => {
+    // Only notify Admin and Team Leaders for completion
     addNotification({
       type: 'completion',
       title: 'Problem Completed',
       message: `Problem #${problemId} has been marked as completed by ${completedBy}`,
       problemId,
-      forAdmin: true,
+      forAdminOrLeader: true,
       icon: '✅',
       color: 'success'
     });
