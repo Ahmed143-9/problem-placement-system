@@ -80,20 +80,20 @@ export default function Navbar() {
                 All Problems
               </Link>
             </li>
-            <li className="nav-item">
+            {/* <li className="nav-item">
               <Link className="nav-link" to="/reports">
                 Reports
               </Link>
-            </li>
+            </li> */}
             
             {/* Admin Panel - Only for Admin and Team Leader */}
-            {isAdminOrLeader && (
+            {/* {isAdminOrLeader && (
               <li className="nav-item">
                 <Link className="nav-link" to="/admin">
                   Admin Panel
                 </Link>
               </li>
-            )}
+            )} */}
           </ul>
           
           <ul className="navbar-nav">

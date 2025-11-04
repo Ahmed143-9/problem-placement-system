@@ -141,7 +141,7 @@ export default function Dashboard() {
                     onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                     onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   >
-                    <FaUsersCog className="me-2" /> Admin Panel
+                    <FaUsersCog className="me-2" /> Add Member
                   </Link>
                 </li>
               )}
@@ -448,7 +448,7 @@ export default function Dashboard() {
 )} */}
 
           {/* Admin/Team Leader Section */}
-          {(user?.role === 'admin' || user?.role === 'team_leader') && (
+          {/* {(user?.role === 'admin' || user?.role === 'team_leader') && (
             <>
               <h5 className="mb-3 fw-bold text-secondary">Admin / Team Leader Tools</h5>
               <div className="card border-0 shadow-sm bg-danger text-white">
@@ -464,7 +464,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </>
-          )}
+          )} */}
         </div>
       </div>
     </div>

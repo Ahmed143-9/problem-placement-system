@@ -171,6 +171,15 @@ export default function ProblemList() {
     return user?.role === 'admin' || user?.role === 'team_leader';
   };
 
+  const canTransfer = (problem) => {
+    // Can transfer only if problem is not done and user is assigned to it or is admin/leader
+    return problem.status !== 'done' && 
+           problem.status !== 'pending_approval' &&
+           (user?.role === 'admin' || 
+            user?.role === 'team_leader' || 
+            user?.name === problem.assignedTo);
+  };
+
   const filteredProblems = problems.filter(problem => {
     const matchesStatus = filterStatus === 'all' || problem.status === filterStatus;
     const matchesDepartment = filterDepartment === 'all' || problem.department === filterDepartment;
@@ -338,8 +347,8 @@ export default function ProblemList() {
                               <i className="bi bi-eye"></i> View
                             </button>
 
-                            {/* Admin/Leader Actions */}
-                            {canAssign() && (
+                            {/* Admin/Leader Actions - Hide if problem is done */}
+                            {canAssign() && problem.status !== 'done' && (
                               <div className="btn-group" role="group">
                                 <button
                                   className="btn btn-sm btn-outline-success dropdown-toggle"
@@ -357,7 +366,7 @@ export default function ProblemList() {
                                       {problem.assignedTo ? '↻ Reassign' : '→ Assign to Member'}
                                     </button>
                                   </li>
-                                  {problem.assignedTo && (
+                                  {problem.assignedTo && canTransfer(problem) && (
                                     <li>
                                       <button
                                         className="dropdown-item"
@@ -384,8 +393,8 @@ export default function ProblemList() {
                               </div>
                             )}
 
-                            {/* Transfer for Assigned User */}
-                            {!canAssign() && user?.name === problem.assignedTo && (
+                            {/* Transfer for Assigned User - Only if not done */}
+                            {!canAssign() && canTransfer(problem) && user?.name === problem.assignedTo && (
                               <button
                                 className="btn btn-sm btn-outline-warning"
                                 onClick={() => openAssignModal(problem, true)}
@@ -393,6 +402,13 @@ export default function ProblemList() {
                               >
                                 Transfer
                               </button>
+                            )}
+
+                            {/* Show "Completed" badge instead of actions if done */}
+                            {problem.status === 'done' && (
+                              <span className="badge bg-success ms-2">
+                                ✓ Completed
+                              </span>
                             )}
                           </div>
                         </td>

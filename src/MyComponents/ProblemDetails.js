@@ -38,22 +38,36 @@ export default function ProblemDetails() {
   };
 
   const handleStatusChange = (newStatus) => {
-    // Check if user is trying to mark as done
+    // If assigned user tries to mark as done, submit for approval instead
     if (newStatus === 'done' && !canApprove()) {
-      // Assigned user marks as pending_approval instead of done
-      handleStatusChange('pending_approval');
-      return;
+      newStatus = 'pending_approval';
     }
 
     try {
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       const updatedProblems = problems.map(p =>
-        p.id === parseInt(id) ? { ...p, status: newStatus } : p
+        p.id === parseInt(id) ? { 
+          ...p, 
+          status: newStatus,
+          ...(newStatus === 'pending_approval' && {
+            submittedForApprovalBy: user?.name,
+            submittedForApprovalAt: new Date().toISOString()
+          })
+        } : p
       );
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       
-      // Send notification
-      if (problem.assignedTo) {
+      // Send notification to Admin/Team Leader when submitted for approval
+      if (newStatus === 'pending_approval') {
+        // Notify all admins and team leaders
+        const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+        users.forEach(u => {
+          if (u.role === 'admin' || u.role === 'team_leader') {
+            notifyStatusChange(problem.id, 'pending_approval', user?.name, u.name);
+          }
+        });
+      } else if (problem.assignedTo && newStatus !== 'done') {
+        // Notify assigned user for other status changes
         notifyStatusChange(problem.id, newStatus, user?.name, problem.assignedTo);
       }
       
@@ -92,6 +106,12 @@ export default function ProblemDetails() {
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       
       notifyCompletion(problem.id, user?.name);
+      
+      // Notify the person who submitted for approval
+      if (problem.submittedForApprovalBy) {
+        notifyStatusChange(problem.id, 'done', user?.name, problem.submittedForApprovalBy);
+      }
+      
       toast.success('Problem marked as completed!');
       fetchProblemDetails();
     } catch (error) {
@@ -116,8 +136,8 @@ export default function ProblemDetails() {
       );
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       
-      if (problem.assignedTo) {
-        notifyStatusChange(problem.id, 'in_progress', user?.name, problem.assignedTo);
+      if (problem.submittedForApprovalBy) {
+        notifyStatusChange(problem.id, 'in_progress', user?.name, problem.submittedForApprovalBy);
       }
       
       toast.warning('Completion rejected. Status changed to In Progress.');
@@ -278,11 +298,16 @@ export default function ProblemDetails() {
                 {problem.status === 'pending_approval' && (
                   <div className="alert alert-warning mb-4">
                     <h5 className="alert-heading">⏳ Waiting for Approval</h5>
-                    <p className="mb-0">
+                    <p className="mb-2">
                       {canApprove() 
                         ? 'This problem has been marked as complete. Please review and approve or reject.'
                         : 'Your completion request is pending Admin/Team Leader approval.'}
                     </p>
+                    {problem.submittedForApprovalBy && (
+                      <small className="text-muted d-block">
+                        Submitted by <strong>{problem.submittedForApprovalBy}</strong> on {new Date(problem.submittedForApprovalAt).toLocaleString()}
+                      </small>
+                    )}
                   </div>
                 )}
 
@@ -358,8 +383,21 @@ export default function ProblemDetails() {
                   </div>
                 )}
 
-                {/* Status Change Buttons for Assigned User */}
-                {canChangeStatus() && problem.status !== 'pending_approval' && (
+                {/* Completed Status Badge - No actions needed */}
+                {problem.status === 'done' && (
+                  <div className="alert alert-success mb-3">
+                    <h5 className="alert-heading">✅ Problem Completed</h5>
+                    <p className="mb-0">This problem has been successfully resolved and marked as done.</p>
+                    {problem.approvedBy && (
+                      <small className="text-muted d-block mt-2">
+                        Approved by <strong>{problem.approvedBy}</strong> on {new Date(problem.approvedAt).toLocaleString()}
+                      </small>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Change Buttons for Assigned User or Admin/Leader */}
+                {canChangeStatus() && problem.status !== 'pending_approval' && problem.status !== 'done' && (
                   <div className="mb-3">
                     <h5>Update Status</h5>
                     <div className="btn-group" role="group">
@@ -379,9 +417,9 @@ export default function ProblemDetails() {
                       </button>
                       {canApprove() ? (
                         <button
-                          className={`btn ${problem.status === 'done' ? 'btn-success' : 'btn-outline-success'}`}
+                          className="btn btn-outline-success"
                           onClick={() => handleStatusChange('done')}
-                          disabled={problem.status === 'done'}
+                          title="Mark as Done (Admin/Team Leader only)"
                         >
                           ✓ Mark as Done
                         </button>
@@ -397,7 +435,7 @@ export default function ProblemDetails() {
                     </div>
                     {!canApprove() && (
                       <small className="text-muted d-block mt-2">
-                        Note: When you mark as "Done", it will be sent to Admin/Team Leader for approval.
+                        <strong>Note:</strong> When you click "Submit for Approval", it will be sent to Admin/Team Leader for final approval.
                       </small>
                     )}
                   </div>
