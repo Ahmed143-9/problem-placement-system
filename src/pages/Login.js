@@ -10,10 +10,14 @@ export default function Login() {
   const { login, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Redirect if already logged in based on role
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      if (user.role === 'admin' || user.role === 'team_leader') {
+        navigate('/dashboard');
+      } else {
+        navigate('/employee-dashboard');
+      }
     }
   }, [user, navigate]);
 
@@ -32,7 +36,14 @@ export default function Login() {
       
       if (result.success) {
         toast.success('Login successful!');
-        navigate('/dashboard');
+        
+        // Get user role and redirect accordingly
+        const userData = JSON.parse(localStorage.getItem('current_user'));
+        if (userData.role === 'admin' || userData.role === 'team_leader') {
+          navigate('/dashboard');
+        } else {
+          navigate('/employee-dashboard');
+        }
       } else {
         toast.error(result.error || 'Login failed');
       }
@@ -102,17 +113,10 @@ export default function Login() {
 
               <div className="alert alert-info mt-4 mb-0">
                 <small>
-                  <strong>Test Credentials:</strong><br />
-                  Username: <code>Admin</code><br />
-                  Password: <code>Admin123</code>
+                  <strong>Admin Credentials:</strong><br />
+                  Username: <code>Admin</code> | Password: <code>Admin123</code>
                 </small>
               </div>
-
-              {/* <div className="alert alert-warning mt-2 mb-0">
-                <small>
-                  <strong>Note:</strong> If this is your first login, please wait for admin approval before accessing the system.
-                </small>
-              </div> */}
             </div>
           </div>
         </div>

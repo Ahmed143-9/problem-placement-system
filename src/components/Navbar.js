@@ -41,10 +41,13 @@ export default function Navbar() {
     return a.read ? 1 : -1;
   });
 
+  // Check if admin or team leader
+  const isAdminOrLeader = user?.role === 'admin' || user?.role === 'team_leader';
+
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
       <div className="container-fluid">
-        <Link className="navbar-brand fw-bold" to="/dashboard">
+        <Link className="navbar-brand fw-bold" to={isAdminOrLeader ? "/dashboard" : "/employee-dashboard"}>
           Problem Management System
         </Link>
         <button
@@ -57,14 +60,16 @@ export default function Navbar() {
         </button>
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav me-auto">
-            {/* Dashboard - Admin Only */}
-            {user?.role === 'admin' && (
-              <li className="nav-item">
-                <Link className="nav-link" to="/dashboard">
-                  Dashboard
-                </Link>
-              </li>
-            )}
+            {/* Dashboard Link - Different for Admin/Leader vs Regular User */}
+            <li className="nav-item">
+              <Link 
+                className="nav-link" 
+                to={isAdminOrLeader ? "/dashboard" : "/employee-dashboard"}
+              >
+                {isAdminOrLeader ? 'Analytics Dashboard' : 'My Dashboard'}
+              </Link>
+            </li>
+            
             <li className="nav-item">
               <Link className="nav-link" to="/problem/create">
                 Create Problem
@@ -72,7 +77,7 @@ export default function Navbar() {
             </li>
             <li className="nav-item">
               <Link className="nav-link" to="/problems">
-                Assign
+                All Problems
               </Link>
             </li>
             <li className="nav-item">
@@ -80,13 +85,15 @@ export default function Navbar() {
                 Reports
               </Link>
             </li>
-            {/* {(user?.role === 'admin' || user?.role === 'team_leader') && (
+            
+            {/* Admin Panel - Only for Admin and Team Leader */}
+            {isAdminOrLeader && (
               <li className="nav-item">
                 <Link className="nav-link" to="/admin">
                   Admin Panel
                 </Link>
               </li>
-            )} */}
+            )}
           </ul>
           
           <ul className="navbar-nav">
@@ -224,7 +231,7 @@ export default function Navbar() {
                 role="button"
                 data-bs-toggle="dropdown"
               >
-                {user?.name} ({user?.role})
+                {user?.name} ({user?.role === 'team_leader' ? 'Team Leader' : user?.role})
               </a>
               <ul className="dropdown-menu dropdown-menu-end">
                 <li>
@@ -232,6 +239,11 @@ export default function Navbar() {
                     <strong>{user?.name}</strong>
                     <br />
                     <small>{user?.email}</small>
+                    <br />
+                    <small className="text-muted">
+                      {user?.role === 'admin' ? 'Administrator' : 
+                       user?.role === 'team_leader' ? 'Team Leader' : 'Employee'}
+                    </small>
                   </span>
                 </li>
                 <li><hr className="dropdown-divider" /></li>

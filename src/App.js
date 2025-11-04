@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { ToastContainer } from "react-toastify";
@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 import AdminPanel from "./pages/AdminPanel";
 import ProblemForm from "./MyComponents/ProblemForm";
 import ProblemList from "./MyComponents/ProblemList";
@@ -24,13 +25,23 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             
-            {/* Dashboard - Admin Only */}
+            {/* Dashboard - Admin/Team Leader Only */}
             <Route
               path="/dashboard"
               element={
                 <AdminRoute>
                   <Dashboard />
                 </AdminRoute>
+              }
+            />
+
+            {/* Employee Dashboard - Regular Users Only */}
+            <Route
+              path="/employee-dashboard"
+              element={
+                <ProtectedRoute>
+                  <EmployeeDashboard />
+                </ProtectedRoute>
               }
             />
             
@@ -70,6 +81,7 @@ function App() {
               }
             />
             
+            {/* Admin Panel - Admin and Team Leader can access */}
             <Route
               path="/admin"
               element={
@@ -79,12 +91,12 @@ function App() {
               }
             />
 
-            {/* Default Route - Redirect to Problems List for non-admin */}
+            {/* Default Route - Redirect based on role */}
             <Route
               path="/"
               element={
                 <ProtectedRoute>
-                  <ProblemList />
+                  <Navigate to="/employee-dashboard" replace />
                 </ProtectedRoute>
               }
             />
