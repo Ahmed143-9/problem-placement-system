@@ -108,11 +108,11 @@ export default function Login() {
                 </small>
               </div>
 
-              <div className="alert alert-warning mt-2 mb-0">
+              {/* <div className="alert alert-warning mt-2 mb-0">
                 <small>
                   <strong>Note:</strong> If this is your first login, please wait for admin approval before accessing the system.
                 </small>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

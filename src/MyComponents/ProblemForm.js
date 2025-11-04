@@ -73,9 +73,9 @@ export default function ProblemForm() {
             <h3 className="mb-0">Submit a Problem Ticket</h3>
           </div>
           <div className="card-body">
-            <div className="alert alert-info">
+            {/* <div className="alert alert-info">
               <strong>Note:</strong> When you submit this problem, the admin will be notified immediately. 🔔
-            </div>
+            </div> */}
             
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
@@ -139,7 +139,7 @@ export default function ProblemForm() {
                     </>
                   ) : (
                     <>
-                      📨 Submit Problem
+                       Submit Problem
                     </>
                   )}
                 </button>
