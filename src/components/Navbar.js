@@ -98,8 +98,8 @@ export default function Navbar() {
             >
               <FaTasks style={{ fontSize: '1.2rem' }} />
             </div>
-            <span className="d-none d-md-inline">Problem Management</span>
-            <span className="d-inline d-md-none">PMS</span>
+            <span className="d-none d-md-inline">Issue Ticket</span>
+            <span className="d-inline d-md-none">Issue Ticket</span>
           </Link>
 
           <button

@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { BsJustify } from 'react-icons/bs';
 
 export default function ProblemList() {
   const { user } = useAuth();
@@ -287,7 +288,7 @@ export default function ProblemList() {
                     <th>Status</th>
                     <th>Created By</th>
                     <th>Assigned To</th>
-                    <th>Actions</th>
+                    <th style={{ textAlign: "center" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
