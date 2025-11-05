@@ -5,20 +5,79 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 
+const SERVICES = [
+  'Bulk SMS',
+  'Topup',
+  'Whatsapp Solution',
+  'Email Solution',
+  'Push-Pull',
+  'Games',
+  'DCB',
+  'Emergency Balance Service',
+  'International SMS',
+  'Invoice Solution',
+  'Campaign',
+  'Web Solution'
+];
+
 export default function ProblemForm() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { notifyNewProblem } = useNotifications();
   const [formData, setFormData] = useState({
     department: '',
+    service: '',
     priority: '',
-    statement: ''
+    statement: '',
+    images: []
   });
   const [loading, setLoading] = useState(false);
+  const [previewImages, setPreviewImages] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (files.length + previewImages.length > 5) {
+      toast.warning('Maximum 5 images allowed');
+      return;
+    }
+
+    const newPreviews = [];
+    const promises = files.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push({
+            url: reader.result,
+            name: file.name,
+            type: file.type
+          });
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(promises).then(() => {
+      setPreviewImages([...previewImages, ...newPreviews]);
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...newPreviews]
+      }));
+    });
+  };
+
+  const removeImage = (index) => {
+    setPreviewImages(previewImages.filter((_, i) => i !== index));
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -26,10 +85,8 @@ export default function ProblemForm() {
     setLoading(true);
 
     try {
-      // Get existing problems from localStorage
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       
-      // Create new problem
       const newProblem = {
         id: problems.length + 1,
         ...formData,
@@ -37,22 +94,24 @@ export default function ProblemForm() {
         createdBy: user?.name || 'Admin',
         assignedTo: null,
         createdAt: new Date().toISOString(),
-        comments: []
+        comments: [],
+        actionHistory: [{
+          action: 'Problem Created',
+          by: user?.name,
+          timestamp: new Date().toISOString(),
+          comment: 'Problem ticket submitted'
+        }]
       };
       
-      // Add to problems array
       problems.push(newProblem);
-      
-      // Save to localStorage
       localStorage.setItem('problems', JSON.stringify(problems));
       
-      // Send notification to admin
-      notifyNewProblem(newProblem.id, newProblem.createdBy, newProblem.department);
+      notifyNewProblem(newProblem.id, newProblem.createdBy, `${formData.department} - ${formData.service}`);
       
       toast.success('Problem submitted successfully! Admin has been notified.');
-      setFormData({ department: '', priority: '', statement: '' });
+      setFormData({ department: '', service: '', priority: '', statement: '', images: [] });
+      setPreviewImages([]);
       
-      // Navigate to problems list
       setTimeout(() => {
         navigate('/problems');
       }, 1000);
@@ -71,15 +130,13 @@ export default function ProblemForm() {
         <div className="card shadow">
           <div className="card-header bg-primary text-white">
             <h3 className="mb-0">Submit a Problem Ticket</h3>
+            <small>Please provide detailed information about the issue</small>
           </div>
           <div className="card-body">
-            {/* <div className="alert alert-info">
-              <strong>Note:</strong> When you submit this problem, the admin will be notified immediately. 🔔
-            </div> */}
-            
             <form onSubmit={handleSubmit}>
+              {/* Department */}
               <div className="mb-3">
-                <label className="form-label">Department *</label>
+                <label className="form-label">Department <span className="text-danger">*</span></label>
                 <select
                   className="form-control"
                   name="department"
@@ -94,8 +151,27 @@ export default function ProblemForm() {
                 </select>
               </div>
 
+              {/* Service - NEW */}
               <div className="mb-3">
-                <label className="form-label">Priority *</label>
+                <label className="form-label">Service <span className="text-danger">*</span></label>
+                <select
+                  className="form-control"
+                  name="service"
+                  value={formData.service}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Select Service</option>
+                  {SERVICES.map(service => (
+                    <option key={service} value={service}>{service}</option>
+                  ))}
+                </select>
+                <small className="text-muted">Select the service related to this problem</small>
+              </div>
+
+              {/* Priority */}
+              <div className="mb-3">
+                <label className="form-label">Priority <span className="text-danger">*</span></label>
                 <select
                   className="form-control"
                   name="priority"
@@ -110,64 +186,67 @@ export default function ProblemForm() {
                 </select>
               </div>
 
+              {/* Problem Statement */}
               <div className="mb-3">
-                <label className="form-label">Problem Statement *</label>
+                <label className="form-label">Problem Statement <span className="text-danger">*</span></label>
                 <textarea
                   className="form-control"
                   name="statement"
                   rows="5"
                   value={formData.statement}
                   onChange={handleChange}
-                  placeholder="Describe the problem in detail...&#10;&#10;Example: The printer on the 2nd floor is not working. It shows 'Paper Jam' error but there's no paper stuck inside."
+                  placeholder="Describe the problem in detail...&#10;&#10;Example: The Bulk SMS service is not delivering messages to Banglalink numbers."
                   required
                 ></textarea>
-                <small className="text-muted">
-                  Be as detailed as possible to help us understand and solve the problem quickly.
-                </small>
+              </div>
+
+              {/* Image Upload - NEW */}
+              <div className="mb-3">
+                <label className="form-label">Upload Screenshots (Optional)</label>
+                <input
+                  type="file"
+                  className="form-control"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  disabled={previewImages.length >= 5}
+                />
+                <small className="text-muted">Upload up to 5 images (screenshots, error messages, etc.)</small>
+                
+                {previewImages.length > 0 && (
+                  <div className="row mt-3">
+                    {previewImages.map((img, index) => (
+                      <div key={index} className="col-md-4 col-6 mb-3">
+                        <div className="position-relative border rounded">
+                          <img 
+                            src={img.url} 
+                            alt={img.name}
+                            style={{ width: '100%', height: '150px', objectFit: 'cover' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm position-absolute"
+                            style={{ top: '5px', right: '5px' }}
+                            onClick={() => removeImage(index)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="d-flex gap-2">
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2"></span>
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                       Submit Problem
-                    </>
-                  )}
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Submitting...' : '📮 Submit Problem'}
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={() => navigate(-1)}
-                  disabled={loading}
-                >
+                <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
                   Cancel
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-
-        {/* Help Section */}
-        <div className="card mt-4">
-          <div className="card-header bg-light">
-            <h5 className="mb-0">💡 Tips for submitting a good problem report</h5>
-          </div>
-          <div className="card-body">
-            <ul>
-              <li><strong>Be specific:</strong> Include details like location, device, error messages</li>
-              <li><strong>Choose correct priority:</strong> High for urgent issues affecting work</li>
-              <li><strong>Include steps:</strong> What you were doing when the problem occurred</li>
-              <li><strong>Expected vs Actual:</strong> What should happen vs what's happening</li>
-            </ul>
           </div>
         </div>
       </div>
