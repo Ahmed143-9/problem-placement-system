@@ -311,6 +311,41 @@ export default function ProblemDetails() {
                   </div>
                 )}
 
+                {/* Images Section - Show if images exist */}
+{problem.images && problem.images.length > 0 && (
+  <div className="mb-3">
+    <h5>Attached Screenshots</h5>
+    <div className="row">
+      {problem.images.map((img, index) => (
+        <div key={index} className="col-md-4 col-6 mb-3">
+          <div className="border rounded p-2 bg-light">
+            <img 
+              src={img.url} 
+              alt={`Screenshot ${index + 1}`}
+              className="img-fluid rounded"
+              style={{ 
+                width: '100%', 
+                height: '200px', 
+                objectFit: 'cover',
+                cursor: 'pointer'
+              }}
+              onClick={() => window.open(img.url, '_blank')}
+              title="Click to view full size"
+            />
+            <small className="text-muted d-block mt-1 text-center">
+              Screenshot {index + 1}
+            </small>
+          </div>
+        </div>
+      ))}
+    </div>
+    <small className="text-muted">
+      <i className="bi bi-info-circle me-1"></i>
+      Click on any image to view full size
+    </small>
+  </div>
+)}
+
                 {/* Rejection Notice */}
                 {problem.rejectionReason && problem.status === 'in_progress' && (
                   <div className="alert alert-danger mb-4">

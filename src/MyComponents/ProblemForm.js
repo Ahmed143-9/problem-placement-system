@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import Navbar from '../components/Navbar';
-import { useAuth } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
 
 const SERVICES = [
   'Bulk SMS',
@@ -20,10 +17,8 @@ const SERVICES = [
   'Web Solution'
 ];
 
-export default function ProblemForm() {
+export default function ProblemFormFixed() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { notifyNewProblem } = useNotifications();
   const [formData, setFormData] = useState({
     department: '',
     service: '',
@@ -91,13 +86,13 @@ export default function ProblemForm() {
         id: problems.length + 1,
         ...formData,
         status: 'pending',
-        createdBy: user?.name || 'Admin',
+        createdBy: 'Current User',
         assignedTo: null,
         createdAt: new Date().toISOString(),
         comments: [],
         actionHistory: [{
           action: 'Problem Created',
-          by: user?.name,
+          by: 'Current User',
           timestamp: new Date().toISOString(),
           comment: 'Problem ticket submitted'
         }]
@@ -106,9 +101,7 @@ export default function ProblemForm() {
       problems.push(newProblem);
       localStorage.setItem('problems', JSON.stringify(problems));
       
-      notifyNewProblem(newProblem.id, newProblem.createdBy, `${formData.department} - ${formData.service}`);
-      
-      toast.success('Problem submitted successfully! Admin has been notified.');
+      toast.success('Problem submitted successfully!');
       setFormData({ department: '', service: '', priority: '', statement: '', images: [] });
       setPreviewImages([]);
       
@@ -124,18 +117,17 @@ export default function ProblemForm() {
   };
 
   return (
-    <div>
-      <Navbar />
-      <div className="container mt-4">
-        <div className="card shadow">
-          <div className="card-header bg-primary text-white">
-            <h3 className="mb-0">Submit a Problem Ticket</h3>
-            <small>Please provide detailed information about the issue</small>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSubmit}>
-              {/* Department */}
-              <div className="mb-3">
+    <div className="container mt-4">
+      <div className="card shadow">
+        <div className="card-header bg-primary text-white">
+          <h3 className="mb-0">Submit a Problem Ticket</h3>
+          <small>Please provide detailed information about the issue</small>
+        </div>
+        <div className="card-body">
+          <form onSubmit={handleSubmit}>
+            {/* Department & Service - Side by Side */}
+            <div className="row">
+              <div className="col-md-6 mb-3">
                 <label className="form-label">Department <span className="text-danger">*</span></label>
                 <select
                   className="form-control"
@@ -151,8 +143,7 @@ export default function ProblemForm() {
                 </select>
               </div>
 
-              {/* Service - NEW */}
-              <div className="mb-3">
+              <div className="col-md-6 mb-3">
                 <label className="form-label">Service <span className="text-danger">*</span></label>
                 <select
                   className="form-control"
@@ -166,88 +157,87 @@ export default function ProblemForm() {
                     <option key={service} value={service}>{service}</option>
                   ))}
                 </select>
-                <small className="text-muted">Select the service related to this problem</small>
               </div>
+            </div>
 
-              {/* Priority */}
-              <div className="mb-3">
-                <label className="form-label">Priority <span className="text-danger">*</span></label>
-                <select
-                  className="form-control"
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Select Priority</option>
-                  <option value="Low">Low - Can wait</option>
-                  <option value="Medium">Medium - Important</option>
-                  <option value="High">High - Urgent</option>
-                </select>
-              </div>
+            {/* Priority */}
+            <div className="mb-3">
+              <label className="form-label">Priority <span className="text-danger">*</span></label>
+              <select
+                className="form-control"
+                name="priority"
+                value={formData.priority}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Priority</option>
+                <option value="Low">Low - Can wait</option>
+                <option value="Medium">Medium - Important</option>
+                <option value="High">High - Urgent</option>
+              </select>
+            </div>
 
-              {/* Problem Statement */}
-              <div className="mb-3">
-                <label className="form-label">Problem Statement <span className="text-danger">*</span></label>
-                <textarea
-                  className="form-control"
-                  name="statement"
-                  rows="5"
-                  value={formData.statement}
-                  onChange={handleChange}
-                  placeholder="Describe the problem in detail...&#10;&#10;Example: The Bulk SMS service is not delivering messages to Banglalink numbers."
-                  required
-                ></textarea>
-              </div>
+            {/* Problem Statement */}
+            <div className="mb-3">
+              <label className="form-label">Problem Statement <span className="text-danger">*</span></label>
+              <textarea
+                className="form-control"
+                name="statement"
+                rows="5"
+                value={formData.statement}
+                onChange={handleChange}
+                placeholder="Describe the problem in detail..."
+                required
+              ></textarea>
+            </div>
 
-              {/* Image Upload - NEW */}
-              <div className="mb-3">
-                <label className="form-label">Upload Screenshots (Optional)</label>
-                <input
-                  type="file"
-                  className="form-control"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  disabled={previewImages.length >= 5}
-                />
-                <small className="text-muted">Upload up to 5 images (screenshots, error messages, etc.)</small>
-                
-                {previewImages.length > 0 && (
-                  <div className="row mt-3">
-                    {previewImages.map((img, index) => (
-                      <div key={index} className="col-md-4 col-6 mb-3">
-                        <div className="position-relative border rounded">
-                          <img 
-                            src={img.url} 
-                            alt={img.name}
-                            style={{ width: '100%', height: '150px', objectFit: 'cover' }}
-                          />
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm position-absolute"
-                            style={{ top: '5px', right: '5px' }}
-                            onClick={() => removeImage(index)}
-                          >
-                            ✕
-                          </button>
-                        </div>
+            {/* Image Upload */}
+            <div className="mb-3">
+              <label className="form-label">Upload Screenshots (Optional)</label>
+              <input
+                type="file"
+                className="form-control"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                disabled={previewImages.length >= 5}
+              />
+              <small className="text-muted">Upload up to 5 images</small>
+              
+              {previewImages.length > 0 && (
+                <div className="row mt-3">
+                  {previewImages.map((img, index) => (
+                    <div key={index} className="col-md-4 col-6 mb-3">
+                      <div className="position-relative border rounded">
+                        <img 
+                          src={img.url} 
+                          alt={img.name}
+                          style={{ width: '100%', height: '150px', objectFit: 'cover' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm position-absolute"
+                          style={{ top: '5px', right: '5px' }}
+                          onClick={() => removeImage(index)}
+                        >
+                          ✕
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-              <div className="d-flex gap-2">
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Submitting...' : '📮 Submit Problem'}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="d-flex gap-2">
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Submitting...' : '📮 Submit Problem'}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
