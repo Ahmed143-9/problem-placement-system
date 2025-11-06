@@ -40,7 +40,7 @@ export default function EmployeeDashboard() {
         in_progress: storedProblems.filter(p => p.status === 'in_progress').length,
         done: storedProblems.filter(p => p.status === 'done').length,
         by_department: {
-          Tech: storedProblems.filter(p => p.department === 'Tech').length,
+          Engineer: storedProblems.filter(p => p.department === 'IT & Innovation').length,
           Business: storedProblems.filter(p => p.department === 'Business').length,
           Accounts: storedProblems.filter(p => p.department === 'Accounts').length
         },
@@ -88,7 +88,7 @@ export default function EmployeeDashboard() {
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
                 <Link 
-                  to="/employee-dashboard" 
+                  to="/dashboard" 
                   className="nav-link text-white bg-primary rounded"
                   style={sidebarLinkStyle}
                 >

@@ -467,7 +467,7 @@ export default function AdminPanelUserManagement() {
                     onChange={handleInputChange}
                   >
                     <option value="">Select Department</option>
-                    <option value="Tech">Tech</option>
+                    <option value="IT & Innovation">IT & Innovation</option>
                     <option value="Business">Business</option>
                     <option value="Accounts">Accounts</option>
                   </select>
