@@ -17,7 +17,20 @@ export default function Reports() {
   const fetchProblems = () => {
     try {
       const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
-      setProblems(storedProblems);
+      
+      // Filter problems based on user role
+      let filteredProblems;
+      if (user?.role === 'admin' || user?.role === 'team_leader') {
+        // Admin and Team Leader see all problems
+        filteredProblems = storedProblems;
+      } else {
+        // Regular users only see their own created problems or assigned problems
+        filteredProblems = storedProblems.filter(p => 
+          p.createdBy === user?.name || p.assignedTo === user?.name
+        );
+      }
+      
+      setProblems(filteredProblems);
     } catch (error) {
       console.error('Failed to fetch problems:', error);
     } finally {
@@ -36,6 +49,9 @@ export default function Reports() {
   const sidebarLinkStyle = {
     transition: 'background-color 0.2s'
   };
+
+  // Check if admin or team leader
+  const isAdminOrLeader = user?.role === 'admin' || user?.role === 'team_leader';
 
   if (loading) {
     return (
@@ -64,7 +80,7 @@ export default function Reports() {
               <ul className="nav flex-column">
                 <li className="nav-item mb-2">
                   <Link 
-                    to="/dashboard" 
+                    to={isAdminOrLeader ? "/dashboard" : "/employee-dashboard"}
                     className="nav-link text-white rounded"
                     style={sidebarLinkStyle}
                     onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
@@ -84,17 +100,34 @@ export default function Reports() {
                     <FaPlusCircle className="me-2" /> Create Problem
                   </Link>
                 </li>
-                <li className="nav-item mb-2">
-                  <Link 
-                    to="/problems" 
-                    className="nav-link text-white rounded"
-                    style={sidebarLinkStyle}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  >
-                    <FaExclamationTriangle className="me-2" /> All Problems
-                  </Link>
-                </li>
+                
+                {/* Show different menu for admin/leader vs regular user */}
+                {isAdminOrLeader ? (
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/problems" 
+                      className="nav-link text-white rounded"
+                      style={sidebarLinkStyle}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      <FaExclamationTriangle className="me-2" /> All Problems
+                    </Link>
+                  </li>
+                ) : (
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/my-issues" 
+                      className="nav-link text-white rounded"
+                      style={sidebarLinkStyle}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      <FaExclamationTriangle className="me-2" /> My Issues
+                    </Link>
+                  </li>
+                )}
+                
                 <li className="nav-item mb-2">
                   <Link 
                     to="/reports" 
@@ -104,7 +137,7 @@ export default function Reports() {
                     <FaFileAlt className="me-2" /> Download Reports
                   </Link>
                 </li>
-                {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                {isAdminOrLeader && (
                   <li className="nav-item mb-2">
                     <Link 
                       to="/admin" 
@@ -125,8 +158,14 @@ export default function Reports() {
           <div className="flex-grow-1 bg-light p-4" style={{ overflowY: 'auto' }}>
             <div className="card shadow-sm border-0">
               <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">Individual Problem Reports</h4>
-                <small>Download printable reports for each problem</small>
+                <h4 className="mb-0">
+                  {isAdminOrLeader ? 'All Problem Reports' : 'My Problem Reports'}
+                </h4>
+                <small>
+                  {isAdminOrLeader 
+                    ? 'Download printable reports for all problems' 
+                    : 'Download reports for problems you created or are assigned to'}
+                </small>
               </div>
               <div className="card-body">
                 <div className="table-responsive">
@@ -201,7 +240,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Printable Report */}
+      {/* Printable Report - Same as before */}
       {selectedProblem && (
         <div className="print-only" style={{ display: 'none' }}>
           <div style={{ 
@@ -359,37 +398,6 @@ export default function Reports() {
                 {selectedProblem.statement || selectedProblem.description || 'No description provided'}
               </p>
             </div>
-
-            {/* Action Timeline (if available) */}
-            {selectedProblem.actions && selectedProblem.actions.length > 0 && (
-              <div style={{ marginBottom: '25px' }}>
-                <h2 style={{ 
-                  fontSize: '18px',
-                  color: '#212529',
-                  marginBottom: '15px',
-                  borderBottom: '2px solid #dee2e6',
-                  paddingBottom: '10px'
-                }}>
-                  Action Timeline
-                </h2>
-                {selectedProblem.actions.map((action, index) => (
-                  <div key={index} style={{
-                    padding: '10px 15px',
-                    marginBottom: '10px',
-                    backgroundColor: '#f8f9fa',
-                    borderLeft: '4px solid #0d6efd',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }}>
-                    <strong>{action.type}:</strong> {action.description}
-                    <br />
-                    <small style={{ color: '#6c757d' }}>
-                      {new Date(action.timestamp).toLocaleString()}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* Signature Section */}
             <div style={{ marginTop: '50px' }}>

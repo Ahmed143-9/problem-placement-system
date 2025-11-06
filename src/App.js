@@ -11,6 +11,7 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import AdminPanel from "./pages/AdminPanel";
 import ProblemForm from "./MyComponents/ProblemForm";
 import ProblemList from "./MyComponents/ProblemList";
+import MyIssues from "./pages/MyIssues"; // New page for regular users
 import ProblemDetails from "./MyComponents/ProblemDetails";
 import Reports from "./pages/Reports";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -54,11 +55,22 @@ function App() {
               }
             />
 
+            {/* All Problems - Admin/Team Leader Only */}
             <Route
               path="/problems"
               element={
-                <ProtectedRoute>
+                <AdminRoute>
                   <ProblemList />
+                </AdminRoute>
+              }
+            />
+
+            {/* My Issues - Regular Users Only */}
+            <Route
+              path="/my-issues"
+              element={
+                <ProtectedRoute>
+                  <MyIssues />
                 </ProtectedRoute>
               }
             />

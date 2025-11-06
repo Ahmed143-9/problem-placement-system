@@ -4,7 +4,6 @@ import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { BsJustify } from 'react-icons/bs';
 
 export default function ProblemList() {
   const { user } = useAuth();
@@ -17,6 +16,10 @@ export default function ProblemList() {
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -44,27 +47,12 @@ export default function ProblemList() {
   const fetchTeamMembers = () => {
     try {
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      // Filter out admin and get only active users
       const members = storedUsers.filter(u => 
         u.username !== 'Admin' && u.status === 'active'
       );
       setTeamMembers(members);
     } catch (error) {
       console.error('Failed to fetch team members:', error);
-    }
-  };
-
-  const handleStatusChange = (problemId, newStatus) => {
-    try {
-      const updatedProblems = problems.map(p => 
-        p.id === problemId ? { ...p, status: newStatus } : p
-      );
-      localStorage.setItem('problems', JSON.stringify(updatedProblems));
-      setProblems(updatedProblems);
-      toast.success(`Problem #${problemId} status updated!`);
-    } catch (error) {
-      toast.error('Failed to update status');
-      console.error(error);
     }
   };
 
@@ -86,7 +74,6 @@ export default function ProblemList() {
         if (p.id === selectedProblem.id) {
           const updatedProblem = { ...p, assignedTo: selectedMember };
           
-          // If it's a transfer, add to transfer history
           if (isTransfer && p.assignedTo) {
             updatedProblem.transferHistory = [
               ...(p.transferHistory || []),
@@ -97,11 +84,8 @@ export default function ProblemList() {
                 by: user?.name || 'Admin'
               }
             ];
-            
-            // Send transfer notification
             notifyTransfer(p.id, p.assignedTo, selectedMember, user?.name);
           } else {
-            // Send assignment notification
             notifyAssignment(p.id, selectedMember, user?.name);
           }
           
@@ -161,19 +145,11 @@ export default function ProblemList() {
     return badges[priority] || 'bg-secondary';
   };
 
-  const canModify = (problem) => {
-    return user?.role === 'admin' || 
-           user?.role === 'team_leader' ||
-           user?.name === problem.assignedTo ||
-           user?.name === problem.createdBy;
-  };
-
   const canAssign = () => {
     return user?.role === 'admin' || user?.role === 'team_leader';
   };
 
   const canTransfer = (problem) => {
-    // Can transfer only if problem is not done and user is assigned to it or is admin/leader
     return problem.status !== 'done' && 
            problem.status !== 'pending_approval' &&
            (user?.role === 'admin' || 
@@ -191,6 +167,37 @@ export default function ProblemList() {
     
     return matchesStatus && matchesDepartment && matchesPriority && matchesSearch;
   });
+
+  // Pagination Logic
+  const reversedProblems = [...filteredProblems].reverse();
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentProblems = reversedProblems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(reversedProblems.length / itemsPerPage);
+
+  const paginate = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, filterDepartment, filterPriority, searchTerm]);
 
   if (loading) {
     return (
@@ -270,9 +277,12 @@ export default function ProblemList() {
               </div>
             </div>
 
-            <div className="mb-3">
+            <div className="d-flex justify-content-between mb-3">
               <small className="text-muted">
-                Showing {filteredProblems.length} of {problems.length} problems
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, reversedProblems.length)} of {reversedProblems.length} problems
+              </small>
+              <small className="text-muted">
+                Page {currentPage} of {totalPages}
               </small>
             </div>
 
@@ -292,7 +302,7 @@ export default function ProblemList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProblems.length === 0 ? (
+                  {currentProblems.length === 0 ? (
                     <tr>
                       <td colSpan="8" className="text-center py-4">
                         <p className="text-muted mb-0">
@@ -303,7 +313,7 @@ export default function ProblemList() {
                       </td>
                     </tr>
                   ) : (
-                    filteredProblems.slice().reverse().map((problem) => (
+                    currentProblems.map((problem) => (
                       <tr key={problem.id}>
                         <td><strong>#{problem.id}</strong></td>
                         <td>{problem.department}</td>
@@ -348,7 +358,6 @@ export default function ProblemList() {
                               <i className="bi bi-eye"></i> View
                             </button>
 
-                            {/* Admin/Leader Actions - Hide if problem is done */}
                             {canAssign() && problem.status !== 'done' && (
                               <>
                                 <div className="btn-group" role="group">
@@ -381,7 +390,6 @@ export default function ProblemList() {
                                   </ul>
                                 </div>
                                 
-                                {/* Delete button - Only for Admin */}
                                 {user?.role === 'admin' && (
                                   <button
                                     className="btn btn-sm btn-outline-danger"
@@ -394,7 +402,6 @@ export default function ProblemList() {
                               </>
                             )}
 
-                            {/* Transfer for Assigned User - Only if not done */}
                             {!canAssign() && canTransfer(problem) && user?.name === problem.assignedTo && (
                               <button
                                 className="btn btn-sm btn-outline-warning"
@@ -405,7 +412,6 @@ export default function ProblemList() {
                               </button>
                             )}
 
-                            {/* Show "Completed" badge instead of actions if done */}
                             {problem.status === 'done' && (
                               <span className="badge bg-success ms-2">
                                 ✓ Completed
@@ -419,6 +425,67 @@ export default function ProblemList() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <nav className="mt-4">
+                <ul className="pagination justify-content-center">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={goToPrevPage}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                  </li>
+                  
+                  {[...Array(totalPages)].map((_, index) => {
+                    const pageNumber = index + 1;
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNumber === 1 || 
+                      pageNumber === totalPages || 
+                      (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                    ) {
+                      return (
+                        <li 
+                          key={pageNumber} 
+                          className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}
+                        >
+                          <button 
+                            className="page-link" 
+                            onClick={() => paginate(pageNumber)}
+                          >
+                            {pageNumber}
+                          </button>
+                        </li>
+                      );
+                    } else if (
+                      pageNumber === currentPage - 2 || 
+                      pageNumber === currentPage + 2
+                    ) {
+                      return (
+                        <li key={pageNumber} className="page-item disabled">
+                          <span className="page-link">...</span>
+                        </li>
+                      );
+                    }
+                    return null;
+                  })}
+                  
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            )}
 
             {/* Summary Stats */}
             {problems.length > 0 && (
