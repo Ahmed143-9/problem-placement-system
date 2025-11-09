@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 export default function ProblemList() {
   const { user } = useAuth();
@@ -16,16 +17,19 @@ export default function ProblemList() {
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
   
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [selectedMember, setSelectedMember] = useState('');
   const [isTransfer, setIsTransfer] = useState(false);
+  const [showProblemModal, setShowProblemModal] = useState(false);
+  const [selectedProblemStatement, setSelectedProblemStatement] = useState('');
 
   useEffect(() => {
     fetchProblems();
@@ -56,11 +60,20 @@ export default function ProblemList() {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarMinimized(!sidebarMinimized);
+  };
+
   const openAssignModal = (problem, transfer = false) => {
     setSelectedProblem(problem);
     setIsTransfer(transfer);
     setSelectedMember('');
     setShowAssignModal(true);
+  };
+
+  const openProblemModal = (problem) => {
+    setSelectedProblemStatement(problem.statement);
+    setShowProblemModal(true);
   };
 
   const handleAssignSubmit = () => {
@@ -129,20 +142,26 @@ export default function ProblemList() {
   const getStatusBadge = (status) => {
     const badges = {
       pending: 'bg-warning text-dark',
-      in_progress: 'bg-info',
-      done: 'bg-success',
-      pending_approval: 'bg-secondary'
+      in_progress: 'bg-info text-white',
+      done: 'bg-success text-white',
+      pending_approval: 'bg-secondary text-white'
     };
-    return badges[status] || 'bg-secondary';
+    return badges[status] || 'bg-secondary text-white';
   };
 
   const getPriorityBadge = (priority) => {
     const badges = {
-      High: 'bg-danger',
+      High: 'bg-danger text-white',
       Medium: 'bg-warning text-dark',
-      Low: 'bg-success'
+      Low: 'bg-success text-white'
     };
-    return badges[priority] || 'bg-secondary';
+    return badges[priority] || 'bg-secondary text-white';
+  };
+
+  const formatStatus = (status) => {
+    if (status === 'done') return 'SOLVED';
+    if (status === 'pending_approval') return 'PENDING APPROVAL';
+    return status.replace('_', ' ').toUpperCase();
   };
 
   const canAssign = () => {
@@ -199,11 +218,15 @@ export default function ProblemList() {
     setCurrentPage(1);
   }, [filterStatus, filterDepartment, filterPriority, searchTerm]);
 
+  const sidebarLinkStyle = {
+    transition: 'all 0.2s ease'
+  };
+
   if (loading) {
     return (
       <div>
         <Navbar />
-        <div className="container mt-5 text-center">
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
@@ -213,362 +236,493 @@ export default function ProblemList() {
   }
 
   return (
-    <div>
+    <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: '#f8f9fa' }}>
       <Navbar />
-      <div className="container mt-4">
-        <div className="card shadow">
-          <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h3 className="mb-0">All Problems</h3>
-            <button 
-              className="btn btn-light btn-sm"
-              onClick={() => navigate('/problem/create')}
-            >
-              + Create New Problem
-            </button>
+      
+      <div className="d-flex flex-grow-1">
+        {/* Sidebar */}
+        <div 
+          className="bg-dark text-white position-relative"
+          style={{ 
+            width: sidebarMinimized ? '70px' : '250px',
+            minHeight: '100%',
+            transition: 'width 0.3s ease'
+          }}
+        >
+          {/* Toggle Button */}
+          <button
+            onClick={toggleSidebar}
+            className="position-absolute d-flex align-items-center justify-content-center"
+            style={{
+              top: '10px',
+              right: '-12px',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#fff',
+              border: '1px solid #ccc',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              cursor: 'pointer',
+            }}
+          >
+            {sidebarMinimized 
+              ? <FaChevronRight size={14} color="#333" /> 
+              : <FaChevronLeft size={14} color="#333" />
+            }
+          </button>
+
+          <div className="p-3">
+            {!sidebarMinimized && (
+              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+                Navigation
+              </h5>
+            )}
+            <ul className="nav flex-column">
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/dashboard" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={sidebarLinkStyle}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Dashboard"
+                >
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+                </Link>
+              </li>
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/problem/create" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={sidebarLinkStyle}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Create Problem"
+                >
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+                </Link>
+              </li>
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/problems" 
+                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
+                  style={sidebarLinkStyle}
+                  title="All Problems"
+                >
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+                </Link>
+              </li>
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/reports" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={sidebarLinkStyle}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Reports"
+                >
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+                </Link>
+              </li>
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <li className="nav-item mb-2">
+                  <Link 
+                    to="/admin" 
+                    className="nav-link text-white rounded d-flex align-items-center"
+                    style={sidebarLinkStyle}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title="Admin Panel"
+                  >
+                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
+                  </Link>
+                </li>
+              )}
+            </ul>
           </div>
-          <div className="card-body">
-            {/* Filters */}
-            <div className="row mb-4">
-              <div className="col-md-3 mb-2">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search by ID or statement..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="col-md-3 mb-2">
-                <select
-                  className="form-control"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+        </div>
+
+        {/* Main Content */}
+        <div 
+          className="flex-grow-1 p-3" 
+          style={{ 
+            overflowY: 'auto',
+            transition: 'margin-left 0.3s ease'
+          }}
+        >
+          <div className="card shadow border-0">
+            {/* Mobile-Friendly Header */}
+            <div className="card-header bg-primary text-white py-3">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                <div className="d-flex align-items-center w-100 w-md-auto">
+                  <h4 className="mb-0 fw-semibold text-truncate flex-grow-1">
+                    <i className="bi bi-list-task me-2"></i>
+                    Problem Management
+                  </h4>
+                </div>
+                <button 
+                  className="btn btn-light btn-sm fw-semibold w-100 w-md-auto mt-2 mt-md-0"
+                  onClick={() => navigate('/problem/create')}
                 >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="done">Done</option>
-                  <option value="pending_approval">Pending Approval</option>
-                </select>
-              </div>
-              <div className="col-md-3 mb-2">
-                <select
-                  className="form-control"
-                  value={filterDepartment}
-                  onChange={(e) => setFilterDepartment(e.target.value)}
-                >
-                  <option value="all">All Departments</option>
-                  <option value="Tech">Tech</option>
-                  <option value="Business">Business</option>
-                  <option value="Accounts">Accounts</option>
-                </select>
-              </div>
-              <div className="col-md-3 mb-2">
-                <select
-                  className="form-control"
-                  value={filterPriority}
-                  onChange={(e) => setFilterPriority(e.target.value)}
-                >
-                  <option value="all">All Priorities</option>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                  <i className="bi bi-plus-circle me-1"></i>
+                  Create New
+                </button>
               </div>
             </div>
+            <div className="card-body p-3">
 
-            <div className="d-flex justify-content-between mb-3">
-              <small className="text-muted">
-                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, reversedProblems.length)} of {reversedProblems.length} problems
-              </small>
-              <small className="text-muted">
-                Page {currentPage} of {totalPages}
-              </small>
-            </div>
+              {/* Quick Stats */}
+              <div className="row g-2 mb-3">
+                <div className="col-auto">
+                  <span className="badge bg-warning text-dark fs-6">
+                    Pending: {problems.filter(p => p.status === 'pending').length}
+                  </span>
+                </div>
+                <div className="col-auto">
+                  <span className="badge bg-info fs-6">
+                    In Progress: {problems.filter(p => p.status === 'in_progress').length}
+                  </span>
+                </div>
+                <div className="col-auto">
+                  <span className="badge bg-success fs-6">
+                    Solved: {problems.filter(p => p.status === 'done').length}
+                  </span>
+                </div>
+                <div className="col-auto">
+                  <span className="badge bg-secondary fs-6">
+                    Unassigned: {problems.filter(p => !p.assignedTo).length}
+                  </span>
+                </div>
+              </div>
 
-            {/* Problems Table */}
-            <div className="table-responsive">
-              <table className="table table-hover">
-                <thead className="table-light">
-                  <tr>
-                    <th>ID</th>
-                    <th>Department</th>
-                    <th>Priority</th>
-                    <th>Problem Statement</th>
-                    <th>Status</th>
-                    <th>Created By</th>
-                    <th>Assigned To</th>
-                    <th style={{ textAlign: "center" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentProblems.length === 0 ? (
+              {/* Compact Filters */}
+              <div className="row g-2 mb-3">
+                <div className="col-md-3 col-sm-6">
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="🔍 Search problems..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="col-md-2 col-sm-6">
+                  <select
+                    className="form-control form-control-sm"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="done">Solved</option>
+                    <option value="pending_approval">Pending Approval</option>
+                  </select>
+                </div>
+                <div className="col-md-2 col-sm-6">
+                  <select
+                    className="form-control form-control-sm"
+                    value={filterDepartment}
+                    onChange={(e) => setFilterDepartment(e.target.value)}
+                  >
+                    <option value="all">All Depts</option>
+                    <option value="Tech">Tech</option>
+                    <option value="Business">Business</option>
+                    <option value="Accounts">Accounts</option>
+                  </select>
+                </div>
+                <div className="col-md-2 col-sm-6">
+                  <select
+                    className="form-control form-control-sm"
+                    value={filterPriority}
+                    onChange={(e) => setFilterPriority(e.target.value)}
+                  >
+                    <option value="all">All Priority</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                <div className="col-md-3 col-sm-12">
+                  <div className="d-flex justify-content-end align-items-center">
+                    <small className="text-muted">
+                      Page {currentPage} of {totalPages}
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              {/* Compact Table */}
+              <div className="table-responsive" style={{ maxHeight: '65vh' }}>
+                <table className="table table-sm table-hover table-striped mb-2">
+                  <thead className="table-dark position-sticky top-0">
                     <tr>
-                      <td colSpan="8" className="text-center py-4">
-                        <p className="text-muted mb-0">
-                          {problems.length === 0 
-                            ? 'No problems found. Create your first problem!' 
-                            : 'No problems match your filters.'}
-                        </p>
-                      </td>
+                      <th style={{ width: '15%' }}>Department</th>
+                      <th style={{ width: '12%' }}>Priority</th>
+                      <th style={{ width: '15%' }}>Status</th>
+                      <th style={{ width: '15%' }}>Created By</th>
+                      <th style={{ width: '15%' }}>Assigned To</th>
+                      <th style={{ width: '10%', textAlign: 'center' }}>Problem Statement</th>
+                      <th style={{ width: '18%', textAlign: 'center' }}>Actions</th>
                     </tr>
-                  ) : (
-                    currentProblems.map((problem) => (
-                      <tr key={problem.id}>
-                        <td><strong>#{problem.id}</strong></td>
-                        <td>{problem.department}</td>
-                        <td>
-                          <span className={`badge ${getPriorityBadge(problem.priority)}`}>
-                            {problem.priority}
-                          </span>
-                        </td>
-                        <td>
-                          <div 
-                            style={{ 
-                              maxWidth: '200px', 
-                              overflow: 'hidden', 
-                              textOverflow: 'ellipsis', 
-                              whiteSpace: 'nowrap' 
-                            }}
-                            title={problem.statement}
-                          >
-                            {problem.statement}
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`badge ${getStatusBadge(problem.status)}`}>
-                            {problem.status === 'pending_approval' ? 'Pending Approval' : problem.status.replace('_', ' ').toUpperCase()}
-                          </span>
-                        </td>
-                        <td>{problem.createdBy}</td>
-                        <td>
-                          {problem.assignedTo ? (
-                            <span className="badge bg-info">{problem.assignedTo}</span>
-                          ) : (
-                            <span className="badge bg-secondary">Unassigned</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="btn-group" role="group">
-                            <button
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => navigate(`/problem/${problem.id}`)}
-                              title="View Details"
-                            >
-                              <i className="bi bi-eye"></i> View
-                            </button>
-
-                            {canAssign() && problem.status !== 'done' && (
-                              <>
-                                <div className="btn-group" role="group">
-                                  <button
-                                    className="btn btn-sm btn-outline-success dropdown-toggle"
-                                    data-bs-toggle="dropdown"
-                                    title="Assign/Transfer"
-                                  >
-                                    Assign
-                                  </button>
-                                  <ul className="dropdown-menu">
-                                    <li>
-                                      <button
-                                        className="dropdown-item"
-                                        onClick={() => openAssignModal(problem, false)}
-                                      >
-                                        {problem.assignedTo ? '↻ Reassign' : '→ Assign to Member'}
-                                      </button>
-                                    </li>
-                                    {problem.assignedTo && canTransfer(problem) && (
-                                      <li>
-                                        <button
-                                          className="dropdown-item"
-                                          onClick={() => openAssignModal(problem, true)}
-                                        >
-                                          ⇄ Transfer to Another
-                                        </button>
-                                      </li>
-                                    )}
-                                  </ul>
-                                </div>
-                                
-                                {user?.role === 'admin' && (
-                                  <button
-                                    className="btn btn-sm btn-outline-danger"
-                                    onClick={() => handleDelete(problem.id)}
-                                    title="Delete Problem (Admin Only)"
-                                  >
-                                    <i className="bi bi-trash"></i>
-                                  </button>
-                                )}
-                              </>
-                            )}
-
-                            {!canAssign() && canTransfer(problem) && user?.name === problem.assignedTo && (
-                              <button
-                                className="btn btn-sm btn-outline-warning"
-                                onClick={() => openAssignModal(problem, true)}
-                                title="Transfer to someone else"
-                              >
-                                Transfer
-                              </button>
-                            )}
-
-                            {problem.status === 'done' && (
-                              <span className="badge bg-success ms-2">
-                                ✓ Completed
-                              </span>
-                            )}
+                  </thead>
+                  <tbody>
+                    {currentProblems.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="text-center py-4 text-muted">
+                          <div className="py-3">
+                            <i className="bi bi-inbox display-6 text-muted"></i>
+                            <p className="mt-2 mb-0">
+                              {problems.length === 0 
+                                ? 'No problems found. Create your first problem!' 
+                                : 'No problems match your filters.'}
+                            </p>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      currentProblems.map((problem) => (
+                        <tr key={problem.id} className="align-middle">
+                          <td>
+                            <span className="fw-semibold" style={{ fontSize: '0.95rem' }}>
+                              {problem.department}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${getPriorityBadge(problem.priority)}`}>
+                              {problem.priority}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${getStatusBadge(problem.status)}`}>
+                              {formatStatus(problem.status)}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '0.95rem' }}>{problem.createdBy}</span>
+                          </td>
+                          <td>
+                            {problem.assignedTo ? (
+                              <span className="badge bg-info text-white">{problem.assignedTo}</span>
+                            ) : (
+                              <span className="badge bg-secondary">Unassigned</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => openProblemModal(problem)}
+                              title="View Problem Statement"
+                              style={{ padding: '6px 10px' }}
+                            >
+                              <i className="bi bi-eye-fill" style={{ fontSize: '1rem' }}></i>
+                            </button>
+                          </td>
+                          <td>
+                            <div className="d-flex gap-2 justify-content-center">
+                              <button
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => navigate(`/problem/${problem.id}`)}
+                                title="View Details"
+                                style={{ padding: '6px 10px' }}
+                              >
+                                <i className="bi bi-info-circle-fill" style={{ fontSize: '1rem' }}></i>
+                              </button>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <nav className="mt-4">
-                <ul className="pagination justify-content-center">
-                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                    <button 
-                      className="page-link" 
-                      onClick={goToPrevPage}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </button>
-                  </li>
-                  
-                  {[...Array(totalPages)].map((_, index) => {
-                    const pageNumber = index + 1;
-                    // Show first page, last page, current page, and pages around current
-                    if (
-                      pageNumber === 1 || 
-                      pageNumber === totalPages || 
-                      (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
-                    ) {
-                      return (
-                        <li 
-                          key={pageNumber} 
-                          className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}
-                        >
-                          <button 
-                            className="page-link" 
-                            onClick={() => paginate(pageNumber)}
-                          >
-                            {pageNumber}
-                          </button>
-                        </li>
-                      );
-                    } else if (
-                      pageNumber === currentPage - 2 || 
-                      pageNumber === currentPage + 2
-                    ) {
-                      return (
-                        <li key={pageNumber} className="page-item disabled">
-                          <span className="page-link">...</span>
-                        </li>
-                      );
-                    }
-                    return null;
-                  })}
-                  
-                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                    <button 
-                      className="page-link" 
-                      onClick={goToNextPage}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-            )}
+                              {canAssign() && problem.status !== 'done' && !problem.assignedTo && (
+                                <button
+                                  className="btn btn-sm btn-outline-success"
+                                  onClick={() => openAssignModal(problem, false)}
+                                  title="Assign Problem"
+                                  style={{ padding: '6px 10px' }}
+                                >
+                                  <i className="bi bi-person-plus-fill" style={{ fontSize: '1rem' }}></i>
+                                </button>
+                              )}
 
-            {/* Summary Stats */}
-            {problems.length > 0 && (
-              <div className="row mt-4">
-                <div className="col-md-3">
-                  <div className="card border-warning">
-                    <div className="card-body text-center">
-                      <h4 className="text-warning mb-0">
-                        {problems.filter(p => p.status === 'pending').length}
-                      </h4>
-                      <small className="text-muted">Pending</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="card border-info">
-                    <div className="card-body text-center">
-                      <h4 className="text-info mb-0">
-                        {problems.filter(p => p.status === 'in_progress').length}
-                      </h4>
-                      <small className="text-muted">In Progress</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="card border-success">
-                    <div className="card-body text-center">
-                      <h4 className="text-success mb-0">
-                        {problems.filter(p => p.status === 'done').length}
-                      </h4>
-                      <small className="text-muted">Completed</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="card border-secondary">
-                    <div className="card-body text-center">
-                      <h4 className="text-secondary mb-0">
-                        {problems.filter(p => !p.assignedTo).length}
-                      </h4>
-                      <small className="text-muted">Unassigned</small>
-                    </div>
-                  </div>
-                </div>
+                              {canAssign() && problem.status !== 'done' && problem.assignedTo && (
+                                <button
+                                  className="btn btn-sm btn-outline-warning"
+                                  onClick={() => openAssignModal(problem, false)}
+                                  title="Reassign Problem"
+                                  style={{ padding: '6px 10px' }}
+                                >
+                                  <i className="bi bi-arrow-clockwise" style={{ fontSize: '1rem' }}></i>
+                                </button>
+                              )}
+
+                              {canTransfer(problem) && (
+                                <button
+                                  className="btn btn-sm btn-outline-info"
+                                  onClick={() => openAssignModal(problem, true)}
+                                  title="Transfer Problem"
+                                  style={{ padding: '6px 10px' }}
+                                >
+                                  <i className="bi bi-arrow-left-right" style={{ fontSize: '1rem' }}></i>
+                                </button>
+                              )}
+
+                              {user?.role === 'admin' && (
+                                <button
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => handleDelete(problem.id)}
+                                  title="Delete Problem"
+                                  style={{ padding: '6px 10px' }}
+                                >
+                                  <i className="bi bi-trash-fill" style={{ fontSize: '1rem' }}></i>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+
+              {/* Compact Pagination */}
+              {totalPages > 1 && (
+                <div className="d-flex justify-content-between align-items-center mt-3">
+                  <small className="text-muted">
+                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, reversedProblems.length)} of {reversedProblems.length}
+                  </small>
+                  
+                  <nav>
+                    <ul className="pagination pagination-sm mb-0">
+                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                        <button 
+                          className="page-link" 
+                          onClick={goToPrevPage}
+                          disabled={currentPage === 1}
+                        >
+                          &laquo;
+                        </button>
+                      </li>
+                      
+                      {[...Array(Math.min(5, totalPages))].map((_, index) => {
+                        let pageNumber;
+                        if (totalPages <= 5) {
+                          pageNumber = index + 1;
+                        } else if (currentPage <= 3) {
+                          pageNumber = index + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNumber = totalPages - 4 + index;
+                        } else {
+                          pageNumber = currentPage - 2 + index;
+                        }
+
+                        return (
+                          <li 
+                            key={pageNumber} 
+                            className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}
+                          >
+                            <button 
+                              className="page-link" 
+                              onClick={() => paginate(pageNumber)}
+                            >
+                              {pageNumber}
+                            </button>
+                          </li>
+                        );
+                      })}
+                      
+                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                        <button 
+                          className="page-link" 
+                          onClick={goToNextPage}
+                          disabled={currentPage === totalPages}
+                        >
+                          &raquo;
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Problem Statement Modal */}
+      {showProblemModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white py-2">
+                <h6 className="modal-title mb-0 fw-semibold">
+                  <i className="bi bi-card-text me-2"></i>
+                  Problem Statement
+                </h6>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white btn-sm"
+                  onClick={() => setShowProblemModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body py-3">
+                <div className="p-3 bg-light rounded">
+                  <p className="mb-0" style={{ fontSize: '1.05rem', lineHeight: '1.6' }}>
+                    {selectedProblemStatement}
+                  </p>
+                </div>
+                <div className="text-center mt-3">
+                  <button 
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowProblemModal(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Assign/Transfer Modal */}
       {showAssignModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
-              <div className="modal-header bg-success text-white">
-                <h5 className="modal-title">
-                  {isTransfer ? '⇄ Transfer Problem' : '→ Assign Problem'}
-                </h5>
+              <div className="modal-header bg-success text-white py-2">
+                <h6 className="modal-title mb-0 fw-semibold">
+                  <i className={`bi ${isTransfer ? 'bi-arrow-left-right' : 'bi-person-plus'} me-2`}></i>
+                  {isTransfer ? 'Transfer Problem' : 'Assign Problem'}
+                </h6>
                 <button 
                   type="button" 
-                  className="btn-close btn-close-white"
+                  className="btn-close btn-close-white btn-sm"
                   onClick={() => setShowAssignModal(false)}
                 ></button>
               </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <p className="text-muted">
-                    Problem #{selectedProblem?.id} - {selectedProblem?.department}
-                  </p>
+              <div className="modal-body py-3">
+                <div className="mb-2">
+                  <small className="text-muted">
+                    Problem <strong>#{selectedProblem?.id}</strong> - {selectedProblem?.department}
+                  </small>
                   {isTransfer && selectedProblem?.assignedTo && (
-                    <p className="text-info">
-                      <strong>Currently assigned to:</strong> {selectedProblem.assignedTo}
-                    </p>
+                    <div className="mt-1">
+                      <small className="text-info">
+                        <strong>Current:</strong> {selectedProblem.assignedTo}
+                      </small>
+                    </div>
                   )}
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label">
-                    {isTransfer ? 'Transfer to:' : 'Assign to:'} *
+                  <label className="form-label small fw-semibold mb-1">
+                    {isTransfer ? 'Transfer to:' : 'Assign to:'}
                   </label>
                   <select
-                    className="form-control"
+                    className="form-control form-control-sm"
                     value={selectedMember}
                     onChange={(e) => setSelectedMember(e.target.value)}
                   >
@@ -583,23 +737,18 @@ export default function ProblemList() {
                       </option>
                     ))}
                   </select>
-                  <small className="text-muted">
-                    {teamMembers.length === 0 
-                      ? 'No team members available. Please add members in Admin Panel.'
-                      : `${teamMembers.length} team member(s) available`}
-                  </small>
                 </div>
 
                 <div className="d-flex gap-2">
                   <button 
-                    className="btn btn-success flex-grow-1"
+                    className="btn btn-success btn-sm flex-grow-1"
                     onClick={handleAssignSubmit}
                     disabled={!selectedMember}
                   >
                     {isTransfer ? 'Transfer' : 'Assign'}
                   </button>
                   <button 
-                    className="btn btn-secondary"
+                    className="btn btn-secondary btn-sm"
                     onClick={() => setShowAssignModal(false)}
                   >
                     Cancel

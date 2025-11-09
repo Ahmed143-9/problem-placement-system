@@ -11,9 +11,10 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import AdminPanel from "./pages/AdminPanel";
 import ProblemForm from "./MyComponents/ProblemForm";
 import ProblemList from "./MyComponents/ProblemList";
-import MyIssues from "./pages/MyIssues"; // New page for regular users
+import MyIssues from "./pages/MyIssues";
 import ProblemDetails from "./MyComponents/ProblemDetails";
 import Reports from "./pages/Reports";
+
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 
@@ -24,9 +25,10 @@ function App() {
         <Router>
           <ToastContainer position="top-right" autoClose={3000} />
           <Routes>
+            {/* Public Route */}
             <Route path="/login" element={<Login />} />
-            
-            {/* Dashboard - Admin/Team Leader Only */}
+
+            {/* Admin-only Routes */}
             <Route
               path="/dashboard"
               element={
@@ -35,27 +37,14 @@ function App() {
                 </AdminRoute>
               }
             />
-
-            {/* Employee Dashboard - Regular Users Only */}
             <Route
-              path="/employee-dashboard"
+              path="/admin"
               element={
-                <ProtectedRoute>
-                  <EmployeeDashboard />
-                </ProtectedRoute>
+                <AdminRoute>
+                  <AdminPanel />
+                </AdminRoute>
               }
             />
-            
-            <Route
-              path="/problem/create"
-              element={
-                <ProtectedRoute>
-                  <ProblemForm />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* All Problems - Admin/Team Leader Only */}
             <Route
               path="/problems"
               element={
@@ -65,7 +54,15 @@ function App() {
               }
             />
 
-            {/* My Issues - Regular Users Only */}
+            {/* User-only Routes */}
+            <Route
+              path="/employee-dashboard"
+              element={
+                <ProtectedRoute>
+                  <EmployeeDashboard />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/my-issues"
               element={
@@ -75,6 +72,15 @@ function App() {
               }
             />
 
+            {/* Routes accessible by both but still protected */}
+            <Route
+              path="/problem/create"
+              element={
+                <ProtectedRoute>
+                  <ProblemForm />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/problem/:id"
               element={
@@ -83,7 +89,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/reports"
               element={
@@ -92,23 +97,20 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            
-            {/* Admin Panel - Admin and Team Leader can access */}
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute>
-                  <AdminPanel />
-                </AdminRoute>
-              }
-            />
 
-            {/* Default Route - Redirect based on role */}
+            {/* Default redirect based on role */}
             <Route
               path="/"
               element={
                 <ProtectedRoute>
-                  <Navigate to="/employee-dashboard" replace />
+                  <Navigate
+                    to={
+                      JSON.parse(localStorage.getItem("current_user"))?.role === "admin"
+                        ? "/dashboard"
+                        : "/employee-dashboard"
+                    }
+                    replace
+                  />
                 </ProtectedRoute>
               }
             />

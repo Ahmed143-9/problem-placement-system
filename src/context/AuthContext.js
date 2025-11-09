@@ -7,59 +7,85 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Initialize system with admin user if not exists
-    const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-    if (systemUsers.length === 0) {
-      const adminUser = {
-        id: 1,
-        name: 'Admin User',
-        username: 'Admin',
-        email: 'admin@example.com',
-        password: 'Admin123',
-        role: 'admin',
-        department: 'Management',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        createdBy: 'System'
-      };
-      localStorage.setItem('system_users', JSON.stringify([adminUser]));
-    }
+  const DEFAULT_ADMIN = {
+    id: 1,
+    name: 'Admin User',
+    username: 'Admin',
+    email: 'admin@example.com',
+    password: 'Admin@123',
+    role: 'admin',
+    department: 'Management',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    createdBy: 'System'
+  };
 
-    // Check if user is logged in
-    const userData = localStorage.getItem('current_user');
-    if (userData) {
-      setUser(JSON.parse(userData));
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('system_users');
+      const systemUsers = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw || '[]') : [];
+
+      const adminIndex = systemUsers.findIndex(u => u.username === DEFAULT_ADMIN.username);
+
+      if (adminIndex === -1) {
+        systemUsers.unshift(DEFAULT_ADMIN);
+        localStorage.setItem('system_users', JSON.stringify(systemUsers));
+        console.info('Default admin created.');
+      } else {
+        const admin = systemUsers[adminIndex];
+        let changed = false;
+
+        if (admin.password !== DEFAULT_ADMIN.password) {
+          admin.password = DEFAULT_ADMIN.password;
+          changed = true;
+        }
+        if (admin.role !== DEFAULT_ADMIN.role) {
+          admin.role = DEFAULT_ADMIN.role;
+          changed = true;
+        }
+        if (admin.status !== DEFAULT_ADMIN.status) {
+          admin.status = DEFAULT_ADMIN.status;
+          changed = true;
+        }
+        if (changed) {
+          systemUsers[adminIndex] = admin;
+          localStorage.setItem('system_users', JSON.stringify(systemUsers));
+          console.info('Admin updated to default values.');
+        }
+      }
+
+      // Load current user if exists
+      const currentUser = localStorage.getItem('current_user');
+      if (currentUser) {
+        setUser(JSON.parse(currentUser));
+      }
+    } catch (err) {
+      console.error('Auth init error:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (username, password) => {
     try {
-      // Get all system users
+      const u = (username || '').trim();
+      const p = (password || '').trim();
+
       const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      
-      // Find user by username and password
+
       const foundUser = systemUsers.find(
-        u => u.username === username && u.password === password
+        usr => usr.username === u && usr.password === p
       );
 
       if (!foundUser) {
-        return { 
-          success: false, 
-          error: 'Invalid username or password' 
-        };
+        console.warn('Login failed. Users:', systemUsers.map(x => ({ username: x.username, role: x.role })));
+        return { success: false, error: 'Invalid username or password' };
       }
 
-      // Check if user is active
       if (foundUser.status !== 'active') {
-        return {
-          success: false,
-          error: 'Your account is inactive. Please contact admin.'
-        };
+        return { success: false, error: 'Your account is inactive. Please contact admin.' };
       }
 
-      // Set current user
       const userData = {
         id: foundUser.id,
         name: foundUser.name,
@@ -74,12 +100,9 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
 
       return { success: true };
-    } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: 'An error occurred during login'
-      };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, error: 'An error occurred during login' };
     }
   };
 
@@ -97,8 +120,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };

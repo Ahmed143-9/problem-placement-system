@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
-import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaPlusCircle, FaUsersCog, FaHome, FaExclamationTriangle, FaFileAlt, FaChartLine } from 'react-icons/fa';
+import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaPlusCircle, FaUsersCog, FaHome, FaExclamationTriangle, FaFileAlt, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
@@ -12,6 +12,7 @@ export default function EmployeeDashboard() {
   const [problems, setProblems] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -23,7 +24,7 @@ export default function EmployeeDashboard() {
       const response = await api.get('/dashboard/stats');
       setStats(response.data);
     } catch (error) {
-      toast.error('Failed to fetch dashboard stats');
+      // toast.error('Failed to fetch dashboard stats');
     } finally {
       setLoading(false);
     }
@@ -40,7 +41,7 @@ export default function EmployeeDashboard() {
         in_progress: storedProblems.filter(p => p.status === 'in_progress').length,
         done: storedProblems.filter(p => p.status === 'done').length,
         by_department: {
-          Engineer: storedProblems.filter(p => p.department === 'IT & Innovation').length,
+          Engineering: storedProblems.filter(p => p.department === 'IT & Innovation').length,
           Business: storedProblems.filter(p => p.department === 'Business').length,
           Accounts: storedProblems.filter(p => p.department === 'Accounts').length
         },
@@ -55,6 +56,10 @@ export default function EmployeeDashboard() {
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     }
+  };
+
+  const toggleSidebar = () => {
+    setSidebarMinimized(!sidebarMinimized);
   };
 
   const sidebarLinkStyle = {
@@ -80,69 +85,106 @@ export default function EmployeeDashboard() {
       
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <div className="bg-dark text-white" style={{ width: '250px', minHeight: '100%' }}>
+        <div 
+          className="bg-dark text-white position-relative"
+          style={{ 
+            width: sidebarMinimized ? '70px' : '250px',
+            minHeight: '100%',
+            transition: 'width 0.3s ease'
+          }}
+        >
+          {/* Toggle Button */}
+          <button
+            onClick={toggleSidebar}
+            className="position-absolute d-flex align-items-center justify-content-center"
+            style={{
+              top: '10px',
+              right: '-12px',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#fff',
+              border: '1px solid #ccc',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              cursor: 'pointer',
+            }}
+>
+        {sidebarMinimized 
+          ? <FaChevronRight size={14} color="#333" /> 
+          : <FaChevronLeft size={14} color="#333" />
+        }
+      </button>
+
           <div className="p-3">
-            <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
-              Navigation
-            </h5>
+            {!sidebarMinimized && (
+              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+                Navigation
+              </h5>
+            )}
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
                 <Link 
                   to="/dashboard" 
-                  className="nav-link text-white bg-primary rounded"
+                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
+                  title="Dashboard"
                 >
-                  <FaHome className="me-2" style={{ fontSize: '0.9rem' }} /> 
-                  <span style={{ fontSize: '0.9rem' }}>Dashboard</span>
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
                 <Link 
                   to="/problem/create" 
-                  className="nav-link text-white rounded"
+                  className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Create Problem"
                 >
-                  <FaPlusCircle className="me-2" style={{ fontSize: '0.9rem' }} /> 
-                  <span style={{ fontSize: '0.9rem' }}>Create Problem</span>
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
                 <Link 
                   to="/problems" 
-                  className="nav-link text-white rounded"
+                  className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="All Problems"
                 >
-                  <FaExclamationTriangle className="me-2" style={{ fontSize: '0.9rem' }} /> 
-                  <span style={{ fontSize: '0.9rem' }}>All Problems</span>
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
                 <Link 
                   to="/reports" 
-                  className="nav-link text-white rounded"
+                  className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Reports"
                 >
-                  <FaFileAlt className="me-2" style={{ fontSize: '0.9rem' }} /> 
-                  <span style={{ fontSize: '0.9rem' }}>Reports</span>
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <li className="nav-item mb-2">
                   <Link 
                     to="/admin" 
-                    className="nav-link text-white rounded"
+                    className="nav-link text-white rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
                     onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                     onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title="Admin Panel"
                   >
-                    <FaUsersCog className="me-2" style={{ fontSize: '0.9rem' }} /> 
-                    <span style={{ fontSize: '0.9rem' }}>Admin Panel</span>
+                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
                   </Link>
                 </li>
               )}
@@ -151,7 +193,13 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-grow-1 p-4" style={{ overflowY: 'auto' }}>
+        <div 
+          className="flex-grow-1 p-4" 
+          style={{ 
+            overflowY: 'auto',
+            transition: 'margin-left 0.3s ease'
+          }}
+        >
           
           {/* Stats Cards - Clean & Consistent */}
           {stats && (

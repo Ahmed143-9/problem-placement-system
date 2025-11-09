@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
 
@@ -15,9 +17,10 @@ export default function Login() {
     if (user) {
       if (user.role === 'admin' || user.role === 'team_leader') {
         navigate('/dashboard');
-      } else {
-        navigate('/employee-dashboard');
-      }
+      } 
+      // else {
+      //   navigate('/employee-dashboard');
+      // }
     }
   }, [user, navigate]);
 
@@ -31,17 +34,25 @@ export default function Login() {
       return;
     }
 
+    // Password validation regex
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};:'",.<>?/\\|`~]).{8,}$/;
+
+    if (!passwordRegex.test(password)) {
+      toast.error('Password must be at least 8 characters, include 1 uppercase letter, 1 number, and 1 special character');
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await login(username, password);
-      
+
       if (result.success) {
         toast.success('Login successful!');
-        
-        // Get user role and redirect accordingly
         const userData = JSON.parse(localStorage.getItem('current_user'));
         if (userData.role === 'admin' || userData.role === 'team_leader') {
           navigate('/dashboard');
-        } else {
+        } 
+        else {
           navigate('/employee-dashboard');
         }
       } else {
@@ -65,7 +76,7 @@ export default function Login() {
                 <h2 className="fw-bold">Problem Management System</h2>
                 <p className="text-muted">Login to your account</p>
               </div>
-              
+
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
                   <label className="form-label">Username</label>
@@ -81,10 +92,10 @@ export default function Login() {
                   />
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-4 position-relative">
                   <label className="form-label">Password</label>
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     className="form-control form-control-lg"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -93,6 +104,13 @@ export default function Login() {
                     disabled={loading}
                     required
                   />
+                  <span
+                    className="position-absolute top-50 end-0 translate-middle-y me-3"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setShowPassword(prev => !prev)}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </span>
                 </div>
 
                 <button
@@ -114,7 +132,7 @@ export default function Login() {
               <div className="alert alert-info mt-4 mb-0">
                 <small>
                   <strong>Admin Credentials:</strong><br />
-                  Username: <code>Admin</code> | Password: <code>Admin123</code>
+                  Username: <code>Admin</code> | Password: <code>Admin@123</code>
                 </small>
               </div>
             </div>

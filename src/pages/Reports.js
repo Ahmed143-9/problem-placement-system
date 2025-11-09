@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Navbar from '../components/Navbar';
-import { FaDownload, FaPrint, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
+import Navbar from '../components/Navbar';
+import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaPlusCircle, FaUsersCog, FaHome, FaExclamationTriangle, FaFileAlt, FaChartLine, FaChevronLeft, FaChevronRight, FaDownload, FaPrint } from 'react-icons/fa';
 
 export default function Reports() {
   const { user } = useAuth();
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProblem, setSelectedProblem] = useState(null);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
   useEffect(() => {
     fetchProblems();
@@ -38,6 +40,10 @@ export default function Reports() {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarMinimized(!sidebarMinimized);
+  };
+
   const generateReport = (problem) => {
     setSelectedProblem(problem);
     setTimeout(() => {
@@ -47,7 +53,7 @@ export default function Reports() {
   };
 
   const sidebarLinkStyle = {
-    transition: 'background-color 0.2s'
+    transition: 'all 0.2s ease'
   };
 
   // Check if admin or team leader
@@ -68,36 +74,73 @@ export default function Reports() {
 
   return (
     <>
-      <div className="d-flex flex-column min-vh-100 no-print">
-        {/* Top Navbar */}
+      <div className="d-flex flex-column min-vh-100 no-print" style={{ backgroundColor: '#f8f9fa' }}>
         <Navbar />
         
         <div className="d-flex flex-grow-1">
-          {/* Left Sidebar */}
-          <div className="bg-dark text-white" style={{ width: '250px', minHeight: '100%' }}>
+          {/* Sidebar - Same as Dashboard */}
+          <div 
+            className="bg-dark text-white position-relative"
+            style={{ 
+              width: sidebarMinimized ? '70px' : '250px',
+              minHeight: '100%',
+              transition: 'width 0.3s ease'
+            }}
+          >
+            {/* Toggle Button */}
+            <button
+              onClick={toggleSidebar}
+              className="position-absolute d-flex align-items-center justify-content-center"
+              style={{
+                top: '10px',
+                right: '-12px',
+                borderRadius: '50%',
+                width: '28px',
+                height: '28px',
+                backgroundColor: '#fff',
+                border: '1px solid #ccc',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                zIndex: 1000,
+                cursor: 'pointer',
+              }}
+            >
+              {sidebarMinimized 
+                ? <FaChevronRight size={14} color="#333" /> 
+                : <FaChevronLeft size={14} color="#333" />
+              }
+            </button>
+
             <div className="p-3">
-              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary">Navigation</h5>
+              {!sidebarMinimized && (
+                <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+                  Navigation
+                </h5>
+              )}
               <ul className="nav flex-column">
                 <li className="nav-item mb-2">
                   <Link 
                     to={isAdminOrLeader ? "/dashboard" : "/employee-dashboard"}
-                    className="nav-link text-white rounded"
+                    className="nav-link text-white rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
                     onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                     onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title="Dashboard"
                   >
-                    <FaHome className="me-2" /> Dashboard
+                    <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
                   </Link>
                 </li>
                 <li className="nav-item mb-2">
                   <Link 
                     to="/problem/create" 
-                    className="nav-link text-white rounded"
+                    className="nav-link text-white rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
                     onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                     onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title="Create Problem"
                   >
-                    <FaPlusCircle className="me-2" /> Create Problem
+                    <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                   </Link>
                 </li>
                 
@@ -106,24 +149,28 @@ export default function Reports() {
                   <li className="nav-item mb-2">
                     <Link 
                       to="/problems" 
-                      className="nav-link text-white rounded"
+                      className="nav-link text-white rounded d-flex align-items-center"
                       style={sidebarLinkStyle}
                       onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                       onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      title="All Problems"
                     >
-                      <FaExclamationTriangle className="me-2" /> All Problems
+                      <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                     </Link>
                   </li>
                 ) : (
                   <li className="nav-item mb-2">
                     <Link 
                       to="/my-issues" 
-                      className="nav-link text-white rounded"
+                      className="nav-link text-white rounded d-flex align-items-center"
                       style={sidebarLinkStyle}
                       onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                       onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      title="My Issues"
                     >
-                      <FaExclamationTriangle className="me-2" /> My Issues
+                      <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>My Issues</span>}
                     </Link>
                   </li>
                 )}
@@ -131,22 +178,26 @@ export default function Reports() {
                 <li className="nav-item mb-2">
                   <Link 
                     to="/reports" 
-                    className="nav-link text-white bg-primary rounded"
+                    className="nav-link text-white bg-primary rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
+                    title="Reports"
                   >
-                    <FaFileAlt className="me-2" /> Download Reports
+                    <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                   </Link>
                 </li>
                 {isAdminOrLeader && (
                   <li className="nav-item mb-2">
                     <Link 
                       to="/admin" 
-                      className="nav-link text-white rounded"
+                      className="nav-link text-white rounded d-flex align-items-center"
                       style={sidebarLinkStyle}
                       onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                       onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      title="Admin Panel"
                     >
-                      <FaUsersCog className="me-2" /> Admin Panel
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
                     </Link>
                   </li>
                 )}
@@ -154,23 +205,30 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Main Content Area */}
-          <div className="flex-grow-1 bg-light p-4" style={{ overflowY: 'auto' }}>
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">
+          {/* Main Content */}
+          <div 
+            className="flex-grow-1 p-4" 
+            style={{ 
+              overflowY: 'auto',
+              transition: 'margin-left 0.3s ease'
+            }}
+          >
+            <div className="card shadow border-0">
+              <div className="card-header bg-primary text-white py-3">
+                <h4 className="mb-1 fw-semibold">
+                  <FaFileAlt className="me-2" />
                   {isAdminOrLeader ? 'All Problem Reports' : 'My Problem Reports'}
                 </h4>
-                <small>
+                <small className="opacity-75">
                   {isAdminOrLeader 
                     ? 'Download printable reports for all problems' 
                     : 'Download reports for problems you created or are assigned to'}
                 </small>
               </div>
-              <div className="card-body">
+              <div className="card-body p-4">
                 <div className="table-responsive">
-                  <table className="table table-hover">
-                    <thead className="table-light">
+                  <table className="table table-hover table-striped">
+                    <thead className="table-dark">
                       <tr>
                         <th>Problem ID</th>
                         <th>Department</th>
@@ -179,23 +237,26 @@ export default function Reports() {
                         <th>Created By</th>
                         <th>Assigned To</th>
                         <th>Created Date</th>
-                        <th>Action</th>
+                        <th style={{ textAlign: 'center' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {problems.length === 0 ? (
                         <tr>
                           <td colSpan="8" className="text-center py-5">
-                            <p className="text-muted mb-3">No problems found to generate reports</p>
-                            <Link to="/problem/create" className="btn btn-primary">
-                              <FaPlusCircle className="me-2" />
-                              Create First Problem
-                            </Link>
+                            <div className="py-4">
+                              <FaFileAlt size={48} className="text-muted mb-3" />
+                              <p className="text-muted mb-3">No problems found to generate reports</p>
+                              <Link to="/problem/create" className="btn btn-primary">
+                                <FaPlusCircle className="me-2" />
+                                Create First Problem
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       ) : (
                         problems.map(problem => (
-                          <tr key={problem.id}>
+                          <tr key={problem.id} className="align-middle">
                             <td className="fw-bold">#{problem.id}</td>
                             <td>{problem.department}</td>
                             <td>
@@ -211,18 +272,27 @@ export default function Reports() {
                               <span className={`badge ${
                                 problem.status === 'pending' ? 'bg-warning text-dark' :
                                 problem.status === 'in_progress' ? 'bg-info' :
-                                'bg-success'
+                                problem.status === 'done' ? 'bg-success' :
+                                'bg-secondary'
                               }`}>
-                                {problem.status.replace('_', ' ').toUpperCase()}
+                                {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : 
+                                 problem.status.replace('_', ' ').toUpperCase()}
                               </span>
                             </td>
                             <td>{problem.createdBy}</td>
-                            <td>{problem.assignedTo || 'Unassigned'}</td>
-                            <td>{new Date(problem.createdAt).toLocaleDateString()}</td>
                             <td>
+                              {problem.assignedTo ? (
+                                <span className="badge bg-info text-white">{problem.assignedTo}</span>
+                              ) : (
+                                <span className="badge bg-secondary">Unassigned</span>
+                              )}
+                            </td>
+                            <td>{new Date(problem.createdAt).toLocaleDateString()}</td>
+                            <td style={{ textAlign: 'center' }}>
                               <button 
                                 className="btn btn-sm btn-primary"
                                 onClick={() => generateReport(problem)}
+                                title="Generate Report"
                               >
                                 <FaPrint className="me-1" />
                                 Print Report
@@ -240,7 +310,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Printable Report - Same as before */}
+      {/* Printable Report */}
       {selectedProblem && (
         <div className="print-only" style={{ display: 'none' }}>
           <div style={{ 
@@ -340,11 +410,13 @@ export default function Reports() {
                       padding: '4px 12px',
                       borderRadius: '4px',
                       backgroundColor: selectedProblem.status === 'pending' ? '#ffc107' :
-                                     selectedProblem.status === 'in_progress' ? '#17a2b8' : '#28a745',
+                                     selectedProblem.status === 'in_progress' ? '#17a2b8' : 
+                                     selectedProblem.status === 'done' ? '#28a745' : '#6c757d',
                       color: selectedProblem.status === 'pending' ? '#000' : '#fff',
                       fontWeight: 'bold'
                     }}>
-                      {selectedProblem.status.replace('_', ' ').toUpperCase()}
+                      {selectedProblem.status === 'pending_approval' ? 'PENDING APPROVAL' : 
+                       selectedProblem.status.replace('_', ' ').toUpperCase()}
                     </span>
                   </td>
                 </tr>

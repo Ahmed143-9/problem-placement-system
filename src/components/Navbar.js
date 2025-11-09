@@ -239,48 +239,48 @@ export default function Navbar() {
                 <ul 
                   className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2" 
                   style={{ 
-                    width: '420px', 
-                    maxHeight: '550px', 
+                    width: '380px', 
+                    maxHeight: '500px', 
                     overflowY: 'auto',
-                    borderRadius: '15px',
+                    borderRadius: '12px',
                     background: 'rgba(255,255,255,0.98)',
                     backdropFilter: 'blur(20px)'
                   }}
                 >
                   {/* Header */}
-                  <li className="dropdown-header d-flex justify-content-between align-items-center py-3 px-4" 
+                  <li className="dropdown-header d-flex justify-content-between align-items-center py-2 px-3" 
                       style={{ 
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        borderRadius: '15px 15px 0 0',
+                        borderRadius: '12px 12px 0 0',
                         color: '#fff'
                       }}>
                     <div>
-                      <strong style={{ fontSize: '1.1rem', fontFamily: 'Poppins, sans-serif' }}>
-                        <FaBell className="me-2" />
+                      <strong style={{ fontSize: '1rem', fontFamily: 'Poppins, sans-serif' }}>
+                        <FaBell className="me-2" style={{ fontSize: '0.9rem' }} />
                         Notifications
                       </strong>
                       {unreadCount > 0 && (
-                        <span className="badge bg-light text-dark ms-2" style={{ fontSize: '0.75rem' }}>
+                        <span className="badge bg-light text-dark ms-2" style={{ fontSize: '0.7rem' }}>
                           {unreadCount} new
                         </span>
                       )}
                     </div>
                     {notifications.length > 0 && (
-                      <div className="d-flex gap-2">
+                      <div className="d-flex gap-1">
                         {unreadCount > 0 && (
                           <button 
                             className="btn btn-sm btn-light text-primary"
                             onClick={markAllAsRead}
-                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '20px' }}
+                            style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem', borderRadius: '15px' }}
                           >
-                            <FaCheckCircle className="me-1" />
-                            Mark all read
+                            <FaCheckCircle style={{ fontSize: '0.7rem' }} className="me-1" />
+                            Mark all
                           </button>
                         )}
                         <button 
                           className="btn btn-sm btn-light text-danger"
                           onClick={clearNotifications}
-                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '20px' }}
+                          style={{ fontSize: '0.7rem', padding: '0.2rem 0.6rem', borderRadius: '15px' }}
                         >
                           Clear
                         </button>
@@ -290,9 +290,9 @@ export default function Navbar() {
                   
                   {notifications.length === 0 ? (
                     <li className="dropdown-item text-center py-5">
-                      <div style={{ fontSize: '4rem', opacity: '0.3', marginBottom: '1rem' }}>🔕</div>
-                      <p className="text-muted mb-0" style={{ fontWeight: '500' }}>No notifications yet</p>
-                      <small className="text-muted">You're all caught up!</small>
+                      <div style={{ fontSize: '3rem', opacity: '0.3', marginBottom: '0.5rem' }}>🔕</div>
+                      <p className="text-muted mb-0" style={{ fontWeight: '500', fontSize: '0.9rem' }}>No notifications yet</p>
+                      <small className="text-muted" style={{ fontSize: '0.8rem' }}>You're all caught up!</small>
                     </li>
                   ) : (
                     sortedNotifications.slice(0, 10).map((notification, index) => (
@@ -302,8 +302,8 @@ export default function Navbar() {
                             className={`dropdown-item ${!notification.read ? 'bg-light' : ''} position-relative`}
                             onClick={() => handleNotificationClick(notification)}
                             style={{ 
-                              padding: '1rem 1.25rem',
-                              borderLeft: !notification.read ? '4px solid #667eea' : '4px solid transparent',
+                              padding: '0.75rem 1rem',
+                              borderLeft: !notification.read ? '3px solid #667eea' : '3px solid transparent',
                               transition: 'all 0.2s',
                               background: !notification.read ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' : 'transparent'
                             }}
@@ -318,60 +318,65 @@ export default function Navbar() {
                           >
                             <div className="d-flex align-items-start">
                               <div 
-                                className="d-flex align-items-center justify-content-center"
+                                className="d-flex align-items-center justify-content-center flex-shrink-0"
                                 style={{ 
-                                  fontSize: '2rem', 
-                                  marginRight: '15px',
-                                  minWidth: '50px',
-                                  height: '50px',
+                                  fontSize: '1.2rem', 
+                                  marginRight: '10px',
+                                  minWidth: '32px',
+                                  height: '32px',
                                   background: 'rgba(102, 126, 234, 0.1)',
-                                  borderRadius: '12px'
+                                  borderRadius: '8px'
                                 }}
                               >
                                 {notification.icon || getNotificationIcon(notification.type)}
                               </div>
-                              <div className="flex-grow-1">
+                              <div className="flex-grow-1" style={{ minWidth: 0 }}>
                                 <div className="d-flex justify-content-between align-items-start mb-1">
                                   <strong 
-                                    className="d-block" 
+                                    className="d-block text-truncate" 
                                     style={{ 
-                                      fontSize: '0.95rem', 
-                                      lineHeight: '1.4',
+                                      fontSize: '0.85rem', 
+                                      lineHeight: '1.3',
                                       fontFamily: 'Poppins, sans-serif',
-                                      color: '#1a202c'
+                                      color: '#1a202c',
+                                      maxWidth: '85%'
                                     }}
                                   >
                                     {notification.title}
                                   </strong>
                                   {!notification.read && (
                                     <span 
-                                      className="badge rounded-circle ms-2" 
+                                      className="badge rounded-circle flex-shrink-0" 
                                       style={{ 
-                                        width: '10px', 
-                                        height: '10px', 
+                                        width: '8px', 
+                                        height: '8px', 
                                         padding: '0',
                                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)'
+                                        boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)'
                                       }}
                                       title="Unread"
                                     />
                                   )}
                                 </div>
                                 <small 
-                                  className="d-block text-muted mb-2" 
+                                  className="d-block text-muted mb-1" 
                                   style={{ 
-                                    fontSize: '0.85rem', 
-                                    lineHeight: '1.5',
-                                    color: '#4a5568'
+                                    fontSize: '0.8rem', 
+                                    lineHeight: '1.4',
+                                    color: '#4a5568',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: '2',
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
                                   }}
                                 >
                                   {notification.message}
                                 </small>
                                 <small 
                                   className="text-muted d-flex align-items-center" 
-                                  style={{ fontSize: '0.75rem', color: '#718096' }}
+                                  style={{ fontSize: '0.7rem', color: '#718096' }}
                                 >
-                                  <span className="me-1">🕐</span>
+                                  <span className="me-1" style={{ fontSize: '0.8rem' }}>🕐</span>
                                   {getTimeAgo(notification.timestamp)}
                                 </small>
                               </div>
@@ -379,7 +384,7 @@ export default function Navbar() {
                           </button>
                         </li>
                         {index < sortedNotifications.slice(0, 10).length - 1 && (
-                          <li><hr className="dropdown-divider my-0" style={{ opacity: '0.1' }} /></li>
+                          <li><hr className="dropdown-divider my-0" style={{ opacity: '0.08' }} /></li>
                         )}
                       </React.Fragment>
                     ))
@@ -387,8 +392,8 @@ export default function Navbar() {
                   
                   {notifications.length > 10 && (
                     <li>
-                      <div className="dropdown-item text-center py-3" style={{ background: '#f8f9fa', borderRadius: '0 0 15px 15px' }}>
-                        <small className="text-muted" style={{ fontWeight: '500' }}>
+                      <div className="dropdown-item text-center py-2" style={{ background: '#f8f9fa', borderRadius: '0 0 12px 12px' }}>
+                        <small className="text-muted" style={{ fontWeight: '500', fontSize: '0.75rem' }}>
                           Showing latest 10 of {notifications.length} notifications
                         </small>
                       </div>
@@ -540,7 +545,7 @@ export default function Navbar() {
 
           /* Smooth scrollbar for notifications */
           .dropdown-menu::-webkit-scrollbar {
-            width: 6px;
+            width: 5px;
           }
 
           .dropdown-menu::-webkit-scrollbar-track {
@@ -556,7 +561,7 @@ export default function Navbar() {
             background: rgba(102, 126, 234, 0.5);
           }
 
-          /* Dropdown animation */
+          /* Dropdown animation */}
           .dropdown-menu {
             animation: dropdownFadeIn 0.3s ease-out;
           }
