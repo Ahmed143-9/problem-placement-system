@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { FaChevronLeft, FaChevronRight, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaArrowLeft, FaTimes } from 'react-icons/fa';
 
 export default function ProblemDetails() {
   const { id } = useParams();
@@ -14,6 +16,8 @@ export default function ProblemDetails() {
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     fetchProblemDetails();
@@ -38,7 +42,6 @@ export default function ProblemDetails() {
   };
 
   const handleStatusChange = (newStatus) => {
-    // If assigned user tries to mark as done, submit for approval instead
     if (newStatus === 'done' && !canApprove()) {
       newStatus = 'pending_approval';
     }
@@ -57,9 +60,7 @@ export default function ProblemDetails() {
       );
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       
-      // Send notification to Admin/Team Leader when submitted for approval
       if (newStatus === 'pending_approval') {
-        // Notify all admins and team leaders
         const users = JSON.parse(localStorage.getItem('system_users') || '[]');
         users.forEach(u => {
           if (u.role === 'admin' || u.role === 'team_leader') {
@@ -67,11 +68,9 @@ export default function ProblemDetails() {
           }
         });
       } else if (problem.assignedTo && newStatus !== 'done') {
-        // Notify assigned user for other status changes
         notifyStatusChange(problem.id, newStatus, user?.name, problem.assignedTo);
       }
       
-      // If approved as done by admin/leader, notify completion
       if (newStatus === 'done' && canApprove()) {
         notifyCompletion(problem.id, user?.name);
       }
@@ -107,7 +106,6 @@ export default function ProblemDetails() {
       
       notifyCompletion(problem.id, user?.name);
       
-      // Notify the person who submitted for approval
       if (problem.submittedForApprovalBy) {
         notifyStatusChange(problem.id, 'done', user?.name, problem.submittedForApprovalBy);
       }
@@ -222,6 +220,10 @@ export default function ProblemDetails() {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarMinimized(!sidebarMinimized);
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       pending: 'bg-warning text-dark',
@@ -272,366 +274,523 @@ export default function ProblemDetails() {
   }
 
   return (
-    <div>
+    <div className="d-flex flex-column" style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
       <Navbar />
-      <div className="container mt-4">
-        <div className="row">
-          <div className="col-12 mb-3">
-            <button className="btn btn-secondary" onClick={() => navigate('/problems')}>
-              ← Back to Problems
-            </button>
-          </div>
+      
+      <div className="d-flex flex-grow-1">
+        {/* Sidebar */}
+        <div 
+          className="bg-dark text-white position-relative"
+          style={{ 
+            width: sidebarMinimized ? '70px' : '250px',
+            minHeight: '100%',
+            transition: 'width 0.3s ease'
+          }}
+        >
+          <button
+            onClick={toggleSidebar}
+            className="position-absolute d-flex align-items-center justify-content-center"
+            style={{
+              top: '10px',
+              right: '-12px',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#fff',
+              border: '1px solid #ccc',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              cursor: 'pointer',
+            }}
+          >
+            {sidebarMinimized ? <FaChevronRight size={14} color="#333" /> : <FaChevronLeft size={14} color="#333" />}
+          </button>
 
-          {/* Problem Details Card */}
-          <div className="col-lg-8">
-            <div className="card shadow mb-4">
-              <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h4 className="mb-0">Problem #{problem.id}</h4>
-                {canDelete() && (
-                  <button className="btn btn-danger btn-sm" onClick={handleDelete}>
-                    🗑 Delete
-                  </button>
-                )}
-              </div>
-              <div className="card-body">
-                {/* Pending Approval Alert */}
-                {problem.status === 'pending_approval' && (
-                  <div className="alert alert-warning mb-4">
-                    <h5 className="alert-heading">⏳ Waiting for Approval</h5>
-                    <p className="mb-2">
-                      {canApprove() 
-                        ? 'This problem has been marked as complete. Please review and approve or reject.'
-                        : 'Your completion request is pending Admin/Team Leader approval.'}
-                    </p>
-                    {problem.submittedForApprovalBy && (
-                      <small className="text-muted d-block">
-                        Submitted by <strong>{problem.submittedForApprovalBy}</strong> on {new Date(problem.submittedForApprovalAt).toLocaleString()}
-                      </small>
-                    )}
-                  </div>
-                )}
-
-                {/* Images Section - Show if images exist */}
-{problem.images && problem.images.length > 0 && (
-  <div className="mb-3">
-    <h5>Attached Screenshots</h5>
-    <div className="row">
-      {problem.images.map((img, index) => (
-        <div key={index} className="col-md-4 col-6 mb-3">
-          <div className="border rounded p-2 bg-light">
-            <img 
-              src={img.url} 
-              alt={`Screenshot ${index + 1}`}
-              className="img-fluid rounded"
-              style={{ 
-                width: '100%', 
-                height: '200px', 
-                objectFit: 'cover',
-                cursor: 'pointer'
-              }}
-              onClick={() => window.open(img.url, '_blank')}
-              title="Click to view full size"
-            />
-            <small className="text-muted d-block mt-1 text-center">
-              Screenshot {index + 1}
-            </small>
+          <div className="p-3">
+            {!sidebarMinimized && (
+              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+                Navigation
+              </h5>
+            )}
+            <ul className="nav flex-column">
+              <li className="nav-item mb-2">
+                <a 
+                  href="/dashboard" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Dashboard"
+                >
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+                </a>
+              </li>
+              <li className="nav-item mb-2">
+                <a 
+                  href="/problem/create" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Create Problem"
+                >
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+                </a>
+              </li>
+              <li className="nav-item mb-2">
+                <a 
+                  href="/problems" 
+                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
+                  title="All Problems"
+                >
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+                </a>
+              </li>
+              <li className="nav-item mb-2">
+                <a 
+                  href="/reports" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title="Reports"
+                >
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+                </a>
+              </li>
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <li className="nav-item mb-2">
+                  <a 
+                    href="/admin" 
+                    className="nav-link text-white rounded d-flex align-items-center"
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title="Admin Panel"
+                  >
+                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
+                  </a>
+                </li>
+              )}
+            </ul>
           </div>
         </div>
-      ))}
-    </div>
-    <small className="text-muted">
-      <i className="bi bi-info-circle me-1"></i>
-      Click on any image to view full size
-    </small>
-  </div>
-)}
 
-                {/* Rejection Notice */}
-                {problem.rejectionReason && problem.status === 'in_progress' && (
-                  <div className="alert alert-danger mb-4">
-                    <h6>❌ Completion Rejected</h6>
-                    <p className="mb-1"><strong>Reason:</strong> {problem.rejectionReason}</p>
-                    <small>Rejected by {problem.rejectedBy} on {new Date(problem.rejectedAt).toLocaleString()}</small>
-                  </div>
-                )}
+        {/* Main Content */}
+        <div className="flex-grow-1 position-relative" style={{ overflowY: 'auto' }}>
+          {/* Floating Back Button - Middle of page vertically */}
+          {/* <button 
+            onClick={() => navigate(-1)}
+            className="position-fixed shadow"
+            style={{
+              top: '50%',
+              left: sidebarMinimized ? '90px' : '270px',
+              transform: 'translateY(-50%)',
+              backdropFilter: 'blur(10px)',
+              backgroundColor: 'rgba(255, 255, 255, 0.85)',
+              border: '1px solid rgba(0,0,0,0.1)',
+              borderRadius: '50px',
+              padding: '10px 24px',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              transition: 'all 0.3s',
+              color: '#495057',
+              zIndex: 100,
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-50%) translateX(5px)';
+              e.target.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)';
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(-50%)';
+              e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
+            }}
+          >
+            <FaArrowLeft className="me-2" /> Back
+          </button> */}
 
-                {/* Basic Info */}
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <p><strong>Department:</strong> {problem.department}</p>
-                    <p><strong>Priority:</strong> 
-                      <span className={`badge ms-2 ${getPriorityBadge(problem.priority)}`}>
-                        {problem.priority}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="col-md-6">
-                    <p><strong>Status:</strong> 
-                      <span className={`badge ms-2 ${getStatusBadge(problem.status)}`}>
-                        {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </p>
-                    <p><strong>Created:</strong> {new Date(problem.createdAt).toLocaleString()}</p>
-                  </div>
-                </div>
-
-                {/* Problem Statement */}
-                <div className="mb-3">
-                  <h5>Problem Statement</h5>
-                  <p className="border p-3 rounded bg-light">{problem.statement}</p>
-                </div>
-
-                {/* Created By / Assigned To */}
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <p><strong>Created By:</strong> {problem.createdBy}</p>
-                  </div>
-                  <div className="col-md-6">
-                    <p><strong>Currently Assigned To:</strong> 
-                      {problem.assignedTo ? (
-                        <span className="badge bg-info ms-2">{problem.assignedTo}</span>
-                      ) : (
-                        <span className="text-muted ms-2">Not assigned yet</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Approval/Rejection Section for Admin/Team Leader */}
-                {problem.status === 'pending_approval' && canApprove() && (
-                  <div className="mb-4">
-                    <h5>Review Completion</h5>
-                    <div className="d-flex gap-2">
-                      <button 
-                        className="btn btn-success"
-                        onClick={handleApproveCompletion}
-                      >
-                        ✓ Approve Completion
+          <div className="p-4">
+            <div className="row">
+              {/* Main Problem Details */}
+              <div className="col-lg-8">
+                <div className="card shadow-sm border-0 mb-4">
+                  <div className="card-header d-flex justify-content-between align-items-center" 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      padding: '1rem 1.5rem'
+                    }}
+                  >
+                    <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
+                      Problem #{problem.id}
+                    </h5>
+                    {canDelete() && (
+                      <button className="btn btn-danger btn-sm" onClick={handleDelete} style={{ fontSize: '0.85rem' }}>
+                        🗑 Delete
                       </button>
-                      <button 
-                        className="btn btn-danger"
-                        onClick={handleRejectCompletion}
-                      >
-                        ✗ Reject & Send Back
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Completed Status Badge - No actions needed */}
-                {problem.status === 'done' && (
-                  <div className="alert alert-success mb-3">
-                    <h5 className="alert-heading">✅ Problem Completed</h5>
-                    <p className="mb-0">This problem has been successfully resolved and marked as done.</p>
-                    {problem.approvedBy && (
-                      <small className="text-muted d-block mt-2">
-                        Approved by <strong>{problem.approvedBy}</strong> on {new Date(problem.approvedAt).toLocaleString()}
-                      </small>
                     )}
                   </div>
-                )}
-
-                {/* Status Change Buttons for Assigned User or Admin/Leader */}
-                {canChangeStatus() && problem.status !== 'pending_approval' && problem.status !== 'done' && (
-                  <div className="mb-3">
-                    <h5>Update Status</h5>
-                    <div className="btn-group" role="group">
-                      <button
-                        className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
-                        onClick={() => handleStatusChange('pending')}
-                        disabled={problem.status === 'pending'}
-                      >
-                        Pending
-                      </button>
-                      <button
-                        className={`btn ${problem.status === 'in_progress' ? 'btn-info' : 'btn-outline-info'}`}
-                        onClick={() => handleStatusChange('in_progress')}
-                        disabled={problem.status === 'in_progress'}
-                      >
-                        In Progress
-                      </button>
-                      {canApprove() ? (
-                        <button
-                          className="btn btn-outline-success"
-                          onClick={() => handleStatusChange('done')}
-                          title="Mark as Done (Admin/Team Leader only)"
-                        >
-                          ✓ Mark as Done
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-outline-success"
-                          onClick={() => handleStatusChange('done')}
-                          title="Submit for approval"
-                        >
-                          ✓ Submit for Approval
-                        </button>
-                      )}
-                    </div>
-                    {!canApprove() && (
-                      <small className="text-muted d-block mt-2">
-                        <strong>Note:</strong> When you click "Submit for Approval", it will be sent to Admin/Team Leader for final approval.
-                      </small>
-                    )}
-                  </div>
-                )}
-
-                {/* Assignment History */}
-                {problem.transferHistory && problem.transferHistory.length > 0 && (
-                  <div className="mb-3">
-                    <h5>Assignment History</h5>
-                    <div className="alert alert-warning">
-                      <strong>Total persons involved:</strong> {problem.transferHistory.length + 1}
-                    </div>
-                    <div className="list-group">
-                      {problem.transferHistory.map((transfer, index) => (
-                        <div key={index} className="list-group-item">
-                          <div className="d-flex align-items-center justify-content-between mb-2">
-                            <div className="d-flex align-items-center gap-3 flex-grow-1">
-                              <span className="badge bg-danger px-3 py-2 fs-6">
-                                {transfer.from}
-                              </span>
-                              <span className="text-primary fs-4 fw-bold">→</span>
-                              <span className="badge bg-success px-3 py-2 fs-6">
-                                {transfer.to}
-                              </span>
-                            </div>
-                            <small className="text-muted">
-                              {new Date(transfer.date).toLocaleString()}
-                            </small>
-                          </div>
-                          <small className="text-muted d-block">
-                            <strong>Transferred by:</strong> {transfer.by}
+                  <div className="card-body" style={{ padding: '1.5rem' }}>
+                    {/* Pending Approval Alert */}
+                    {problem.status === 'pending_approval' && (
+                      <div className="alert alert-warning mb-3" style={{ borderRadius: '8px', fontSize: '0.9rem' }}>
+                        <h6 className="alert-heading mb-2" style={{ fontSize: '1rem', fontWeight: '600' }}>⏳ Awaiting Approval</h6>
+                        <p className="mb-2" style={{ fontSize: '0.85rem' }}>
+                          {canApprove() 
+                            ? 'This problem has been marked as complete. Please review and approve or reject.'
+                            : 'Your completion request is pending Admin/Team Leader approval.'}
+                        </p>
+                        {problem.submittedForApprovalBy && (
+                          <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>
+                            Submitted by <strong>{problem.submittedForApprovalBy}</strong> on {new Date(problem.submittedForApprovalAt).toLocaleString()}
                           </small>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Images Section with Modal */}
+                    {problem.images && problem.images.length > 0 && (
+                      <div className="mb-4">
+                        <h6 className="mb-3" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#495057' }}>
+                          📎 Attached Screenshots
+                        </h6>
+                        <div className="row g-3">
+                          {problem.images.map((img, index) => (
+                            <div key={index} className="col-md-4 col-6">
+                              <div 
+                                className="position-relative overflow-hidden"
+                                style={{
+                                  borderRadius: '10px',
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.2s, box-shadow 0.2s',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                }}
+                                onClick={() => setSelectedImage(img.url)}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                                }}
+                              >
+                                <img 
+                                  src={img.url} 
+                                  alt={`Screenshot ${index + 1}`}
+                                  className="img-fluid"
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '150px', 
+                                    objectFit: 'cover',
+                                    borderRadius: '10px'
+                                  }}
+                                />
+                                <div 
+                                  className="position-absolute bottom-0 start-0 end-0 text-center text-white"
+                                  style={{
+                                    background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
+                                    padding: '0.5rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '500',
+                                    borderBottomLeftRadius: '10px',
+                                    borderBottomRightRadius: '10px'
+                                  }}
+                                >
+                                  Screenshot {index + 1}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                        <small className="text-muted d-block mt-2" style={{ fontSize: '0.75rem' }}>
+                          💡 Click on any image to view full size
+                        </small>
+                      </div>
+                    )}
+
+                    {/* Rejection Notice */}
+                    {problem.rejectionReason && problem.status === 'in_progress' && (
+                      <div className="alert alert-danger mb-3" style={{ borderRadius: '8px', fontSize: '0.9rem' }}>
+                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600' }}>❌ Completion Rejected</h6>
+                        <p className="mb-1" style={{ fontSize: '0.85rem' }}><strong>Reason:</strong> {problem.rejectionReason}</p>
+                        <small style={{ fontSize: '0.75rem' }}>Rejected by {problem.rejectedBy} on {new Date(problem.rejectedAt).toLocaleString()}</small>
+                      </div>
+                    )}
+
+                    {/* Basic Info - Professional Grid */}
+                    <div className="row g-3 mb-4">
+                      <div className="col-md-6">
+                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Department</small>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#495057' }}>{problem.department}</div>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority</small>
+                          <span className={`badge ${getPriorityBadge(problem.priority)}`} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                            {problem.priority}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</small>
+                          <span className={`badge ${getStatusBadge(problem.status)}`} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                            {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Created</small>
+                          <div style={{ fontSize: '0.8rem', color: '#6c757d' }}>{new Date(problem.createdAt).toLocaleString()}</div>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Problem Statement */}
+                    <div className="mb-4">
+                      <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#495057' }}>
+                        📋 Problem Statement
+                      </h6>
+                      <div className="p-3 rounded-3" style={{ backgroundColor: '#f8f9fa', border: '1px solid #e9ecef', fontSize: '0.9rem', lineHeight: '1.6', color: '#495057' }}>
+                        {problem.statement}
+                      </div>
+                    </div>
+
+                    {/* Created By / Assigned To */}
+                    <div className="row g-3 mb-4">
+                      <div className="col-md-6">
+                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Created By</small>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#495057' }}>{problem.createdBy}</div>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned To</small>
+                          {problem.assignedTo ? (
+                            <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>{problem.assignedTo}</span>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '0.85rem' }}>Not assigned yet</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Approval/Rejection Section */}
+                    {problem.status === 'pending_approval' && canApprove() && (
+                      <div className="mb-4">
+                        <h6 className="mb-3" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Review Completion</h6>
+                        <div className="d-flex gap-2">
+                          <button 
+                            className="btn btn-success"
+                            onClick={handleApproveCompletion}
+                            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                          >
+                            ✓ Approve
+                          </button>
+                          <button 
+                            className="btn btn-danger"
+                            onClick={handleRejectCompletion}
+                            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                          >
+                            ✗ Reject
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Completed Status */}
+                    {problem.status === 'done' && (
+                      <div className="alert alert-success mb-4" style={{ borderRadius: '8px', fontSize: '0.9rem' }}>
+                        <h6 className="alert-heading mb-2" style={{ fontSize: '1rem', fontWeight: '600' }}>✅ Problem Completed</h6>
+                        <p className="mb-0" style={{ fontSize: '0.85rem' }}>This problem has been successfully resolved and marked as done.</p>
+                        {problem.approvedBy && (
+                          <small className="text-muted d-block mt-2" style={{ fontSize: '0.75rem' }}>
+                            Approved by <strong>{problem.approvedBy}</strong> on {new Date(problem.approvedAt).toLocaleString()}
+                          </small>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Status Change Buttons */}
+                    {canChangeStatus() && problem.status !== 'pending_approval' && problem.status !== 'done' && (
+                      <div className="mb-4">
+                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Update Status</h6>
+                        <div className="btn-group btn-group-sm" role="group">
+                          <button
+                            className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
+                            onClick={() => handleStatusChange('pending')}
+                            disabled={problem.status === 'pending'}
+                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
+                          >
+                            Pending
+                          </button>
+                          <button
+                            className={`btn ${problem.status === 'in_progress' ? 'btn-info' : 'btn-outline-info'}`}
+                            onClick={() => handleStatusChange('in_progress')}
+                            disabled={problem.status === 'in_progress'}
+                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
+                          >
+                            In Progress
+                          </button>
+                          <button
+                            className="btn btn-outline-success"
+                            onClick={() => handleStatusChange('done')}
+                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
+                          >
+                            ✓ {canApprove() ? 'Mark Solved' : 'Submit'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-
+                </div>
                 {/* Comments Section */}
-                <div className="mt-4">
-                  <h5>Comments ({problem.comments?.length || 0})</h5>
-                  
-                  <form onSubmit={handleAddComment} className="mb-3">
-                    <div className="mb-2">
-                      <textarea
-                        className="form-control"
-                        rows="3"
-                        placeholder="Add a comment..."
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                      ></textarea>
-                    </div>
-                    <button 
-                      type="submit" 
-                      className="btn btn-primary"
-                      disabled={submittingComment}
-                    >
-                      {submittingComment ? 'Adding...' : '💬 Add Comment'}
-                    </button>
-                  </form>
-
-                  <div>
+                <div className="card shadow-sm border-0 mb-4">
+                  <div className="card-header"
+                    style={{ 
+                      background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
+                      color: 'white',
+                      padding: '1rem 1.5rem'
+                    }}
+                  >
+                    <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
+                      💬 Comments
+                    </h5>
+                  </div>
+                  <div className="card-body" style={{ padding: '1.5rem' }}>
+                    {/* Comment Form */}
+                    <form onSubmit={handleAddComment} className="mb-4">
+                      <div className="mb-3">
+                        <label htmlFor="comment" className="form-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
+                          Add a Comment
+                        </label>
+                        <textarea
+                          id="comment"
+                          className="form-control"
+                          rows="3"
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                          style={{ fontSize: '0.9rem' }}
+                        ></textarea>
+                      </div>
+                      <button 
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={submittingComment}
+                        style={{ fontSize: '0.9rem', padding: '0.5rem 1.2rem' }}
+                      >
+                        {submittingComment ? 'Submitting...' : 'Submit Comment'}
+                      </button>
+                    </form>
+                    {/* Comments List */}
                     {problem.comments && problem.comments.length > 0 ? (
-                      problem.comments.map((c) => (
-                        <div key={c.id} className="card mb-2">
-                          <div className="card-body">
-                            <div className="d-flex justify-content-between">
-                              <h6 className="mb-1">{c.user?.name}</h6>
-                              <small className="text-muted">
+                      <div>
+                        {problem.comments.map(c => (
+                          <div key={c.id} className="mb-3 pb-3 border-bottom" style={{ fontSize: '0.9rem' }}>
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <strong style={{ fontSize: '0.95rem' }}>{c.user.name}</strong>
+                              <small className="text-muted" style={{ fontSize: '0.75rem' }}>
                                 {new Date(c.created_at).toLocaleString()}
                               </small>
                             </div>
-                            <p className="mb-0">{c.comment}</p>
+                            <div style={{ color: '#495057', lineHeight: '1.5' }}>
+                              {c.comment}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        ))}
+                      </div>
                     ) : (
-                      <p className="text-muted">No comments yet. Be the first to comment!</p>
+                      <p className="text-muted" style={{ fontSize: '0.9rem' }}>No comments yet. Be the first to comment!</p>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="col-lg-4">
-            <div className="card shadow mb-4">
-              <div className="card-header bg-info text-white">
-                <h5 className="mb-0">Quick Info</h5>
-              </div>
-              <div className="card-body">
-                <ul className="list-unstyled mb-0">
-                  <li className="mb-2">
-                    <strong>Problem ID:</strong> #{problem.id}
-                  </li>
-                  <li className="mb-2">
-                    <strong>Department:</strong> {problem.department}
-                  </li>
-                  <li className="mb-2">
-                    <strong>Priority:</strong> 
-                    <span className={`badge ms-2 ${getPriorityBadge(problem.priority)}`}>
-                      {problem.priority}
-                    </span>
-                  </li>
-                  <li className="mb-2">
-                    <strong>Current Status:</strong> 
-                    <span className={`badge ms-2 ${getStatusBadge(problem.status)}`}>
-                      {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </li>
-                  <li className="mb-2">
-                    <strong>Created:</strong><br />
-                    <small>{new Date(problem.createdAt).toLocaleString()}</small>
-                  </li>
-                  {problem.approvedBy && (
-                    <li className="mb-2">
-                      <strong>Approved By:</strong> {problem.approvedBy}<br />
-                      <small>{new Date(problem.approvedAt).toLocaleString()}</small>
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-
-            <div className="card shadow">
-              <div className="card-header bg-secondary text-white">
-                <h5 className="mb-0">Activity</h5>
-              </div>
-              <div className="card-body">
-                <ul className="list-unstyled mb-0">
-                  <li className="mb-2">
-                    <small className="text-muted">
-                      📝 Problem created by <strong>{problem.createdBy}</strong>
-                    </small>
-                  </li>
-                  {problem.assignedTo && (
-                    <li className="mb-2">
-                      <small className="text-muted">
-                        👤 Currently assigned to <strong>{problem.assignedTo}</strong>
-                      </small>
-                    </li>
-                  )}
-                  {problem.transferHistory && problem.transferHistory.length > 0 && (
-                    <li className="mb-2">
-                      <small className="text-muted">
-                        ⇄ Transferred {problem.transferHistory.length} time(s)
-                      </small>
-                    </li>
-                  )}
-                  <li className="mb-2">
-                    <small className="text-muted">
-                      💬 {problem.comments?.length || 0} comment(s)
-                    </small>
-                  </li>
-                </ul>
+              {/* Sidebar - Problem Metadata */}
+              <div className="col-lg-4">
+                <div className="card shadow-sm border-0 mb-4">
+                  <div className="card-header"
+                    style={{ 
+                      background: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)',
+                      color: 'white',
+                      padding: '1rem 1.5rem'
+                    }}
+                  >
+                    <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
+                      🗂 Problem Details
+                    </h5>
+                  </div>
+                  <div className="card-body" style={{ padding: '1.5rem' }}>
+                    <ul className="list-group list-group-flush">
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Problem ID:</strong></span>
+                        <span>{problem.id}</span>
+                      </li>
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Department:</strong></span>
+                        <span>{problem.department}</span>
+                      </li>
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Priority:</strong></span>
+                        <span>{problem.priority}</span>
+                      </li>
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Status:</strong></span>
+                        <span className={getStatusBadge(problem.status)} style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>
+                          {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </li>
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Created At:</strong></span>
+                        <span>{new Date(problem.createdAt).toLocaleString()}</span>
+                      </li>
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Created By:</strong></span>
+                        <span>{problem.createdBy}</span>
+                      </li>
+                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                        <span><strong>Assigned To:</strong></span>
+                        <span>{problem.assignedTo || 'Unassigned'}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+      {/* Image Modal */}
+      {selectedImage && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ 
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 1050,
+            cursor: 'pointer'
+          }}
+          onClick={() => setSelectedImage(null)}
+        >
+          <img 
+            src={selectedImage}
+            alt="Full Size"
+            style={{ 
+              maxWidth: '90%',
+              maxHeight: '90%',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              borderRadius: '10px'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
