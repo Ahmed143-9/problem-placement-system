@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaRobot, FaTasks, FaArrowRight, FaUserCheck, FaLayerGroup, FaUserTie } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
@@ -9,12 +9,18 @@ export default function AdminPanelUserManagement() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
+  const [problems, setProblems] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState('');
+  const [showFirstFaceModal, setShowFirstFaceModal] = useState(false);
+  const [selectedFirstFace, setSelectedFirstFace] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [firstFaceStats, setFirstFaceStats] = useState({ assigned: 0, total: 0 });
+  const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -30,6 +36,8 @@ export default function AdminPanelUserManagement() {
 
   useEffect(() => {
     loadUsers();
+    loadProblems();
+    loadFirstFaceAssignments();
   }, []);
 
   const loadUsers = () => {
@@ -39,6 +47,24 @@ export default function AdminPanelUserManagement() {
       setUsers(filteredUsers);
     } catch (error) {
       console.error('Failed to load users:', error);
+    }
+  };
+
+  const loadProblems = () => {
+    try {
+      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      setProblems(storedProblems);
+    } catch (error) {
+      console.error('Failed to load problems:', error);
+    }
+  };
+
+  const loadFirstFaceAssignments = () => {
+    try {
+      const storedAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      setFirstFaceAssignments(storedAssignments);
+    } catch (error) {
+      console.error('Failed to load first face assignments:', error);
     }
   };
 
@@ -52,9 +78,87 @@ export default function AdminPanelUserManagement() {
   };
 
   const validatePassword = (password) => {
-    // Minimum 8 chars, 1 uppercase, 1 number, 1 special char
     const re = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     return re.test(password);
+  };
+
+  // 🔥 NEW: First Face Assignment System
+  const handleFirstFaceAssignment = () => {
+    if (!selectedFirstFace) {
+      toast.error('Please select a First Face');
+      return;
+    }
+
+    try {
+      // Check if already assigned for this department
+      const existingAssignment = firstFaceAssignments.find(ff => 
+        ff.department === selectedDepartment
+      );
+
+      if (existingAssignment && selectedDepartment !== 'all') {
+        if (!window.confirm(`${existingAssignment.userName} is already First Face for ${selectedDepartment}. Replace?`)) {
+          return;
+        }
+      }
+
+      const selectedUser = users.find(u => u.name === selectedFirstFace);
+      
+      const newAssignment = {
+        id: Date.now(),
+        userName: selectedFirstFace,
+        userId: selectedUser?.id,
+        department: selectedDepartment,
+        type: selectedDepartment === 'all' ? 'all' : 'specific',
+        assignedBy: user?.name || 'Admin',
+        assignedAt: new Date().toISOString()
+      };
+
+      // Remove existing assignment for this department
+      const updatedAssignments = firstFaceAssignments.filter(ff => 
+        ff.department !== selectedDepartment
+      );
+
+      updatedAssignments.push(newAssignment);
+      
+      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+      setFirstFaceAssignments(updatedAssignments);
+      
+      toast.success(`✅ ${selectedFirstFace} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
+      
+      setShowFirstFaceModal(false);
+      setSelectedFirstFace('');
+      setSelectedDepartment('all');
+    } catch (error) {
+      toast.error('Failed to assign First Face');
+      console.error(error);
+    }
+  };
+
+  // Remove First Face Assignment
+  const handleRemoveFirstFace = (assignmentId) => {
+    try {
+      const updatedAssignments = firstFaceAssignments.filter(ff => ff.id !== assignmentId);
+      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+      setFirstFaceAssignments(updatedAssignments);
+      toast.success('First Face assignment removed!');
+    } catch (error) {
+      toast.error('Failed to remove First Face');
+      console.error(error);
+    }
+  };
+
+  // Get unassigned problems count by department
+  const getUnassignedProblemsByDepartment = () => {
+    const unassigned = problems.filter(p => !p.assignedTo && p.status === 'pending');
+    
+    const byDepartment = {
+      all: unassigned.length,
+      'IT & Innovation': unassigned.filter(p => p.department === 'IT & Innovation').length,
+      'Business': unassigned.filter(p => p.department === 'Business').length,
+      'Accounts': unassigned.filter(p => p.department === 'Accounts').length
+    };
+    
+    return byDepartment;
   };
 
   const handleSaveUser = () => {
@@ -181,6 +285,12 @@ export default function AdminPanelUserManagement() {
     setSelectedEmail(email);
     setShowEmailModal(true);
   };
+
+  // Get ALL ACTIVE USERS for First Face
+  const activeUsers = users.filter(u => u.status === 'active');
+
+  // Get unassigned problems count by department
+  const unassignedProblemsByDept = getUnassignedProblemsByDepartment();
 
   const sidebarLinkStyle = {
     transition: 'all 0.2s ease'
@@ -321,17 +431,26 @@ export default function AdminPanelUserManagement() {
                   </small>
                 </div>
                 {isAdmin && (
-                  <button
-                    className="btn btn-light btn-sm w-100 w-md-auto mt-2 mt-md-0"
-                    onClick={() => {
-                      setEditingUser(null);
-                      setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
-                      setShowAddModal(true);
-                    }}
-                  >
-                    <FaUserPlus className="me-1" />
-                    <span>Add New User</span>
-                  </button>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-warning btn-sm"
+                      onClick={() => setShowFirstFaceModal(true)}
+                    >
+                      <FaUserCheck className="me-1" />
+                      First Face
+                    </button>
+                    <button
+                      className="btn btn-light btn-sm"
+                      onClick={() => {
+                        setEditingUser(null);
+                        setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
+                        setShowAddModal(true);
+                      }}
+                    >
+                      <FaUserPlus className="me-1" />
+                      <span>Add New User</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -343,9 +462,44 @@ export default function AdminPanelUserManagement() {
                 </div>
               )}
 
-              {/* Stats Cards */}
+              {/* First Face Assignments Section */}
+              {isAdmin && firstFaceAssignments.length > 0 && (
+                <div className="card border-warning mb-4">
+                  <div className="card-header bg-warning text-dark">
+                    <h6 className="mb-0">
+                      <FaUserCheck className="me-2" />
+                      Active First Face Assignments
+                    </h6>
+                  </div>
+                  <div className="card-body p-3">
+                    <div className="row g-2">
+                      {firstFaceAssignments.map(assignment => (
+                        <div key={assignment.id} className="col-md-6">
+                          <div className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                            <div>
+                              <strong>{assignment.userName}</strong>
+                              <small className="text-muted d-block">
+                                {assignment.department === 'all' ? 'All Departments' : assignment.department}
+                              </small>
+                            </div>
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleRemoveFirstFace(assignment.id)}
+                              title="Remove First Face"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Enhanced Stats Cards */}
               <div className="row g-3 mb-4">
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="card border-primary text-center h-100">
                     <div className="card-body">
                       <h3 className="text-primary mb-0">{users.filter(u => u.role === 'team_leader').length}</h3>
@@ -353,7 +507,7 @@ export default function AdminPanelUserManagement() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="card border-info text-center h-100">
                     <div className="card-body">
                       <h3 className="text-info mb-0">{users.filter(u => u.role === 'user').length}</h3>
@@ -361,11 +515,19 @@ export default function AdminPanelUserManagement() {
                     </div>
                   </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
                   <div className="card border-success text-center h-100">
                     <div className="card-body">
                       <h3 className="text-success mb-0">{users.filter(u => u.status === 'active').length}</h3>
                       <small className="text-muted">Active Users</small>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="card border-warning text-center h-100">
+                    <div className="card-body">
+                      <h3 className="text-warning mb-0">{firstFaceAssignments.length}</h3>
+                      <small className="text-muted">First Face Assignments</small>
                     </div>
                   </div>
                 </div>
@@ -409,7 +571,12 @@ export default function AdminPanelUserManagement() {
                     ) : (
                       users.map(u => (
                         <tr key={u.id} className="align-middle">
-                          <td className="fw-semibold">{u.name}</td>
+                          <td className="fw-semibold">
+                            {u.name}
+                            {firstFaceAssignments.some(ff => ff.userName === u.name) && (
+                              <span className="badge bg-warning text-dark ms-1" title="First Face">FF</span>
+                            )}
+                          </td>
                           <td>
                             <code className="bg-light px-2 py-1 rounded d-inline-block">
                               {u.username}
@@ -507,6 +674,108 @@ export default function AdminPanelUserManagement() {
                     onClick={() => setShowEmailModal(false)}
                   >
                     Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* First Face Assignment Modal */}
+      {showFirstFaceModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning text-dark">
+                <h5 className="modal-title">
+                  <FaUserCheck className="me-2" />
+                  First Face Assignment
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setShowFirstFaceModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  <strong>First Face System:</strong> New problems will be automatically assigned to First Face users based on department.
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Select First Face:</label>
+                  <select
+                    className="form-control"
+                    value={selectedFirstFace}
+                    onChange={(e) => setSelectedFirstFace(e.target.value)}
+                  >
+                    <option value="">-- Select First Face --</option>
+                    {activeUsers.map(user => (
+                      <option key={user.id} value={user.name}>
+                        {user.name} 
+                        {user.role === 'team_leader' && ' 👑'} 
+                        {user.role === 'user' && ' 👨‍💼'} 
+                        - {user.department}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-muted">
+                    You can select any active user (Team Leader or Regular User)
+                  </small>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Assign For Department:</label>
+                  <select
+                    className="form-control"
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                  >
+                    <option value="all">🎯 All Departments</option>
+                    <option value="IT & Innovation">💻 IT & Innovation Department</option>
+                    <option value="Business">📊 Business Department</option>
+                    <option value="Accounts">💰 Accounts Department</option>
+                  </select>
+                  <small className="text-muted">
+                    {selectedDepartment === 'all' 
+                      ? 'Will receive ALL new problems from any department' 
+                      : `Will receive only ${selectedDepartment} department problems`
+                    }
+                  </small>
+                </div>
+
+                <div className="p-3 bg-light rounded">
+                  <div className="row text-center">
+                    <div className="col-12">
+                      <h5 className="text-warning mb-2">Assignment Summary</h5>
+                      <p className="mb-1">
+                        <strong>{selectedFirstFace || 'Selected User'}</strong> will receive:
+                      </p>
+                      <p className="mb-0 text-success">
+                        {selectedDepartment === 'all' 
+                          ? 'ALL new problems from ANY department'
+                          : `NEW problems only from ${selectedDepartment} department`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="d-flex gap-2 mt-4">
+                  <button 
+                    className="btn btn-warning flex-grow-1"
+                    onClick={handleFirstFaceAssignment}
+                    disabled={!selectedFirstFace}
+                  >
+                    <FaUserCheck className="me-2" />
+                    Set as First Face
+                  </button>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => setShowFirstFaceModal(false)}
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>

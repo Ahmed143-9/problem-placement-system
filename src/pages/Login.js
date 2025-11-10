@@ -73,7 +73,7 @@ export default function Login() {
           <div className="card shadow-lg">
             <div className="card-body p-5">
               <div className="text-center mb-4">
-                <h2 className="fw-bold">Problem Management System</h2>
+                <h2 className="fw-bold">Issue Management System</h2>
                 <p className="text-muted">Login to your account</p>
               </div>
 

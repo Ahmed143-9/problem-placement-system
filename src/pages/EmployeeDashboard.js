@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // useCallback import করুন
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner } from 'react-icons/fa';
+import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaExchangeAlt } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 const MOTIVATIONAL_QUOTES = [
   "Great work starts with great attitude! 💪",
@@ -23,13 +24,13 @@ export default function EmployeeDashboard() {
   const [assignedProblems, setAssignedProblems] = useState([]);
   const [stats, setStats] = useState(null);
   const [randomQuote, setRandomQuote] = useState('');
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedProblem, setSelectedProblem] = useState(null);
+  const [transferTo, setTransferTo] = useState('');
+  const [teamMembers, setTeamMembers] = useState([]);
 
-  useEffect(() => {
-    fetchUserProblems();
-    setRandomQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
-  }, []);
-
-  const fetchUserProblems = () => {
+  // useCallback দিয়ে functions গুলো wrap করুন
+  const fetchUserProblems = useCallback(() => {
     try {
       const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
       
@@ -43,7 +44,7 @@ export default function EmployeeDashboard() {
       setAssignedProblems(assignedToMe);
       
       const statsData = {
-        my_problems: createdByMe.length, // Only count self-created problems
+        my_problems: createdByMe.length,
         assigned_to_me: assignedToMe.length,
         in_progress: assignedToMe.filter(p => p.status === 'in_progress').length,
         completed: assignedToMe.filter(p => p.status === 'done').length
@@ -53,11 +54,76 @@ export default function EmployeeDashboard() {
     } catch (error) {
       console.error('Failed to fetch problems:', error);
     }
+  }, [user?.name]); // dependencies যোগ করুন
+
+  const fetchTeamMembers = useCallback(() => {
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      // Filter out current user and inactive users
+      const members = storedUsers.filter(u => 
+        u.username !== user?.name && u.status === 'active'
+      );
+      setTeamMembers(members);
+    } catch (error) {
+      console.error('Failed to fetch team members:', error);
+    }
+  }, [user?.name]); // dependencies যোগ করুন
+
+  useEffect(() => {
+    fetchUserProblems();
+    fetchTeamMembers();
+    setRandomQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
+  }, [fetchUserProblems, fetchTeamMembers]); // dependencies যোগ করুন
+
+  const handleTransferClick = (problem) => {
+    setSelectedProblem(problem);
+    setTransferTo('');
+    setShowTransferModal(true);
+  };
+
+  const handleTransferSubmit = () => {
+    if (!transferTo.trim()) {
+      toast.error('Please select a team member to transfer to');
+      return;
+    }
+
+    try {
+      const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      const updatedProblems = allProblems.map(p => {
+        if (p.id === selectedProblem.id) {
+          return {
+            ...p,
+            assignedTo: transferTo,
+            transferHistory: [
+              ...(p.transferHistory || []),
+              {
+                from: user?.name,
+                to: transferTo,
+                date: new Date().toISOString(),
+                by: user?.name
+              }
+            ]
+          };
+        }
+        return p;
+      });
+
+      localStorage.setItem('problems', JSON.stringify(updatedProblems));
+      setShowTransferModal(false);
+      setTransferTo('');
+      setSelectedProblem(null);
+      fetchUserProblems();
+      toast.success('Work transferred successfully!');
+    } catch (error) {
+      console.error('Failed to transfer work:', error);
+      toast.error('Failed to transfer work. Please try again.');
+    }
   };
 
   return (
     <div>
       <Navbar />
+      {/* REMOVED: Sidebar completely */}
       <div className="container mt-4">
         {/* Motivational Banner */}
         <div className="alert alert-info mb-4 text-center" style={{
@@ -151,7 +217,6 @@ export default function EmployeeDashboard() {
                       <table className="table table-hover table-sm">
                         <thead className="sticky-top bg-light">
                           <tr>
-                            <th>ID</th>
                             <th>Priority</th>
                             <th>Status</th>
                             <th>Assigned To</th>
@@ -161,7 +226,6 @@ export default function EmployeeDashboard() {
                         <tbody>
                           {myCreatedProblems.slice(0, 10).reverse().map(problem => (
                             <tr key={problem.id}>
-                              <td><strong>#{problem.id}</strong></td>
                               <td>
                                 <span className={`badge ${
                                   problem.priority === 'High' ? 'bg-danger' :
@@ -197,9 +261,9 @@ export default function EmployeeDashboard() {
                     </div>
                     {myCreatedProblems.length > 10 && (
                       <div className="text-center mt-3">
-                        <Link to="/my-issues" className="btn btn-sm btn-primary">
-                          View All My Issues ({myCreatedProblems.length})
-                        </Link>
+                        <span className="badge bg-primary">
+                          Total: {myCreatedProblems.length} issues
+                        </span>
                       </div>
                     )}
                   </>
@@ -227,17 +291,15 @@ export default function EmployeeDashboard() {
                     <table className="table table-hover table-sm">
                       <thead className="sticky-top bg-light">
                         <tr>
-                          <th>ID</th>
                           <th>Department</th>
                           <th>Priority</th>
                           <th>Status</th>
-                          <th>Action</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {assignedProblems.slice(0, 10).reverse().map(problem => (
                           <tr key={problem.id}>
-                            <td><strong>#{problem.id}</strong></td>
                             <td>{problem.department}</td>
                             <td>
                               <span className={`badge ${
@@ -256,9 +318,16 @@ export default function EmployeeDashboard() {
                               </span>
                             </td>
                             <td>
-                              <Link to={`/problem/${problem.id}`} className="btn btn-sm btn-outline-primary">
+                              <Link to={`/problem/${problem.id}`} className="btn btn-sm btn-outline-primary me-1">
                                 View
                               </Link>
+                              <button 
+                                onClick={() => handleTransferClick(problem)}
+                                className="btn btn-sm btn-outline-warning"
+                                title="Transfer this work"
+                              >
+                                <FaExchangeAlt />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -278,19 +347,13 @@ export default function EmployeeDashboard() {
           </div>
           <div className="card-body">
             <div className="row">
-              <div className="col-md-4 mb-3">
+              <div className="col-md-6 mb-3">
                 <Link to="/problem/create" className="btn btn-primary w-100 py-3">
                   <FaClipboardList className="me-2" style={{ fontSize: '1.5rem' }} />
                   <div>Create New Problem</div>
                 </Link>
               </div>
-              <div className="col-md-4 mb-3">
-                <Link to="/my-issues" className="btn btn-success w-100 py-3">
-                  <FaTasks className="me-2" style={{ fontSize: '1.5rem' }} />
-                  <div>View My Issues</div>
-                </Link>
-              </div>
-              <div className="col-md-4 mb-3">
+              <div className="col-md-6 mb-3">
                 <Link to="/reports" className="btn btn-secondary w-100 py-3">
                   <FaCheckCircle className="me-2" style={{ fontSize: '1.5rem' }} />
                   <div>Download Reports</div>
@@ -299,6 +362,83 @@ export default function EmployeeDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Transfer Modal */}
+        {showTransferModal && (
+          <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-warning">
+                  <h5 className="modal-title">
+                    <FaExchangeAlt className="me-2" />
+                    Transfer Work
+                  </h5>
+                  <button 
+                    type="button" 
+                    className="btn-close" 
+                    onClick={() => {
+                      setShowTransferModal(false);
+                      setTransferTo('');
+                      setSelectedProblem(null);
+                    }}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <p className="text-muted">
+                      <strong>Problem ID:</strong> #{selectedProblem?.id}<br />
+                      <strong>Department:</strong> {selectedProblem?.department}<br />
+                      <strong>Priority:</strong> <span className={`badge ${
+                        selectedProblem?.priority === 'High' ? 'bg-danger' :
+                        selectedProblem?.priority === 'Medium' ? 'bg-warning' : 'bg-success'
+                      }`}>{selectedProblem?.priority}</span>
+                    </p>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Transfer to:</label>
+                    <select
+                      className="form-control"
+                      value={transferTo}
+                      onChange={(e) => setTransferTo(e.target.value)}
+                    >
+                      <option value="">-- Select Team Member --</option>
+                      {teamMembers.map(member => (
+                        <option key={member.id} value={member.name}>
+                          {member.name} ({member.role === 'team_leader' ? 'Team Leader' : 'User'}) - {member.department}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="text-muted">
+                      Only active team members are shown
+                    </small>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowTransferModal(false);
+                      setTransferTo('');
+                      setSelectedProblem(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-warning"
+                    onClick={handleTransferSubmit}
+                    disabled={!transferTo}
+                  >
+                    <FaExchangeAlt className="me-1" />
+                    Transfer Work
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -20,7 +20,7 @@ const SERVICES = [
   'Web Solution'
 ];
 
-export default function ProblemFormFixed() {
+export default function ProblemForm() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -81,46 +81,80 @@ export default function ProblemFormFixed() {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  // 🔥 COMPLETE AUTO FIRST FACE ASSIGNMENT FUNCTION
+  // 🔥 COMPLETE AUTO FIRST FACE ASSIGNMENT FUNCTION
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-      
-      const newProblem = {
-        id: problems.length + 1,
-        ...formData,
-        status: 'pending',
-        createdBy: 'Current User',
-        assignedTo: null,
-        createdAt: new Date().toISOString(),
-        comments: [],
-        actionHistory: [{
-          action: 'Problem Created',
-          by: 'Current User',
-          timestamp: new Date().toISOString(),
-          comment: 'Problem ticket submitted'
-        }]
-      };
-      
-      problems.push(newProblem);
-      localStorage.setItem('problems', JSON.stringify(problems));
-      
-      toast.success('Problem submitted successfully!');
-      setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
-      setPreviewImages([]);
-      
-      setTimeout(() => {
-        navigate('/problems');
-      }, 1000);
-    } catch (error) {
-      toast.error('Failed to submit problem');
-      console.error(error);
-    } finally {
-      setLoading(false);
+  try {
+    const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+    
+    // 🔥 AUTO FIRST FACE ASSIGNMENT LOGIC
+    const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+    let autoAssignedTo = '';
+    
+    // Check for specific department first face
+    const deptFirstFace = firstFaceAssignments.find(ff => 
+      ff.department === formData.department
+    );
+    
+    // Check for all department first face (if no specific found)
+    const allDeptFirstFace = firstFaceAssignments.find(ff => ff.department === 'all');
+    
+    if (deptFirstFace) {
+      autoAssignedTo = deptFirstFace.userName;
+    } else if (allDeptFirstFace) {
+      autoAssignedTo = allDeptFirstFace.userName;
     }
-  };
+
+    const newProblem = {
+      id: problems.length + 1,
+      ...formData,
+      status: 'pending', // 🔥 ALWAYS KEEP AS PENDING (even if assigned)
+      createdBy: user?.name || 'Unknown User',
+      assignedTo: autoAssignedTo, // 🔥 AUTO ASSIGNED BUT STATUS PENDING
+      createdAt: new Date().toISOString(),
+      comments: [],
+      actionHistory: [{
+        action: 'Problem Created',
+        by: user?.name || 'Unknown User',
+        timestamp: new Date().toISOString(),
+        comment: autoAssignedTo 
+          ? `Auto assigned to ${autoAssignedTo} (First Face) - Status: Pending`
+          : 'Problem ticket submitted - Waiting for assignment'
+      }]
+    };
+    
+    problems.push(newProblem);
+    localStorage.setItem('problems', JSON.stringify(problems));
+    
+    // Show appropriate success message
+    if (autoAssignedTo) {
+      toast.success(`Problem submitted and auto-assigned to ${autoAssignedTo}! (Status: Pending)`);
+    } else {
+      toast.success('Problem submitted! Will be assigned manually.');
+    }
+    
+    setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
+    setPreviewImages([]);
+    
+    // Role-based redirect
+    setTimeout(() => {
+      if (user?.role === 'admin' || user?.role === 'team_leader') {
+        navigate('/dashboard');
+      } else {
+        navigate('/employee-dashboard');
+      }
+    }, 1000);
+    
+  } catch (error) {
+    toast.error('Failed to submit problem');
+    console.error(error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
@@ -176,11 +210,9 @@ export default function ProblemFormFixed() {
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
                 <Link 
-                  to="/dashboard" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  to="/employee-dashboard" 
+                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
+                  style={{ transition: 'all 0.2s ease' }}
                   title="Dashboard"
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -190,32 +222,39 @@ export default function ProblemFormFixed() {
               <li className="nav-item mb-2">
                 <Link 
                   to="/problem/create" 
-                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={{ transition: 'all 0.2s ease' }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Create Problem"
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                 </Link>
               </li>
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/problems" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  title="All Problems"
-                >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-                </Link>
-              </li>
+              
+              {/* Only show All Problems for Admin/Team Leader in Sidebar */}
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <li className="nav-item mb-2">
+                  <Link 
+                    to="/problems" 
+                    className="nav-link text-white rounded d-flex align-items-center"
+                    style={{ transition: 'all 0.2s ease' }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title="All Problems"
+                  >
+                    <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+                  </Link>
+                </li>
+              )}
+              
               <li className="nav-item mb-2">
                 <Link 
                   to="/reports" 
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
+                  style={{ transition: 'all 0.2s ease' }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Reports"
@@ -224,21 +263,6 @@ export default function ProblemFormFixed() {
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
-              {(user?.role === 'admin' || user?.role === 'team_leader') && (
-                <li className="nav-item mb-2">
-                  <Link 
-                    to="/admin" 
-                    className="nav-link text-white rounded d-flex align-items-center"
-                    style={sidebarLinkStyle}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    title="Admin Panel"
-                  >
-                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
-                  </Link>
-                </li>
-              )}
             </ul>
           </div>
         </div>
@@ -258,19 +282,10 @@ export default function ProblemFormFixed() {
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
                       <h4 className="mb-1 fw-semibold">
-                        <i className="bi bi-ticket-perforated me-2"></i>
                         Submit Problem Ticket
                       </h4>
                       <small className="opacity-75">Please provide detailed information about the issue</small>
                     </div>
-                    {/* <button 
-                      type="button" 
-                      className="btn btn-light btn-sm"
-                      onClick={() => navigate(-1)}
-                    >
-                      <i className="bi bi-arrow-left me-1"></i>
-                      Back
-                    </button> */}
                   </div>
                 </div>
                 <div className="card-body p-4">
@@ -421,7 +436,6 @@ export default function ProblemFormFixed() {
                           </>
                         ) : (
                           <>
-                            <i className="bi bi-send-check me-2"></i>
                             Submit Problem
                           </>
                         )}
@@ -431,7 +445,6 @@ export default function ProblemFormFixed() {
                         className="btn btn-outline-secondary px-4"
                         onClick={() => navigate(-1)}
                       >
-                        <i className="bi bi-x-circle me-2"></i>
                         Cancel
                       </button>
                     </div>

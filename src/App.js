@@ -17,6 +17,7 @@ import Reports from "./pages/Reports";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import ProblemCreate from "./pages/ProblemCreate";
 
 function App() {
   return (
@@ -114,6 +115,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/problem/create" element={<ProblemCreate />} />
           </Routes>
         </Router>
       </NotificationProvider>

@@ -11,7 +11,8 @@ import {
   FaPlusCircle, 
   FaTasks, 
   FaCheckCircle,
-  FaExclamationCircle
+  FaExclamationCircle,
+  FaFileAlt
 } from 'react-icons/fa';
 
 export default function Navbar() {
@@ -53,6 +54,9 @@ export default function Navbar() {
 
   // Check if admin or team leader
   const isAdminOrLeader = user?.role === 'admin' || user?.role === 'team_leader';
+
+  // Check if regular user (not admin or team leader)
+  const isRegularUser = !isAdminOrLeader;
 
   // Get role display name
   const getRoleDisplay = () => {
@@ -137,7 +141,7 @@ export default function Navbar() {
                   }}
                 >
                   <FaHome className="me-2" />
-                  {isAdminOrLeader ? 'Dashboard' : 'My Dashboard'}
+                  {isAdminOrLeader ? 'Admin Dashboard' : 'My Dashboard'}
                 </Link>
               </li>
               
@@ -164,28 +168,83 @@ export default function Navbar() {
                 </Link>
               </li>
 
-              <li className="nav-item">
-                <Link 
-                  className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
-                  to="/problems"
-                  style={{
-                    transition: 'all 0.3s ease',
-                    fontWeight: '500',
-                    fontSize: '0.95rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <FaExclamationCircle className="me-2" />
-                  All Problems
-                </Link>
-              </li>
+              {/* Show Reports only for Regular Users (NOT Admin/Team Leader) */}
+              {isRegularUser && (
+                <li className="nav-item">
+                  <Link 
+                    className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
+                    to="/reports"
+                    style={{
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500',
+                      fontSize: '0.95rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <FaFileAlt className="me-2" />
+                    Reports
+                  </Link>
+                </li>
+              )}
+
+              {/* Show My Issues only for Regular Users (NOT Admin/Team Leader) */}
+              {isRegularUser && (
+                <li className="nav-item">
+                  <Link 
+                    className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
+                    to="/my-issues"
+                    style={{
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500',
+                      fontSize: '0.95rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <FaTasks className="me-2" />
+                    My Issues
+                  </Link>
+                </li>
+              )}
+
+              {/* Show All Problems only for Admin/Team Leader */}
+              {isAdminOrLeader && (
+                <li className="nav-item">
+                  <Link 
+                    className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
+                    to="/problems"
+                    style={{
+                      transition: 'all 0.3s ease',
+                      fontWeight: '500',
+                      fontSize: '0.95rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <FaExclamationCircle className="me-2" />
+                    All Problems
+                  </Link>
+                </li>
+              )}
             </ul>
             
             {/* Right Side Items */}
@@ -561,7 +620,7 @@ export default function Navbar() {
             background: rgba(102, 126, 234, 0.5);
           }
 
-          /* Dropdown animation */}
+          /* Dropdown animation */
           .dropdown-menu {
             animation: dropdownFadeIn 0.3s ease-out;
           }
