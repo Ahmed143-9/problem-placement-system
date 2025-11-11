@@ -24,6 +24,79 @@ export default function Reports() {
     endDate: ''
   });
 
+  // Helper functions for the report
+  const calculateDuration = (createdAt) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - created);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return '1 day';
+    if (diffDays < 30) return `${diffDays} days`;
+    
+    const diffMonths = Math.floor(diffDays / 30);
+    const remainingDays = diffDays % 30;
+    
+    if (remainingDays === 0) return `${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
+    return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ${remainingDays} day${remainingDays > 1 ? 's' : ''}`;
+  };
+
+  const getProblemType = (problem) => {
+    if (problem.statement) {
+      const statement = problem.statement.toLowerCase();
+      if (statement.includes('sms') || statement.includes('message')) return 'SMS Service Issue';
+      if (statement.includes('email') || statement.includes('mail')) return 'Email Service Issue';
+      if (statement.includes('topup') || statement.includes('top-up')) return 'Topup Service Issue';
+      if (statement.includes('whatsapp') || statement.includes('wa')) return 'WhatsApp Service Issue';
+      if (statement.includes('web') || statement.includes('website')) return 'Web Solution Issue';
+      if (statement.includes('game') || statement.includes('games')) return 'Games Service Issue';
+      if (statement.includes('dcb')) return 'DCB Service Issue';
+      if (statement.includes('balance')) return 'Balance Service Issue';
+      if (statement.includes('international')) return 'International SMS Issue';
+      if (statement.includes('invoice')) return 'Invoice Solution Issue';
+      if (statement.includes('campaign')) return 'Campaign Service Issue';
+      if (statement.includes('push') || statement.includes('pull')) return 'Push-Pull Service Issue';
+    }
+    return 'Technical Service Issue';
+  };
+
+  const getSolvingTeam = (problem) => {
+    if (problem.assignedTo) {
+      return `${problem.assignedTo}'s Team`;
+    }
+    
+    if (problem.department === 'IT & Innovation') {
+      return 'IT Support Team';
+    } else if (problem.department === 'Business') {
+      return 'Business Support Team';
+    } else if (problem.department === 'Accounts') {
+      return 'Accounts Team';
+    }
+    
+    return 'Technical Support Team';
+  };
+
+  const getTeamLeader = (department) => {
+    const teamLeaders = {
+      'IT & Innovation': 'IT Department Team Leader',
+      'Business': 'Business Department Team Leader', 
+      'Accounts': 'Accounts Department Team Leader'
+    };
+    return teamLeaders[department] || 'Department Team Leader';
+  };
+
+  const getResolutionDate = (problem) => {
+    if (problem.status === 'done' && problem.actionHistory) {
+      const resolutionAction = problem.actionHistory.find(action => 
+        action.action.includes('Resolved') || action.action.includes('Done') || action.action.includes('Completed')
+      );
+      if (resolutionAction) {
+        return new Date(resolutionAction.timestamp).toLocaleDateString();
+      }
+    }
+    return 'In Progress';
+  };
+
   useEffect(() => {
     fetchProblems();
   }, []);
@@ -124,8 +197,7 @@ export default function Reports() {
     setSelectedProblem(problem);
     setTimeout(() => {
       window.print();
-      setSelectedProblem(null);
-    }, 100);
+    }, 500);
   };
 
   const exportToCSV = () => {
@@ -186,7 +258,7 @@ export default function Reports() {
         <Navbar />
         
         <div className="d-flex flex-grow-1">
-          {/* Sidebar - Same as before */}
+          {/* Sidebar */}
           <div 
             className="bg-dark text-white position-relative"
             style={{ 
@@ -344,7 +416,7 @@ export default function Reports() {
                   <div className="col-md-6 col-lg-4">
                     <label className="form-label small fw-semibold">Select Department:</label>
                     <select 
-                      className="form-select form-select-sm"
+                      className="form-select"
                       value={filters.department}
                       onChange={(e) => handleFilterChange('department', e.target.value)}
                     >
@@ -359,7 +431,7 @@ export default function Reports() {
                   <div className="col-md-6 col-lg-4">
                     <label className="form-label small fw-semibold">Select Priority:</label>
                     <select 
-                      className="form-select form-select-sm"
+                      className="form-select"
                       value={filters.priority}
                       onChange={(e) => handleFilterChange('priority', e.target.value)}
                     >
@@ -374,7 +446,7 @@ export default function Reports() {
                   <div className="col-md-6 col-lg-4">
                     <label className="form-label small fw-semibold">Select Status:</label>
                     <select 
-                      className="form-select form-select-sm"
+                      className="form-select"
                       value={filters.status}
                       onChange={(e) => handleFilterChange('status', e.target.value)}
                     >
@@ -390,7 +462,7 @@ export default function Reports() {
                   <div className="col-md-6 col-lg-4">
                     <label className="form-label small fw-semibold">Created By:</label>
                     <select 
-                      className="form-select form-select-sm"
+                      className="form-select"
                       value={filters.createdBy}
                       onChange={(e) => handleFilterChange('createdBy', e.target.value)}
                     >
@@ -405,7 +477,7 @@ export default function Reports() {
                   <div className="col-md-6 col-lg-4">
                     <label className="form-label small fw-semibold">Assigned To:</label>
                     <select 
-                      className="form-select form-select-sm"
+                      className="form-select"
                       value={filters.assignedTo}
                       onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
                     >
@@ -416,45 +488,51 @@ export default function Reports() {
                     </select>
                   </div>
 
-                  {/* Date Range Filters */}
+                  {/* Start Date and End Date Filter - Side by side in same line */}
                   <div className="col-md-6 col-lg-4">
-                    <label className="form-label small fw-semibold">Start Date:</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      value={filters.startDate}
-                      onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="col-md-6 col-lg-4">
-                    <label className="form-label small fw-semibold">End Date:</label>
-                    <input
-                      type="date"
-                      className="form-control form-control-sm"
-                      value={filters.endDate}
-                      onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                    />
+                    <label className="form-label small fw-semibold">Date Range:</label>
+                    <div className="row g-2">
+                      <div className="col-6">
+                        <input
+                          type="date"
+                          className="form-control form-control-sm"
+                          value={filters.startDate}
+                          onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                          title="Start Date"
+                        />
+                        <small className="text-muted">Start</small>
+                      </div>
+                      <div className="col-6">
+                        <input
+                          type="date"
+                          className="form-control form-control-sm"
+                          value={filters.endDate}
+                          onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                          title="End Date"
+                        />
+                        <small className="text-muted">End</small>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Action Buttons */}
                   <div className="col-12">
                     <div className="d-flex gap-2">
                       <button 
-                        className="btn btn-sm btn-primary"
+                        className="btn btn-primary"
                         onClick={applyFilters}
                       >
                         <FaFilter className="me-1" />
                         Apply Filters
                       </button>
                       <button 
-                        className="btn btn-sm btn-outline-secondary"
+                        className="btn btn-outline-secondary"
                         onClick={resetFilters}
                       >
                         Reset Filters
                       </button>
                       <button 
-                        className="btn btn-sm btn-success ms-auto"
+                        className="btn btn-success ms-auto"
                         onClick={exportToCSV}
                       >
                         <FaDownload className="me-1" />
@@ -464,58 +542,6 @@ export default function Reports() {
                   </div>
                 </div>
               </div>
-
-              {/* Summary Cards - SMS Log Style */}
-              {/* <div className="card-body border-bottom bg-light">
-                <div className="row g-3">
-                  <div className="col-md-3">
-                    <div className="card border-0 bg-white shadow-sm">
-                      <div className="card-body text-center py-3">
-                        <h5 className="card-title text-primary mb-1">Total</h5>
-                        <p className="card-text h4 mb-0">{filteredProblems.length}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="card border-0 bg-white shadow-sm">
-                      <div className="card-body text-center py-3">
-                        <h5 className="card-title text-success mb-1">
-                          <FaCheckCircle className="me-1" />
-                          Resolved
-                        </h5>
-                        <p className="card-text h4 mb-0">
-                          {filteredProblems.filter(p => p.status === 'done').length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="card border-0 bg-white shadow-sm">
-                      <div className="card-body text-center py-3">
-                        <h5 className="card-title text-warning mb-1">
-                          In Progress
-                        </h5>
-                        <p className="card-text h4 mb-0">
-                          {filteredProblems.filter(p => p.status === 'in_progress').length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-md-3">
-                    <div className="card border-0 bg-white shadow-sm">
-                      <div className="card-body text-center py-3">
-                        <h5 className="card-title text-danger mb-1">
-                          <FaTimesCircle className="me-1" />
-                          Pending
-                        </h5>
-                        <p className="card-text h4 mb-0">
-                          {filteredProblems.filter(p => p.status === 'pending').length}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div> */}
 
               {/* Problems Table */}
               <div className="card-body p-4">
@@ -586,7 +612,7 @@ export default function Reports() {
                             <td>{new Date(problem.createdAt).toLocaleDateString()}</td>
                             <td style={{ textAlign: 'center' }}>
                               <button 
-                                className="btn btn-sm btn-primary"
+                                className="btn btn-primary"
                                 onClick={() => generateReport(problem)}
                                 title="Generate Report"
                               >
@@ -606,10 +632,271 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Printable Report Section - Same as before */}
+      {/* Printable Report Section - Compact One Page Version */}
       {selectedProblem && (
         <div className="print-only" style={{ display: 'none' }}>
-          {/* ... আপনার আগের printable report section এখানে থাকবে ... */}
+          <div style={{ 
+            maxWidth: '190mm',
+            minHeight: '277mm',
+            margin: '10mm auto',
+            padding: '15mm',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '11pt',
+            lineHeight: '1.3',
+            backgroundColor: 'white',
+            border: '1px solid #ccc'
+          }}>
+            
+            {/* Header Section */}
+            <div className="text-center mb-3">
+              <h1 style={{ color: '#2c5aa0', fontSize: '18pt', fontWeight: 'bold', marginBottom: '2px' }}>
+                PROBLEM RESOLUTION REPORT
+              </h1>
+              <p style={{ color: '#666', fontSize: '10pt', margin: 0 }}>
+                Official Problem Management System
+              </p>
+            </div>
+
+            {/* Ticket Info & Priority */}
+            <div className="row mb-3">
+              <div className="col-8">
+                <div style={{ padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '3px' }}>
+                  <strong style={{ color: '#2c5aa0', fontSize: '11pt' }}>Ticket # {selectedProblem.id}</strong>
+                  <br />
+                  <span style={{ color: '#666', fontSize: '9pt' }}>
+                    Created: {new Date(selectedProblem.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <div className="col-4 text-end">
+                <div style={{ 
+                  backgroundColor: selectedProblem.priority === 'High' ? '#dc3545' : 
+                                 selectedProblem.priority === 'Medium' ? '#ffc107' : '#28a745',
+                  color: selectedProblem.priority === 'Medium' ? '#000' : '#fff',
+                  padding: '6px 10px',
+                  borderRadius: '3px',
+                  display: 'inline-block',
+                  fontSize: '10pt',
+                  fontWeight: 'bold'
+                }}>
+                  {selectedProblem.priority} PRIORITY
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Info Row */}
+            <div className="row mb-3">
+              <div className="col-12">
+                <div style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '3px', 
+                  padding: '8px',
+                  backgroundColor: '#fafafa',
+                  fontSize: '10pt'
+                }}>
+                  <div className="row text-center">
+                    <div className="col-3">
+                      <div><strong>Department</strong></div>
+                      <div style={{ color: '#2c5aa0', fontWeight: 'bold' }}>{selectedProblem.department}</div>
+                    </div>
+                    <div className="col-3">
+                      <div><strong>Service</strong></div>
+                      <div>{selectedProblem.service}</div>
+                    </div>
+                    <div className="col-3">
+                      <div><strong>Status</strong></div>
+                      <div style={{ 
+                        color: selectedProblem.status === 'done' ? '#28a745' : 
+                              selectedProblem.status === 'in_progress' ? '#17a2b8' : '#ffc107',
+                        fontWeight: 'bold'
+                      }}>
+                        {selectedProblem.status === 'pending_approval' ? 'PENDING APPROVAL' : 
+                         selectedProblem.status.replace('_', ' ').toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="col-3">
+                      <div><strong>Duration</strong></div>
+                      <div style={{ color: '#2c5aa0', fontWeight: 'bold' }}>
+                        {calculateDuration(selectedProblem.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Problem Description - Compact */}
+            <div className="row mb-3">
+              <div className="col-12">
+                <div style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '3px', 
+                  padding: '10px'
+                }}>
+                  <h4 style={{ 
+                    color: '#2c5aa0', 
+                    fontSize: '11pt',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid #2c5aa0',
+                    paddingBottom: '3px'
+                  }}>
+                    Problem Description
+                  </h4>
+                  <div style={{ 
+                    padding: '8px', 
+                    borderRadius: '2px',
+                    borderLeft: '2px solid #2c5aa0',
+                    fontSize: '10pt',
+                    lineHeight: '1.4',
+                    minHeight: '60px'
+                  }}>
+                    {selectedProblem.statement || selectedProblem.description || 'No detailed description provided.'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Resolution Team & Timeline */}
+            <div className="row mb-3">
+              <div className="col-6">
+                <div style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '3px', 
+                  padding: '10px',
+                  height: '100%'
+                }}>
+                  <h4 style={{ 
+                    color: '#2c5aa0', 
+                    fontSize: '11pt',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid #2c5aa0',
+                    paddingBottom: '3px'
+                  }}>
+                    Resolution Team
+                  </h4>
+                  <table style={{ width: '100%', fontSize: '9pt' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: '40%', fontWeight: 'bold', padding: '2px 0' }}>Reported By:</td>
+                        <td>{selectedProblem.createdBy}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Assigned To:</td>
+                        <td>
+                          {selectedProblem.assignedTo || 'Unassigned'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Solved By Team:</td>
+                        <td style={{ color: '#fd7e14', fontWeight: '600' }}>
+                          {getSolvingTeam(selectedProblem)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Team Leader:</td>
+                        <td style={{ color: '#0d6efd' }}>
+                          {getTeamLeader(selectedProblem.department)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="col-6">
+                <div style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '3px', 
+                  padding: '10px',
+                  height: '100%'
+                }}>
+                  <h4 style={{ 
+                    color: '#2c5aa0', 
+                    fontSize: '11pt',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid #2c5aa0',
+                    paddingBottom: '3px'
+                  }}>
+                    Timeline
+                  </h4>
+                  <table style={{ width: '100%', fontSize: '9pt' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: '45%', fontWeight: 'bold', padding: '2px 0' }}>Created Date:</td>
+                        <td>{new Date(selectedProblem.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Created Time:</td>
+                        <td>{new Date(selectedProblem.createdAt).toLocaleTimeString()}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Resolution Date:</td>
+                        <td>{getResolutionDate(selectedProblem)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Problem Type:</td>
+                        <td style={{ color: '#d63384' }}>
+                          {getProblemType(selectedProblem)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Action History - Compact */}
+            {selectedProblem.actionHistory && selectedProblem.actionHistory.length > 0 && (
+              <div className="row mb-3">
+                <div className="col-12">
+                  <div style={{ 
+                    border: '1px solid #ddd', 
+                    borderRadius: '3px', 
+                    padding: '10px'
+                  }}>
+                    <h4 style={{ 
+                      color: '#2c5aa0', 
+                      fontSize: '11pt',
+                      marginBottom: '8px',
+                      borderBottom: '1px solid #2c5aa0',
+                      paddingBottom: '3px'
+                    }}>
+                      Recent Actions
+                    </h4>
+                    <div style={{ fontSize: '8pt', maxHeight: '80px', overflow: 'hidden' }}>
+                      {selectedProblem.actionHistory.slice(-3).map((action, index) => (
+                        <div key={index} style={{ 
+                          padding: '4px 0',
+                          borderBottom: index < Math.min(selectedProblem.actionHistory.length - 1, 2) ? '1px dashed #eee' : 'none'
+                        }}>
+                          <strong>{action.action}</strong> by {action.by} 
+                          <span style={{ color: '#666', marginLeft: '8px' }}>
+                            {new Date(action.timestamp).toLocaleDateString()}
+                          </span>
+                          {action.comment && (
+                            <div style={{ color: '#666', fontSize: '7pt' }}>
+                              {action.comment}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="row mt-3 pt-2" style={{ borderTop: '1px solid #ddd' }}>
+              <div className="col-12 text-center">
+                <p style={{ color: '#666', margin: '2px 0', fontSize: '8pt' }}>
+                  Generated by {user?.name || 'System'} on {new Date().toLocaleString()}
+                </p>
+                {/* <p style={{ color: '#999', margin: 0, fontSize: '7pt' }}>
+                  This is an official problem resolution report - Page 1 of 1
+                </p> */}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -623,8 +910,18 @@ export default function Reports() {
               display: block !important;
             }
             body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: white !important;
+              font-size: 11pt;
+              font-family: 'Arial', sans-serif;
+            }
+            .btn {
+              display: none !important;
+            }
+            @page {
+              size: A4;
               margin: 0;
-              padding: 0;
             }
           }
           @media screen {

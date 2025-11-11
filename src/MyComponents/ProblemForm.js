@@ -82,86 +82,90 @@ export default function ProblemForm() {
   };
 
   // 🔥 COMPLETE AUTO FIRST FACE ASSIGNMENT FUNCTION
-  // 🔥 COMPLETE AUTO FIRST FACE ASSIGNMENT FUNCTION
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-    
-    // 🔥 AUTO FIRST FACE ASSIGNMENT LOGIC
-    const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-    let autoAssignedTo = '';
-    
-    // Check for specific department first face
-    const deptFirstFace = firstFaceAssignments.find(ff => 
-      ff.department === formData.department
-    );
-    
-    // Check for all department first face (if no specific found)
-    const allDeptFirstFace = firstFaceAssignments.find(ff => ff.department === 'all');
-    
-    if (deptFirstFace) {
-      autoAssignedTo = deptFirstFace.userName;
-    } else if (allDeptFirstFace) {
-      autoAssignedTo = allDeptFirstFace.userName;
-    }
-
-    const newProblem = {
-      id: problems.length + 1,
-      ...formData,
-      status: 'pending', // 🔥 ALWAYS KEEP AS PENDING (even if assigned)
-      createdBy: user?.name || 'Unknown User',
-      assignedTo: autoAssignedTo, // 🔥 AUTO ASSIGNED BUT STATUS PENDING
-      createdAt: new Date().toISOString(),
-      comments: [],
-      actionHistory: [{
-        action: 'Problem Created',
-        by: user?.name || 'Unknown User',
-        timestamp: new Date().toISOString(),
-        comment: autoAssignedTo 
-          ? `Auto assigned to ${autoAssignedTo} (First Face) - Status: Pending`
-          : 'Problem ticket submitted - Waiting for assignment'
-      }]
-    };
-    
-    problems.push(newProblem);
-    localStorage.setItem('problems', JSON.stringify(problems));
-    
-    // Show appropriate success message
-    if (autoAssignedTo) {
-      toast.success(`Problem submitted and auto-assigned to ${autoAssignedTo}! (Status: Pending)`);
-    } else {
-      toast.success('Problem submitted! Will be assigned manually.');
-    }
-    
-    setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
-    setPreviewImages([]);
-    
-    // Role-based redirect
-    setTimeout(() => {
-      if (user?.role === 'admin' || user?.role === 'team_leader') {
-        navigate('/dashboard');
-      } else {
-        navigate('/employee-dashboard');
+    try {
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      
+      // 🔥 AUTO FIRST FACE ASSIGNMENT LOGIC
+      const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      let autoAssignedTo = '';
+      
+      // Check for specific department first face
+      const deptFirstFace = firstFaceAssignments.find(ff => 
+        ff.department === formData.department
+      );
+      
+      // Check for all department first face (if no specific found)
+      const allDeptFirstFace = firstFaceAssignments.find(ff => ff.department === 'all');
+      
+      if (deptFirstFace) {
+        autoAssignedTo = deptFirstFace.userName;
+      } else if (allDeptFirstFace) {
+        autoAssignedTo = allDeptFirstFace.userName;
       }
-    }, 1000);
-    
-  } catch (error) {
-    toast.error('Failed to submit problem');
-    console.error(error);
-  } finally {
-    setLoading(false);
-  }
-};
+
+      const newProblem = {
+        id: problems.length + 1,
+        ...formData,
+        status: 'pending', // 🔥 ALWAYS KEEP AS PENDING (even if assigned)
+        createdBy: user?.name || 'Unknown User',
+        assignedTo: autoAssignedTo, // 🔥 AUTO ASSIGNED BUT STATUS PENDING
+        createdAt: new Date().toISOString(),
+        comments: [],
+        actionHistory: [{
+          action: 'Problem Created',
+          by: user?.name || 'Unknown User',
+          timestamp: new Date().toISOString(),
+          comment: autoAssignedTo 
+            ? `Auto assigned to ${autoAssignedTo} (First Face) - Status: Pending`
+            : 'Problem ticket submitted - Waiting for assignment'
+        }]
+      };
+      
+      problems.push(newProblem);
+      localStorage.setItem('problems', JSON.stringify(problems));
+      
+      // Show appropriate success message
+      if (autoAssignedTo) {
+        toast.success(`Problem submitted and auto-assigned to ${autoAssignedTo}! (Status: Pending)`);
+      } else {
+        toast.success('Problem submitted! Will be assigned manually.');
+      }
+      
+      setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
+      setPreviewImages([]);
+      
+      // Role-based redirect - FIXED
+      setTimeout(() => {
+        if (user?.role === 'admin' || user?.role === 'team_leader') {
+          navigate('/dashboard'); // Admin dashboard
+        } else {
+          navigate('/employee-dashboard'); // Employee dashboard
+        }
+      }, 1000);
+      
+    } catch (error) {
+      toast.error('Failed to submit problem');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
   };
 
-  const sidebarLinkStyle = {
-    transition: 'all 0.2s ease'
+  // 🔥 FIXED: Get correct dashboard path based on user role
+  const getDashboardPath = () => {
+    if (user?.role === 'admin' || user?.role === 'team_leader') {
+      return '/dashboard'; // Admin dashboard
+    } else {
+      return '/employee-dashboard'; // Employee dashboard
+    }
   };
 
   return (
@@ -210,7 +214,7 @@ const handleSubmit = async (e) => {
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
                 <Link 
-                  to="/employee-dashboard" 
+                  to={getDashboardPath()} // 🔥 FIXED: Dynamic dashboard path
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="Dashboard"

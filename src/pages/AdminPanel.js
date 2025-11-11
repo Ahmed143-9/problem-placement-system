@@ -21,6 +21,7 @@ export default function AdminPanelUserManagement() {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [firstFaceStats, setFirstFaceStats] = useState({ assigned: 0, total: 0 });
   const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false); // ✅ এই লাইন যোগ করুন
 
   const [formData, setFormData] = useState({
     name: '',
@@ -232,7 +233,7 @@ export default function AdminPanelUserManagement() {
         name: userToEdit.name,
         username: userToEdit.username,
         email: userToEdit.email,
-        password: '',
+        password: userToEdit.password,
         role: userToEdit.role,
         department: userToEdit.department,
         status: userToEdit.status
@@ -785,141 +786,161 @@ export default function AdminPanelUserManagement() {
       )}
 
       {/* Add/Edit Modal */}
-      {showAddModal && isAdmin && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title">
-                  <FaUserPlus className="me-2" /> 
-                  {editingUser ? 'Edit User' : 'Add New User'}
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={() => { setShowAddModal(false); setEditingUser(null); }}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Full Name *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      name="name" 
-                      value={formData.name} 
-                      onChange={handleInputChange} 
-                      placeholder="John Doe" 
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Username *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      name="username" 
-                      value={formData.username} 
-                      onChange={handleInputChange} 
-                      placeholder="johndoe" 
-                    />
-                    <small className="text-muted">User will use this to login</small>
-                  </div>
+      {/* Add/Edit Modal */}
+{showAddModal && isAdmin && (
+  <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+    <div className="modal-dialog modal-dialog-centered modal-lg">
+      <div className="modal-content">
+        <div className="modal-header bg-primary text-white">
+          <h5 className="modal-title">
+            <FaUserPlus className="me-2" /> 
+            {editingUser ? 'Edit User' : 'Add New User'}
+          </h5>
+          <button 
+            type="button" 
+            className="btn-close btn-close-white" 
+            onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+          ></button>
+        </div>
+        <div className="modal-body">
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">Full Name *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                name="name" 
+                value={formData.name} 
+                onChange={handleInputChange} 
+                placeholder="John Doe" 
+              />
+            </div>
+            
+            {/* Email Field - Now comes first */}
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">Email *</label>
+              <input 
+                type="email" 
+                className="form-control" 
+                name="email" 
+                value={formData.email} 
+                onChange={(e) => {
+                  handleInputChange(e);
+                  // Auto-generate username from email (part before @)
+                  if (!editingUser && e.target.value.includes('@')) {
+                    const usernameFromEmail = e.target.value.split('@')[0];
+                    setFormData(prev => ({
+                      ...prev,
+                      username: usernameFromEmail
+                    }));
+                  }
+                }} 
+                placeholder="john@example.com" 
+              />
+              {/* <small className="text-muted">Username will be auto-generated from email</small> */}
+            </div>
 
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Email *</label>
-                    <input 
-                      type="email" 
-                      className="form-control" 
-                      name="email" 
-                      value={formData.email} 
-                      onChange={handleInputChange} 
-                      placeholder="john@example.com" 
-                    />
-                  </div>
-                  <div className="col-md-6 position-relative">
-                    <label className="form-label fw-semibold">
-                      <FaKey className="me-1" /> 
-                      Password * 
-                      {editingUser && <small className="text-muted"> (Leave blank to keep current)</small>}
-                    </label>
-                    <input 
-                      type={showPassword ? 'text' : 'password'} 
-                      className="form-control" 
-                      name="password" 
-                      value={formData.password} 
-                      onChange={handleInputChange} 
-                      placeholder="Enter password" 
-                    />
-                    <span 
-                      className="position-absolute top-50 end-0 translate-middle-y me-3" 
-                      style={{cursor:'pointer', marginTop: '12px'}} 
-                      onClick={() => setShowPassword(prev => !prev)}
-                    >
-                      {showPassword ? <FaEyeSlash /> : <FaEye />}
-                    </span>
-                  </div>
+            {/* Username Field - Now comes after email */}
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">Username *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                name="username" 
+                value={formData.username} 
+                onChange={handleInputChange} 
+                placeholder="johndoe" 
+              />
+              <small className="text-muted">Auto-generated from email, can be modified</small>
+            </div>
 
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Role *</label>
-                    <select 
-                      className="form-control" 
-                      name="role" 
-                      value={formData.role} 
-                      onChange={handleInputChange}
-                    >
-                      <option value="user">User (Employee)</option>
-                      <option value="team_leader">Team Leader</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Department *</label>
-                    <select 
-                      className="form-control" 
-                      name="department" 
-                      value={formData.department} 
-                      onChange={handleInputChange}
-                    >
-                      <option value="">Select Department</option>
-                      <option value="IT & Innovation">IT & Innovation</option>
-                      <option value="Business">Business</option>
-                      <option value="Accounts">Accounts</option>
-                    </select>
-                  </div>
-
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Status</label>
-                    <select 
-                      className="form-control" 
-                      name="status" 
-                      value={formData.status} 
-                      onChange={handleInputChange}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="d-flex gap-2 mt-4 pt-3 border-top">
-                  <button 
-                    className="btn btn-primary flex-grow-1" 
-                    onClick={handleSaveUser}
+            <div className="col-md-6 position-relative">
+                  <label className="form-label fw-semibold">
+                    <FaKey className="me-1" /> 
+                    Password * 
+                    {editingUser && <small className="text-muted"> (Leave blank to keep current)</small>}
+                  </label>
+                  <input 
+                    type={showPassword ? 'text' : 'password'} 
+                    className="form-control" 
+                    name="password" 
+                    value={formData.password} 
+                    onChange={handleInputChange}
+                    onFocus={() => setShowPasswordRequirements(true)}
+                    onBlur={() => setShowPasswordRequirements(false)}
+                    placeholder="8+ chars, 1 uppercase, 1 number, 1 special char" 
+                  />
+                  <span 
+                    className="position-absolute top-50 end-0 translate-middle-y me-3" 
+                    style={{cursor:'pointer', marginTop: '12px'}} 
+                    onClick={() => setShowPassword(prev => !prev)}
                   >
-                    {editingUser ? 'Update User' : 'Add User'}
-                  </button>
-                  <button 
-                    className="btn btn-secondary" 
-                    onClick={() => { setShowAddModal(false); setEditingUser(null); }}
-                  >
-                    Cancel
-                  </button>
-                </div>
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </span>
+                  
+  
               </div>
+
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">Role *</label>
+              <select 
+                className="form-control" 
+                name="role" 
+                value={formData.role} 
+                onChange={handleInputChange}
+              >
+                <option value="user">User (Employee)</option>
+                <option value="team_leader">Team Leader</option>
+              </select>
+            </div>
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">Department *</label>
+              <select 
+                className="form-control" 
+                name="department" 
+                value={formData.department} 
+                onChange={handleInputChange}
+              >
+                <option value="">Select Department</option>
+                <option value="IT & Innovation">IT & Innovation</option>
+                <option value="Business">Business</option>
+                <option value="Accounts">Accounts</option>
+              </select>
+            </div>
+
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">Status</label>
+              <select 
+                className="form-control" 
+                name="status" 
+                value={formData.status} 
+                onChange={handleInputChange}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
             </div>
           </div>
+
+          <div className="d-flex gap-2 mt-4 pt-3 border-top">
+            <button 
+              className="btn btn-primary flex-grow-1" 
+              onClick={handleSaveUser}
+            >
+              {editingUser ? 'Update User' : 'Add User'}
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
