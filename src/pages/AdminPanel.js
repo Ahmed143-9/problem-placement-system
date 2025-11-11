@@ -818,27 +818,29 @@ export default function AdminPanelUserManagement() {
             
             {/* Email Field - Now comes first */}
             <div className="col-md-6">
-              <label className="form-label fw-semibold">Email *</label>
-              <input 
-                type="email" 
-                className="form-control" 
-                name="email" 
-                value={formData.email} 
-                onChange={(e) => {
-                  handleInputChange(e);
-                  // Auto-generate username from email (part before @)
-                  if (!editingUser && e.target.value.includes('@')) {
-                    const usernameFromEmail = e.target.value.split('@')[0];
-                    setFormData(prev => ({
-                      ...prev,
-                      username: usernameFromEmail
-                    }));
-                  }
-                }} 
-                placeholder="john@example.com" 
-              />
-              {/* <small className="text-muted">Username will be auto-generated from email</small> */}
-            </div>
+                <label className="form-label fw-semibold">Email *</label>
+                <input 
+                  type="email" 
+                  className="form-control" 
+                  name="email" 
+                  value={formData.email} 
+                  onChange={(e) => {
+                    handleInputChange(e);
+                    // Auto-generate username from email (part before @) - FIRST LETTER CAPITAL
+                    if (!editingUser && e.target.value.includes('@')) {
+                      const emailPart = e.target.value.split('@')[0];
+                       const capitalizedUsername = emailPart.charAt(0).toUpperCase() + emailPart.slice(1);
+                      
+                      setFormData(prev => ({
+                        ...prev,
+                        username: capitalizedUsername
+                      }));
+                    }
+                  }} 
+                  placeholder="john@example.com" 
+                />
+                <small className="text-muted">Username will be auto-generated from email</small>
+              </div>
 
             {/* Username Field - Now comes after email */}
             <div className="col-md-6">
