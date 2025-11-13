@@ -1,125 +1,94 @@
 // src/context/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const DEFAULT_ADMIN = {
-    id: 1,
-    name: 'Admin User',
-    username: 'Admin',
-    email: 'admin@example.com',
-    password: 'Admin@123',
-    role: 'admin',
-    department: 'Management',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    createdBy: 'System'
-  };
+  const API_BASE_URL = 'http://localhost:8000/api';
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('system_users');
-      const systemUsers = Array.isArray(JSON.parse(raw || '[]')) ? JSON.parse(raw || '[]') : [];
+    const token = localStorage.getItem('token');
+    const userInfo = localStorage.getItem('user');
 
-      const adminIndex = systemUsers.findIndex(u => u.username === DEFAULT_ADMIN.username);
-
-      if (adminIndex === -1) {
-        systemUsers.unshift(DEFAULT_ADMIN);
-        localStorage.setItem('system_users', JSON.stringify(systemUsers));
-        console.info('Default admin created.');
-      } else {
-        const admin = systemUsers[adminIndex];
-        let changed = false;
-
-        if (admin.password !== DEFAULT_ADMIN.password) {
-          admin.password = DEFAULT_ADMIN.password;
-          changed = true;
-        }
-        if (admin.role !== DEFAULT_ADMIN.role) {
-          admin.role = DEFAULT_ADMIN.role;
-          changed = true;
-        }
-        if (admin.status !== DEFAULT_ADMIN.status) {
-          admin.status = DEFAULT_ADMIN.status;
-          changed = true;
-        }
-        if (changed) {
-          systemUsers[adminIndex] = admin;
-          localStorage.setItem('system_users', JSON.stringify(systemUsers));
-          console.info('Admin updated to default values.');
-        }
-      }
-
-      // Load current user if exists
-      const currentUser = localStorage.getItem('current_user');
-      if (currentUser) {
-        setUser(JSON.parse(currentUser));
-      }
-    } catch (err) {
-      console.error('Auth init error:', err);
-    } finally {
-      setLoading(false);
+    if (token && userInfo) {
+      setUser(JSON.parse(userInfo));
     }
+    setLoading(false);
   }, []);
 
   const login = async (username, password) => {
     try {
-      const u = (username || '').trim();
-      const p = (password || '').trim();
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-      const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const data = await response.json();
 
-      const foundUser = systemUsers.find(
-        usr => usr.username === u && usr.password === p
-      );
-
-      if (!foundUser) {
-        console.warn('Login failed. Users:', systemUsers.map(x => ({ username: x.username, role: x.role })));
-        return { success: false, error: 'Invalid username or password' };
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
       }
-
-      if (foundUser.status !== 'active') {
-        return { success: false, error: 'Your account is inactive. Please contact admin.' };
-      }
-
-      const userData = {
-        id: foundUser.id,
-        name: foundUser.name,
-        username: foundUser.username,
-        email: foundUser.email,
-        role: foundUser.role,
-        department: foundUser.department,
-        status: foundUser.status
-      };
-
-      localStorage.setItem('current_user', JSON.stringify(userData));
-      setUser(userData);
-
-      return { success: true };
-    } catch (err) {
-      console.error('Login error:', err);
-      return { success: false, error: 'An error occurred during login' };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { success: false, error: 'Network error. Please try again.' };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('current_user');
+  const logout = async () => {
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      try {
+        await fetch(`${API_BASE_URL}/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 
+  const value = {
+    user,
+    login,
+    logout,
+    loading,
+    API_BASE_URL
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
-};
+// Default export remove করুন
+export default AuthContext;

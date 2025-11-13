@@ -1,3 +1,5 @@
+// src/pages/AdminPanel.js (সম্পূর্ণ কোড)
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -6,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
 export default function AdminPanelUserManagement() {
-  const { user } = useAuth();
+  const { user, API_BASE_URL } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [problems, setProblems] = useState([]);
@@ -21,7 +23,8 @@ export default function AdminPanelUserManagement() {
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [firstFaceStats, setFirstFaceStats] = useState({ assigned: 0, total: 0 });
   const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false); // ✅ এই লাইন যোগ করুন
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [activeUsers, setActiveUsers] = useState([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -39,33 +42,108 @@ export default function AdminPanelUserManagement() {
     loadUsers();
     loadProblems();
     loadFirstFaceAssignments();
-  }, []);
+    loadActiveUsers();
+  }, [API_BASE_URL]);
 
-  const loadUsers = () => {
+  const loadUsers = async () => {
     try {
-      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const filteredUsers = storedUsers.filter(u => u.username !== 'Admin');
-      setUsers(filteredUsers);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUsers(data.users);
+      } else {
+        toast.error(data.error || 'Failed to load users');
+      }
     } catch (error) {
       console.error('Failed to load users:', error);
+      toast.error('Network error while loading users');
     }
   };
 
-  const loadProblems = () => {
+  const loadProblems = async () => {
     try {
-      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
-      setProblems(storedProblems);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/problems`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setProblems(data.problems);
+      } else {
+        toast.error(data.error || 'Failed to load problems');
+      }
     } catch (error) {
       console.error('Failed to load problems:', error);
+      toast.error('Network error while loading problems');
     }
   };
 
-  const loadFirstFaceAssignments = () => {
+const loadFirstFaceAssignments = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    console.log('Loading first face assignments with token:', token ? 'Yes' : 'No');
+    
+    const response = await fetch(`${API_BASE_URL}/first-face`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('First Face API Response Status:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('First Face API Data:', data);
+
+    if (data.success) {
+      setFirstFaceAssignments(data.firstFaceAssignments || []);
+      console.log('First Face Assignments loaded:', data.firstFaceAssignments?.length || 0);
+    } else {
+      console.error('First Face API Error:', data.error);
+      toast.error(data.error || 'Failed to load first face assignments');
+      setFirstFaceAssignments([]);
+    }
+  } catch (error) {
+    console.error('Failed to load first face assignments:', error);
+    toast.error('Network error while loading first face assignments');
+    setFirstFaceAssignments([]);
+  }
+};
+
+  const loadActiveUsers = async () => {
     try {
-      const storedAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-      setFirstFaceAssignments(storedAssignments);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/users/active`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setActiveUsers(data.activeUsers);
+      } else {
+        toast.error(data.error || 'Failed to load active users');
+      }
     } catch (error) {
-      console.error('Failed to load first face assignments:', error);
+      console.error('Failed to load active users:', error);
+      toast.error('Network error while loading active users');
     }
   };
 
@@ -83,74 +161,74 @@ export default function AdminPanelUserManagement() {
     return re.test(password);
   };
 
-  // 🔥 NEW: First Face Assignment System
-  const handleFirstFaceAssignment = () => {
-    if (!selectedFirstFace) {
-      toast.error('Please select a First Face');
-      return;
-    }
+const handleFirstFaceAssignment = async () => {
+  if (!selectedFirstFace) {
+    toast.error('Please select a First Face');
+    return;
+  }
 
-    try {
-      // Check if already assigned for this department
-      const existingAssignment = firstFaceAssignments.find(ff => 
-        ff.department === selectedDepartment
-      );
-
-      if (existingAssignment && selectedDepartment !== 'all') {
-        if (!window.confirm(`${existingAssignment.userName} is already First Face for ${selectedDepartment}. Replace?`)) {
-          return;
-        }
-      }
-
-      const selectedUser = users.find(u => u.name === selectedFirstFace);
-      
-      const newAssignment = {
-        id: Date.now(),
-        userName: selectedFirstFace,
-        userId: selectedUser?.id,
+  try {
+    const token = localStorage.getItem('token');
+    
+    const response = await fetch(`${API_BASE_URL}/first-face`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: parseInt(selectedFirstFace),
         department: selectedDepartment,
-        type: selectedDepartment === 'all' ? 'all' : 'specific',
-        assignedBy: user?.name || 'Admin',
-        assignedAt: new Date().toISOString()
-      };
+        type: selectedDepartment === 'all' ? 'all' : 'specific'
+      }),
+    });
 
-      // Remove existing assignment for this department
-      const updatedAssignments = firstFaceAssignments.filter(ff => 
-        ff.department !== selectedDepartment
-      );
+    const data = await response.json();
 
-      updatedAssignments.push(newAssignment);
-      
-      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
-      setFirstFaceAssignments(updatedAssignments);
-      
-      toast.success(`✅ ${selectedFirstFace} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
-      
+    if (data.success) {
+      toast.success(`✅ ${data.assignment.userName} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
       setShowFirstFaceModal(false);
       setSelectedFirstFace('');
       setSelectedDepartment('all');
-    } catch (error) {
-      toast.error('Failed to assign First Face');
-      console.error(error);
+      loadFirstFaceAssignments();
+      
+      // Show assignment rules info
+      toast.info(`New ${selectedDepartment === 'all' ? 'ALL' : selectedDepartment} problems will be auto-assigned to ${data.assignment.userName}`);
+    } else {
+      toast.error(data.error || 'Failed to assign First Face');
     }
-  };
+  } catch (error) {
+    console.error('First Face Assignment Error:', error);
+    toast.error('Failed to assign First Face: ' + error.message);
+  }
+};
 
-  // Remove First Face Assignment
-  const handleRemoveFirstFace = (assignmentId) => {
-    try {
-      const updatedAssignments = firstFaceAssignments.filter(ff => ff.id !== assignmentId);
-      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
-      setFirstFaceAssignments(updatedAssignments);
+  const handleRemoveFirstFace = async (assignmentId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/first-face/${assignmentId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
       toast.success('First Face assignment removed!');
-    } catch (error) {
-      toast.error('Failed to remove First Face');
-      console.error(error);
+      loadFirstFaceAssignments(); // Reload assignments
+    } else {
+      toast.error(data.error || 'Failed to remove First Face');
     }
-  };
+  } catch (error) {
+    console.error('Remove First Face Error:', error);
+    toast.error('Failed to remove First Face: ' + error.message);
+  }
+};
 
-  // Get unassigned problems count by department
   const getUnassignedProblemsByDepartment = () => {
-    const unassigned = problems.filter(p => !p.assignedTo && p.status === 'pending');
+    const unassigned = problems.filter(p => !p.assigned_to && p.status === 'pending');
     
     const byDepartment = {
       all: unassigned.length,
@@ -162,7 +240,7 @@ export default function AdminPanelUserManagement() {
     return byDepartment;
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!isAdmin) return toast.error('Only Admin can add or edit users!');
     if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
 
@@ -172,52 +250,38 @@ export default function AdminPanelUserManagement() {
     }
 
     try {
-      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const token = localStorage.getItem('token');
+      const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
+      const method = editingUser ? 'PUT' : 'POST';
 
-      if (editingUser) {
-        const updatedUsers = storedUsers.map(u => {
-          if (u.id === editingUser.id) {
-            return {
-              ...u,
-              name: formData.name,
-              username: formData.username,
-              email: formData.email,
-              ...(formData.password && { password: formData.password }),
-              role: formData.role,
-              department: formData.department,
-              status: formData.status
-            };
-          }
-          return u;
-        });
-        localStorage.setItem('system_users', JSON.stringify(updatedUsers));
-        toast.success('User updated successfully!');
-      } else {
-        if (storedUsers.some(u => u.username === formData.username)) return toast.error('Username already exists!');
-
-        const newUser = {
-          id: Date.now(),
-          ...formData,
-          createdAt: new Date().toISOString(),
-          createdBy: user?.name || 'Admin'
-        };
-        storedUsers.push(newUser);
-        localStorage.setItem('system_users', JSON.stringify(storedUsers));
-        toast.success(`${formData.role === 'team_leader' ? 'Team Leader' : 'User'} added successfully!`);
-      }
-
-      setFormData({
-        name: '',
-        username: '',
-        email: '',
-        password: '',
-        role: 'user',
-        department: '',
-        status: 'active'
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
-      setShowAddModal(false);
-      setEditingUser(null);
-      loadUsers();
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        setFormData({
+          name: '',
+          username: '',
+          email: '',
+          password: '',
+          role: 'user',
+          department: '',
+          status: 'active'
+        });
+        setShowAddModal(false);
+        setEditingUser(null);
+        loadUsers();
+      } else {
+        toast.error(data.error || 'Failed to save user');
+      }
     } catch (error) {
       toast.error('Failed to save user');
       console.error(error);
@@ -233,7 +297,7 @@ export default function AdminPanelUserManagement() {
         name: userToEdit.name,
         username: userToEdit.username,
         email: userToEdit.email,
-        password: userToEdit.password,
+        password: '',
         role: userToEdit.role,
         department: userToEdit.department,
         status: userToEdit.status
@@ -242,33 +306,52 @@ export default function AdminPanelUserManagement() {
     }
   };
 
-  const handleDeleteUser = userId => {
+  const handleDeleteUser = async userId => {
     if (!isAdmin) return toast.error('Only Admin can delete users!');
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const updatedUsers = storedUsers.filter(u => u.id !== userId);
-      localStorage.setItem('system_users', JSON.stringify(updatedUsers));
-      toast.success('User deleted successfully!');
-      loadUsers();
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('User deleted successfully!');
+        loadUsers();
+      } else {
+        toast.error(data.error || 'Failed to delete user');
+      }
     } catch (error) {
       toast.error('Failed to delete user');
       console.error(error);
     }
   };
 
-  const handleToggleStatus = userId => {
+  const handleToggleStatus = async userId => {
     if (!isAdmin) return toast.error('Only Admin can change user status!');
     try {
-      const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const updatedUsers = storedUsers.map(u => {
-        if (u.id === userId) return { ...u, status: u.status === 'active' ? 'inactive' : 'active' };
-        return u;
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/toggle-status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
-      localStorage.setItem('system_users', JSON.stringify(updatedUsers));
-      toast.success('User status updated!');
-      loadUsers();
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('User status updated!');
+        loadUsers();
+      } else {
+        toast.error(data.error || 'Failed to update status');
+      }
     } catch (error) {
       toast.error('Failed to update status');
       console.error(error);
@@ -287,10 +370,6 @@ export default function AdminPanelUserManagement() {
     setShowEmailModal(true);
   };
 
-  // Get ALL ACTIVE USERS for First Face
-  const activeUsers = users.filter(u => u.status === 'active');
-
-  // Get unassigned problems count by department
   const unassignedProblemsByDept = getUnassignedProblemsByDepartment();
 
   const sidebarLinkStyle = {
@@ -478,7 +557,7 @@ export default function AdminPanelUserManagement() {
                         <div key={assignment.id} className="col-md-6">
                           <div className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
                             <div>
-                              <strong>{assignment.userName}</strong>
+                              <strong>{assignment.user?.name}</strong>
                               <small className="text-muted d-block">
                                 {assignment.department === 'all' ? 'All Departments' : assignment.department}
                               </small>
@@ -574,7 +653,7 @@ export default function AdminPanelUserManagement() {
                         <tr key={u.id} className="align-middle">
                           <td className="fw-semibold">
                             {u.name}
-                            {firstFaceAssignments.some(ff => ff.userName === u.name) && (
+                            {firstFaceAssignments.some(ff => ff.user_id === u.id) && (
                               <span className="badge bg-warning text-dark ms-1" title="First Face">FF</span>
                             )}
                           </td>
@@ -684,256 +763,121 @@ export default function AdminPanelUserManagement() {
       )}
 
       {/* First Face Assignment Modal */}
-      {showFirstFaceModal && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header bg-warning text-dark">
-                <h5 className="modal-title">
-                  <FaUserCheck className="me-2" />
-                  First Face Assignment
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setShowFirstFaceModal(false)}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="alert alert-info">
-                  <strong>First Face System:</strong> New problems will be automatically assigned to First Face users based on department.
-                </div>
-                
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Select First Face:</label>
-                  <select
-                    className="form-control"
-                    value={selectedFirstFace}
-                    onChange={(e) => setSelectedFirstFace(e.target.value)}
-                  >
-                    <option value="">-- Select First Face --</option>
-                    {activeUsers.map(user => (
-                      <option key={user.id} value={user.name}>
-                        {user.name} 
-                        {user.role === 'team_leader' && ' 👑'} 
-                        {user.role === 'user' && ' 👨‍💼'} 
-                        - {user.department}
-                      </option>
-                    ))}
-                  </select>
-                  <small className="text-muted">
-                    You can select any active user (Team Leader or Regular User)
-                  </small>
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Assign For Department:</label>
-                  <select
-                    className="form-control"
-                    value={selectedDepartment}
-                    onChange={(e) => setSelectedDepartment(e.target.value)}
-                  >
-                    <option value="all">🎯 All Departments</option>
-                    <option value="IT & Innovation">💻 IT & Innovation Department</option>
-                    <option value="Business">📊 Business Department</option>
-                    <option value="Accounts">💰 Accounts Department</option>
-                  </select>
-                  <small className="text-muted">
-                    {selectedDepartment === 'all' 
-                      ? 'Will receive ALL new problems from any department' 
-                      : `Will receive only ${selectedDepartment} department problems`
-                    }
-                  </small>
-                </div>
-
-                <div className="p-3 bg-light rounded">
-                  <div className="row text-center">
-                    <div className="col-12">
-                      <h5 className="text-warning mb-2">Assignment Summary</h5>
-                      <p className="mb-1">
-                        <strong>{selectedFirstFace || 'Selected User'}</strong> will receive:
-                      </p>
-                      <p className="mb-0 text-success">
-                        {selectedDepartment === 'all' 
-                          ? 'ALL new problems from ANY department'
-                          : `NEW problems only from ${selectedDepartment} department`
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="d-flex gap-2 mt-4">
-                  <button 
-                    className="btn btn-warning flex-grow-1"
-                    onClick={handleFirstFaceAssignment}
-                    disabled={!selectedFirstFace}
-                  >
-                    <FaUserCheck className="me-2" />
-                    Set as First Face
-                  </button>
-                  <button 
-                    className="btn btn-secondary"
-                    onClick={() => setShowFirstFaceModal(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add/Edit Modal */}
-      {/* Add/Edit Modal */}
-{showAddModal && isAdmin && (
+     // AdminPanel.js - First Face Modal section সম্পূর্ণ code
+{showFirstFaceModal && (
   <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-    <div className="modal-dialog modal-dialog-centered modal-lg">
+    <div className="modal-dialog modal-dialog-centered">
       <div className="modal-content">
-        <div className="modal-header bg-primary text-white">
+        <div className="modal-header bg-warning text-dark">
           <h5 className="modal-title">
-            <FaUserPlus className="me-2" /> 
-            {editingUser ? 'Edit User' : 'Add New User'}
+            <FaUserCheck className="me-2" />
+            First Face Assignment
           </h5>
           <button 
             type="button" 
-            className="btn-close btn-close-white" 
-            onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+            className="btn-close" 
+            onClick={() => {
+              setShowFirstFaceModal(false);
+              setSelectedFirstFace('');
+              setSelectedDepartment('all');
+            }}
           ></button>
         </div>
         <div className="modal-body">
-          <div className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label fw-semibold">Full Name *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                name="name" 
-                value={formData.name} 
-                onChange={handleInputChange} 
-                placeholder="John Doe" 
-              />
-            </div>
-            
-            {/* Email Field - Now comes first */}
-            <div className="col-md-6">
-                <label className="form-label fw-semibold">Email *</label>
-                <input 
-                  type="email" 
-                  className="form-control" 
-                  name="email" 
-                  value={formData.email} 
-                  onChange={(e) => {
-                    handleInputChange(e);
-                    // Auto-generate username from email (part before @) - FIRST LETTER CAPITAL
-                    if (!editingUser && e.target.value.includes('@')) {
-                      const emailPart = e.target.value.split('@')[0];
-                       const capitalizedUsername = emailPart.charAt(0).toUpperCase() + emailPart.slice(1);
-                      
-                      setFormData(prev => ({
-                        ...prev,
-                        username: capitalizedUsername
-                      }));
+          <div className="alert alert-info">
+            <strong>First Face System:</strong> New problems will be automatically assigned to First Face users based on department.
+          </div>
+          
+          <div className="mb-3">
+            <label className="form-label fw-semibold">Select First Face User:</label>
+            <select
+              className="form-control"
+              value={selectedFirstFace}
+              onChange={(e) => setSelectedFirstFace(e.target.value)}
+            >
+              <option value="">-- Select User --</option>
+              {activeUsers.length > 0 ? (
+                activeUsers.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} 
+                    {user.role === 'team_leader' && ' 👑'} 
+                    {user.role === 'user' && ' 👨‍💼'} 
+                    - {user.department}
+                    {user.role === 'admin' && ' ⚡'}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>Loading users...</option>
+              )}
+            </select>
+            <small className="text-muted">
+              You can select any active user (Admin, Team Leader or Regular User)
+            </small>
+            {activeUsers.length === 0 && (
+              <div className="text-danger small mt-1">
+                No active users found. Please check if users are created and active.
+              </div>
+            )}
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label fw-semibold">Assign For Department:</label>
+            <select
+              className="form-control"
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+            >
+              <option value="all">🎯 All Departments</option>
+              <option value="IT & Innovation">💻 IT & Innovation Department</option>
+              <option value="Business">📊 Business Department</option>
+              <option value="Accounts">💰 Accounts Department</option>
+            </select>
+            <small className="text-muted">
+              {selectedDepartment === 'all' 
+                ? 'Will receive ALL new problems from ANY department' 
+                : `Will receive only ${selectedDepartment} department problems`
+              }
+            </small>
+          </div>
+
+          <div className="p-3 bg-light rounded">
+            <div className="row text-center">
+              <div className="col-12">
+                <h5 className="text-warning mb-2">Assignment Summary</h5>
+                <p className="mb-1">
+                  <strong>
+                    {selectedFirstFace 
+                      ? activeUsers.find(u => u.id == selectedFirstFace)?.name 
+                      : 'Selected User'
                     }
-                  }} 
-                  placeholder="john@example.com" 
-                />
-                <small className="text-muted">Username will be auto-generated from email</small>
+                  </strong> will receive:
+                </p>
+                <p className="mb-0 text-success">
+                  {selectedDepartment === 'all' 
+                    ? 'ALL new problems from ANY department'
+                    : `NEW problems only from ${selectedDepartment} department`
+                  }
+                </p>
               </div>
-
-            {/* Username Field - Now comes after email */}
-            <div className="col-md-6">
-              <label className="form-label fw-semibold">Username *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                name="username" 
-                value={formData.username} 
-                onChange={handleInputChange} 
-                placeholder="johndoe" 
-              />
-              <small className="text-muted">Auto-generated from email, can be modified</small>
-            </div>
-
-            <div className="col-md-6 position-relative">
-                  <label className="form-label fw-semibold">
-                    <FaKey className="me-1" /> 
-                    Password * 
-                    {editingUser && <small className="text-muted"> (Leave blank to keep current)</small>}
-                  </label>
-                  <input 
-                    type={showPassword ? 'text' : 'password'} 
-                    className="form-control" 
-                    name="password" 
-                    value={formData.password} 
-                    onChange={handleInputChange}
-                    onFocus={() => setShowPasswordRequirements(true)}
-                    onBlur={() => setShowPasswordRequirements(false)}
-                    placeholder="8+ chars, 1 uppercase, 1 number, 1 special char" 
-                  />
-                  <span 
-                    className="position-absolute top-50 end-0 translate-middle-y me-3" 
-                    style={{cursor:'pointer', marginTop: '12px'}} 
-                    onClick={() => setShowPassword(prev => !prev)}
-                  >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                  </span>
-                  
-  
-              </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold">Role *</label>
-              <select 
-                className="form-control" 
-                name="role" 
-                value={formData.role} 
-                onChange={handleInputChange}
-              >
-                <option value="user">User (Employee)</option>
-                <option value="team_leader">Team Leader</option>
-              </select>
-            </div>
-            <div className="col-md-6">
-              <label className="form-label fw-semibold">Department *</label>
-              <select 
-                className="form-control" 
-                name="department" 
-                value={formData.department} 
-                onChange={handleInputChange}
-              >
-                <option value="">Select Department</option>
-                <option value="IT & Innovation">IT & Innovation</option>
-                <option value="Business">Business</option>
-                <option value="Accounts">Accounts</option>
-              </select>
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold">Status</label>
-              <select 
-                className="form-control" 
-                name="status" 
-                value={formData.status} 
-                onChange={handleInputChange}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
             </div>
           </div>
 
-          <div className="d-flex gap-2 mt-4 pt-3 border-top">
+          <div className="d-flex gap-2 mt-4">
             <button 
-              className="btn btn-primary flex-grow-1" 
-              onClick={handleSaveUser}
+              className="btn btn-warning flex-grow-1"
+              onClick={handleFirstFaceAssignment}
+              disabled={!selectedFirstFace || activeUsers.length === 0}
             >
-              {editingUser ? 'Update User' : 'Add User'}
+              <FaUserCheck className="me-2" />
+              Set as First Face
             </button>
             <button 
-              className="btn btn-secondary" 
-              onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowFirstFaceModal(false);
+                setSelectedFirstFace('');
+                setSelectedDepartment('all');
+              }}
             >
               Cancel
             </button>
@@ -943,6 +887,171 @@ export default function AdminPanelUserManagement() {
     </div>
   </div>
 )}
+
+      {/* Add/Edit User Modal */}
+      {showAddModal && isAdmin && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">
+                  <FaUserPlus className="me-2" /> 
+                  {editingUser ? 'Edit User' : 'Add New User'}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white" 
+                  onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold">Full Name *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      name="name" 
+                      value={formData.name} 
+                      onChange={handleInputChange} 
+                      placeholder="John Doe" 
+                    />
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold">Email *</label>
+                    <input 
+                      type="email" 
+                      className="form-control" 
+                      name="email" 
+                      value={formData.email} 
+                      onChange={(e) => {
+                        handleInputChange(e);
+                        if (!editingUser && e.target.value.includes('@')) {
+                          const emailPart = e.target.value.split('@')[0];
+                          const capitalizedUsername = emailPart.charAt(0).toUpperCase() + emailPart.slice(1);
+                          
+                          setFormData(prev => ({
+                            ...prev,
+                            username: capitalizedUsername
+                          }));
+                        }
+                      }} 
+                      placeholder="john@example.com" 
+                    />
+                    <small className="text-muted">Username will be auto-generated from email</small>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold">Username *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      name="username" 
+                      value={formData.username} 
+                      onChange={handleInputChange} 
+                      placeholder="johndoe" 
+                    />
+                    <small className="text-muted">Auto-generated from email, can be modified</small>
+                  </div>
+
+                  <div className="col-md-6 position-relative">
+                    <label className="form-label fw-semibold">
+                      <FaKey className="me-1" /> 
+                      Password * 
+                      {editingUser && <small className="text-muted"> (Leave blank to keep current)</small>}
+                    </label>
+                    <input 
+                      type={showPassword ? 'text' : 'password'} 
+                      className="form-control" 
+                      name="password" 
+                      value={formData.password} 
+                      onChange={handleInputChange}
+                      onFocus={() => setShowPasswordRequirements(true)}
+                      onBlur={() => setShowPasswordRequirements(false)}
+                      placeholder="8+ chars, 1 uppercase, 1 number, 1 special char" 
+                    />
+                    <span 
+                      className="position-absolute top-50 end-0 translate-middle-y me-3" 
+                      style={{cursor:'pointer', marginTop: '12px'}} 
+                      onClick={() => setShowPassword(prev => !prev)}
+                    >
+                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </span>
+                    
+                    {showPasswordRequirements && (
+                      <div className="form-text">
+                        Password must contain:
+                        <ul className="small mb-0">
+                          <li>At least 8 characters</li>
+                          <li>1 uppercase letter</li>
+                          <li>1 number</li>
+                          <li>1 special character (@$!%*?&)</li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold">Role *</label>
+                    <select 
+                      className="form-control" 
+                      name="role" 
+                      value={formData.role} 
+                      onChange={handleInputChange}
+                    >
+                      <option value="user">User (Employee)</option>
+                      <option value="team_leader">Team Leader</option>
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold">Department *</label>
+                    <select 
+                      className="form-control" 
+                      name="department" 
+                      value={formData.department} 
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Department</option>
+                      <option value="IT & Innovation">IT & Innovation</option>
+                      <option value="Business">Business</option>
+                      <option value="Accounts">Accounts</option>
+                    </select>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold">Status</label>
+                    <select 
+                      className="form-control" 
+                      name="status" 
+                      value={formData.status} 
+                      onChange={handleInputChange}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="d-flex gap-2 mt-4 pt-3 border-top">
+                  <button 
+                    className="btn btn-primary flex-grow-1" 
+                    onClick={handleSaveUser}
+                  >
+                    {editingUser ? 'Update User' : 'Add User'}
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

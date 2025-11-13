@@ -9,8 +9,8 @@ import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaC
 export default function ProblemList() {
   const { user } = useAuth();
   const { notifyAssignment, notifyTransfer } = useNotifications();
+  const API_BASE_URL = 'http://localhost:8000/api';
   const navigate = useNavigate();
-  const [problems, setProblems] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -30,6 +30,98 @@ export default function ProblemList() {
   const [isTransfer, setIsTransfer] = useState(false);
   const [showProblemModal, setShowProblemModal] = useState(false);
   const [selectedProblemStatement, setSelectedProblemStatement] = useState('');
+  const [problems, setProblems] = useState([]);
+
+  useEffect(() => {
+    loadProblems();
+  }, []);
+
+  // src/MyComponents/ProblemList.js - loadProblems function
+const loadProblems = async () => {
+  try {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    console.log('🔍 Loading problems...');
+    console.log('Token available:', !!token);
+    
+    if (!token) {
+      toast.error('No authentication token found. Please login again.');
+      setLoading(false);
+      return;
+    }
+
+    // API call with better error handling
+    const response = await fetch(`${API_BASE_URL}/problems`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response ok:', response.ok);
+
+    // Handle different HTTP status codes
+    if (response.status === 401) {
+      toast.error('Session expired. Please login again.');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      return;
+    }
+
+    if (response.status === 500) {
+      toast.error('Server error. Please try again later.');
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Parse response
+    const responseText = await response.text();
+    console.log('📄 Raw response:', responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      toast.error('Invalid response from server');
+      return;
+    }
+
+    console.log('✅ Parsed data:', data);
+
+    if (data.success) {
+      setProblems(data.problems || []);
+      console.log(`✅ Loaded ${data.problems?.length || 0} problems`);
+    } else {
+      console.error('❌ API error:', data.error);
+      toast.error(data.error || 'Failed to load problems');
+      setProblems([]);
+    }
+
+  } catch (error) {
+    console.error('💥 Network error details:', error);
+    
+    // Specific error messages
+    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+      toast.error('Cannot connect to server. Make sure Laravel is running on http://localhost:8000');
+    } else if (error.name === 'NetworkError') {
+      toast.error('Network connection failed. Check your internet connection.');
+    } else {
+      toast.error('Network error while loading problems: ' + error.message);
+    }
+    
+    setProblems([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchProblems();
