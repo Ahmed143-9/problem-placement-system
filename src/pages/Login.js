@@ -17,7 +17,9 @@ export default function Login() {
     if (user) {
       if (user.role === 'admin' || user.role === 'team_leader') {
         navigate('/dashboard');
-      } 
+      } else {
+    navigate('/employee-dashboard'); // Normal user এখানে যাবে
+  }
     }
   }, [user, navigate]);
 
@@ -57,7 +59,7 @@ export default function Login() {
       }
     } catch (error) {
       console.error('Login error:', error);
-      toast.error('An error occurred during login');
+      // toast.error('An error occurred during login');
     } finally {
       setLoading(false);
     }
@@ -67,11 +69,12 @@ export default function Login() {
     <div 
       className="container-fluid p-0"
       style={{
-        backgroundImage: 'url("/Log_Page.jpg")',
+        backgroundImage: 'url("/Checkinglog.PNG")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
         position: 'relative'
       }}
     >
@@ -84,7 +87,7 @@ export default function Login() {
           right: 0,
           bottom: 0,
           background: 'rgba(255, 255, 255, 0.12)',
-          backdropFilter: 'blur(8px)',
+          backdropFilter: 'blur(0px)',
           zIndex: 1
         }}
       ></div>
@@ -95,7 +98,7 @@ export default function Login() {
             className="card"
             style={{
               background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(9px)',
               border: '1px solid rgba(255, 255, 255, 0.4)',
               borderRadius: '20px',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',

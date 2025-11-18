@@ -18,6 +18,7 @@ import Reports from "./pages/Reports";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import ProblemCreate from "./pages/ProblemCreate";
+import FirstFaceAssignment from "./components/FirstFaceAssignment";
 
 function App() {
   return (
@@ -116,6 +117,7 @@ function App() {
               }
             />
             <Route path="/problem/create" element={<ProblemCreate />} />
+            <Route path="/first-face-assignments" element={<FirstFaceAssignment />} />
           </Routes>
         </Router>
       </NotificationProvider>

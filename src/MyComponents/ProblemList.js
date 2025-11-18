@@ -32,123 +32,234 @@ export default function ProblemList() {
   const [selectedProblemStatement, setSelectedProblemStatement] = useState('');
   const [problems, setProblems] = useState([]);
 
+  // Load all data
   useEffect(() => {
-    loadProblems();
+    const loadAllData = async () => {
+      try {
+        setLoading(true);
+        await loadProblems();
+        await fetchTeamMembers();
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast.error('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllData();
   }, []);
 
-  // src/MyComponents/ProblemList.js - loadProblems function
-const loadProblems = async () => {
-  try {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    console.log('🔍 Loading problems...');
-    console.log('Token available:', !!token);
-    
-    if (!token) {
-      toast.error('No authentication token found. Please login again.');
-      setLoading(false);
-      return;
-    }
-
-    // API call with better error handling
-    const response = await fetch(`${API_BASE_URL}/problems`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+  // Create sample problems in localStorage
+  const createSampleProblems = () => {
+    const sampleProblems = [
+      {
+        id: 1,
+        department: 'Tech',
+        priority: 'High',
+        status: 'pending',
+        createdBy: user?.name || 'Admin',
+        assignedTo: '',
+        statement: 'Server downtime affecting user login functionality',
+        createdAt: new Date().toISOString()
       },
-    });
-
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response ok:', response.ok);
-
-    // Handle different HTTP status codes
-    if (response.status === 401) {
-      toast.error('Session expired. Please login again.');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-      return;
-    }
-
-    if (response.status === 500) {
-      toast.error('Server error. Please try again later.');
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // Parse response
-    const responseText = await response.text();
-    console.log('📄 Raw response:', responseText);
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      toast.error('Invalid response from server');
-      return;
-    }
-
-    console.log('✅ Parsed data:', data);
-
-    if (data.success) {
-      setProblems(data.problems || []);
-      console.log(`✅ Loaded ${data.problems?.length || 0} problems`);
-    } else {
-      console.error('❌ API error:', data.error);
-      toast.error(data.error || 'Failed to load problems');
-      setProblems([]);
-    }
-
-  } catch (error) {
-    console.error('💥 Network error details:', error);
+      {
+        id: 2,
+        department: 'Business',
+        priority: 'Medium',
+        status: 'in_progress',
+        createdBy: user?.name || 'Admin',
+        assignedTo: 'John Doe',
+        statement: 'Update pricing page with new product features',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 3,
+        department: 'Accounts',
+        priority: 'Low',
+        status: 'done',
+        createdBy: user?.name || 'Admin',
+        assignedTo: 'Jane Smith',
+        statement: 'Fix calculation error in monthly reports',
+        createdAt: new Date().toISOString()
+      }
+    ];
     
-    // Specific error messages
-    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-      toast.error('Cannot connect to server. Make sure Laravel is running on http://localhost:8000');
-    } else if (error.name === 'NetworkError') {
-      toast.error('Network connection failed. Check your internet connection.');
-    } else {
-      toast.error('Network error while loading problems: ' + error.message);
-    }
-    
-    setProblems([]);
-  } finally {
-    setLoading(false);
-  }
-};
+    setProblems(sampleProblems);
+    localStorage.setItem('problems', JSON.stringify(sampleProblems));
+    toast.info('Created sample problems to get you started!');
+  };
 
-  useEffect(() => {
-    fetchProblems();
-    fetchTeamMembers();
-  }, []);
-
-  const fetchProblems = () => {
+  // Create sample problems via API
+  const createSampleProblemsInAPI = async () => {
     try {
-      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
-      setProblems(storedProblems);
+      const token = localStorage.getItem('token');
+      const sampleProblems = [
+        {
+          department: 'Tech',
+          priority: 'High',
+          statement: 'Server downtime affecting user login functionality',
+          created_by: user?.name || 'Admin'
+        },
+        {
+          department: 'Business',
+          priority: 'Medium',
+          statement: 'Update pricing page with new product features',
+          created_by: user?.name || 'Admin'
+        },
+        {
+          department: 'Accounts',
+          priority: 'Low',
+          statement: 'Fix calculation error in monthly reports',
+          created_by: user?.name || 'Admin'
+        }
+      ];
+
+      console.log('📝 Creating sample problems via API...');
+      
+      for (const problemData of sampleProblems) {
+        const response = await fetch(`${API_BASE_URL}/problems`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(problemData)
+        });
+
+        if (response.ok) {
+          console.log('✅ Created sample problem:', problemData.statement);
+        } else {
+          console.error('❌ Failed to create sample problem:', await response.text());
+        }
+      }
+
+      toast.success('Sample problems created successfully via API!');
     } catch (error) {
-      toast.error('Failed to fetch problems');
-      console.error(error);
-    } finally {
-      setLoading(false);
+      console.error('Error creating sample problems via API:', error);
+      toast.error('Failed to create sample problems via API');
     }
   };
 
-  const fetchTeamMembers = () => {
+  // Main load problems function
+  const loadProblems = async () => {
     try {
+      console.log('🔄 Starting to load problems...');
+      
+      const token = localStorage.getItem('token');
+      console.log('🔑 Token exists:', !!token);
+
+      // First, try to load from API if token exists
+      if (token) {
+        try {
+          console.log('🌐 Attempting API call to:', `${API_BASE_URL}/problems`);
+          
+          const response = await fetch(`${API_BASE_URL}/problems`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          console.log('📡 API Response status:', response.status);
+          console.log('📡 API Response ok:', response.ok);
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ API response data:', data);
+            
+            // Handle different response structures
+            let apiProblems = [];
+            if (data.success && Array.isArray(data.problems)) {
+              apiProblems = data.problems;
+            } else if (data.success && Array.isArray(data.data)) {
+              apiProblems = data.data;
+            } else if (Array.isArray(data)) {
+              apiProblems = data;
+            }
+
+            console.log(`✅ Extracted ${apiProblems.length} problems from API response`);
+
+            if (apiProblems.length > 0) {
+              // Transform data to match frontend structure
+              const transformedProblems = apiProblems.map(problem => ({
+                id: problem.id,
+                department: problem.department,
+                priority: problem.priority,
+                status: problem.status,
+                statement: problem.statement,
+                createdBy: problem.created_by || problem.createdBy,
+                assignedTo: problem.assigned_to || problem.assignedTo,
+                transferHistory: problem.transfer_history || problem.transferHistory,
+                createdAt: problem.created_at || problem.createdAt
+              }));
+
+              setProblems(transformedProblems);
+              localStorage.setItem('problems', JSON.stringify(transformedProblems));
+              toast.success(`Loaded ${transformedProblems.length} problems from server`);
+              return;
+            } else {
+              console.log('📝 No problems found in API, creating sample data via API...');
+              await createSampleProblemsInAPI();
+              // Don't return here, let it fall through to load again
+            }
+          }
+        } catch (apiError) {
+          console.warn('API call failed, using fallback:', apiError);
+        }
+      }
+
+      // Fallback: Use localStorage
+      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      console.log(`📁 Found ${storedProblems.length} problems in localStorage`);
+      
+      if (storedProblems.length > 0) {
+        setProblems(storedProblems);
+        console.log(`📁 Loaded ${storedProblems.length} problems from localStorage`);
+      } else {
+        console.log('📝 No problems found anywhere, creating local samples...');
+        createSampleProblems();
+      }
+
+    } catch (error) {
+      console.error('💥 Error loading problems:', error);
+      
+      // Final fallback
+      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      if (storedProblems.length === 0) {
+        createSampleProblems();
+      } else {
+        setProblems(storedProblems);
+      }
+    }
+  };
+
+  const fetchTeamMembers = async () => {
+    try {
+      // Try localStorage first
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const members = storedUsers.filter(u => 
-        u.username !== 'Admin' && u.status === 'active'
-      );
-      setTeamMembers(members);
+      
+      if (storedUsers.length === 0) {
+        // Create sample team members if none exist
+        const sampleMembers = [
+          { id: 1, name: 'John Doe', role: 'team_leader', department: 'Tech', status: 'active', username: 'john' },
+          { id: 2, name: 'Jane Smith', role: 'user', department: 'Business', status: 'active', username: 'jane' },
+          { id: 3, name: 'Mike Johnson', role: 'user', department: 'Accounts', status: 'active', username: 'mike' }
+        ];
+        localStorage.setItem('system_users', JSON.stringify(sampleMembers));
+        setTeamMembers(sampleMembers);
+        console.log('✅ Created sample team members');
+      } else {
+        const members = storedUsers.filter(u => 
+          u.username !== 'Admin' && u.status === 'active'
+        );
+        setTeamMembers(members);
+        console.log(`✅ Loaded ${members.length} team members from localStorage`);
+      }
     } catch (error) {
       console.error('Failed to fetch team members:', error);
+      setTeamMembers([]);
     }
   };
 
@@ -177,7 +288,11 @@ const loadProblems = async () => {
     try {
       const updatedProblems = problems.map(p => {
         if (p.id === selectedProblem.id) {
-          const updatedProblem = { ...p, assignedTo: selectedMember };
+          const updatedProblem = { 
+            ...p, 
+            assignedTo: selectedMember,
+            status: p.status === 'pending' ? 'in_progress' : p.status
+          };
           
           if (isTransfer && p.assignedTo) {
             updatedProblem.transferHistory = [
@@ -199,8 +314,8 @@ const loadProblems = async () => {
         return p;
       });
       
-      localStorage.setItem('problems', JSON.stringify(updatedProblems));
       setProblems(updatedProblems);
+      localStorage.setItem('problems', JSON.stringify(updatedProblems));
       
       toast.success(
         isTransfer 
@@ -221,8 +336,8 @@ const loadProblems = async () => {
     if (window.confirm(`Are you sure you want to delete Problem #${problemId}?`)) {
       try {
         const updatedProblems = problems.filter(p => p.id !== problemId);
-        localStorage.setItem('problems', JSON.stringify(updatedProblems));
         setProblems(updatedProblems);
+        localStorage.setItem('problems', JSON.stringify(updatedProblems));
         toast.success(`Problem #${problemId} deleted!`);
       } catch (error) {
         toast.error('Failed to delete problem');
@@ -449,7 +564,6 @@ const loadProblems = async () => {
           }}
         >
           <div className="card shadow border-0">
-            {/* Mobile-Friendly Header */}
             <div className="card-header bg-primary text-white py-3">
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
                 <div className="d-flex align-items-center w-100 w-md-auto">
@@ -458,13 +572,31 @@ const loadProblems = async () => {
                     Problem Management
                   </h4>
                 </div>
-                <button 
-                  className="btn btn-light btn-sm fw-semibold w-100 w-md-auto mt-2 mt-md-0"
-                  onClick={() => navigate('/problem/create')}
-                >
-                  <i className="bi bi-plus-circle me-1"></i>
-                  Create New
-                </button>
+                <div className="d-flex gap-2 w-100 w-md-auto mt-2 mt-md-0">
+                  <button 
+                    className="btn btn-light btn-sm fw-semibold flex-grow-1"
+                    onClick={() => navigate('/problem/create')}
+                  >
+                    <i className="bi bi-plus-circle me-1"></i>
+                    Create New
+                  </button>
+                  {problems.length === 0 && (
+                    <button 
+                      className="btn btn-warning btn-sm fw-semibold"
+                      onClick={createSampleProblems}
+                    >
+                      <i className="bi bi-magic me-1"></i>
+                      Create Samples
+                    </button>
+                  )}
+                  <button 
+                    className="btn btn-outline-light btn-sm"
+                    onClick={loadProblems}
+                    title="Refresh problems"
+                  >
+                    <i className="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
               </div>
             </div>
             <div className="card-body p-3">
@@ -491,6 +623,18 @@ const loadProblems = async () => {
                     Unassigned: {problems.filter(p => !p.assignedTo).length}
                   </span>
                 </div>
+                <div className="col-auto">
+                  <span className="badge bg-primary fs-6">
+                    Total: {problems.length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Debug Info */}
+              <div className="alert alert-info py-2 mb-3" style={{ fontSize: '0.8rem' }}>
+                <strong>Debug Info:</strong> Loaded {problems.length} problems | 
+                Filtered: {filteredProblems.length} | 
+                API: {API_BASE_URL}
               </div>
 
               {/* Compact Filters */}
@@ -555,32 +699,45 @@ const loadProblems = async () => {
                 <table className="table table-sm table-hover table-striped mb-2">
                   <thead className="table-dark position-sticky top-0">
                     <tr>
+                      <th style={{ width: '10%' }}>ID</th>
                       <th style={{ width: '15%' }}>Department</th>
                       <th style={{ width: '12%' }}>Priority</th>
                       <th style={{ width: '15%' }}>Status</th>
                       <th style={{ width: '15%' }}>Created By</th>
                       <th style={{ width: '15%' }}>Assigned To</th>
-                      <th style={{ width: '10%', textAlign: 'center' }}>Problem Statement</th>
-                      <th style={{ width: '18%', textAlign: 'center' }}>Actions</th>
+                      <th style={{ width: '8%', textAlign: 'center' }}>View</th>
+                      <th style={{ width: '20%', textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {currentProblems.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="text-center py-4 text-muted">
+                        <td colSpan="8" className="text-center py-4 text-muted">
                           <div className="py-3">
                             <i className="bi bi-inbox display-6 text-muted"></i>
-                            <p className="mt-2 mb-0">
+                            <p className="mt-2 mb-2">
                               {problems.length === 0 
-                                ? 'No problems found. Create your first problem!' 
+                                ? 'No problems found.' 
                                 : 'No problems match your filters.'}
                             </p>
+                            {problems.length === 0 && (
+                              <button 
+                                className="btn btn-primary btn-sm"
+                                onClick={createSampleProblems}
+                              >
+                                <i className="bi bi-magic me-1"></i>
+                                Create Sample Problems
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
                     ) : (
                       currentProblems.map((problem) => (
                         <tr key={problem.id} className="align-middle">
+                          <td>
+                            <span className="fw-bold text-primary">#{problem.id}</span>
+                          </td>
                           <td>
                             <span className="fw-semibold" style={{ fontSize: '0.95rem' }}>
                               {problem.department}

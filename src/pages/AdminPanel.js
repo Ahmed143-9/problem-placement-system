@@ -46,26 +46,36 @@ export default function AdminPanelUserManagement() {
   }, [API_BASE_URL]);
 
   const loadUsers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+  try {
+    const token = localStorage.getItem('token');
+    
+    // 🔥 TEMPORARILY REMOVE AUTHORIZATION HEADER
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
 
-      const data = await response.json();
+    // if (token) {
+    //   headers['Authorization'] = `Bearer ${token}`;
+    // }
 
-      if (data.success) {
-        setUsers(data.users);
-      } else {
-        toast.error(data.error || 'Failed to load users');
-      }
-    } catch (error) {
-      console.error('Failed to load users:', error);
-      toast.error('Network error while loading users');
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      headers: headers,
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      setUsers(data.users);
+      console.log('✅ Users loaded successfully:', data.users.length);
+    } else {
+      toast.error(data.error || 'Failed to load users');
     }
-  };
+  } catch (error) {
+    console.error('Failed to load users:', error);
+    toast.error('Network error while loading users');
+  }
+};
 
   const loadProblems = async () => {
     try {
@@ -126,26 +136,34 @@ const loadFirstFaceAssignments = async () => {
 };
 
   const loadActiveUsers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/users/active`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+  try {
+    const token = localStorage.getItem('token');
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
 
-      const data = await response.json();
+    // if (token) {
+    //   headers['Authorization'] = `Bearer ${token}`;
+    // }
 
-      if (data.success) {
-        setActiveUsers(data.activeUsers);
-      } else {
-        toast.error(data.error || 'Failed to load active users');
-      }
-    } catch (error) {
-      console.error('Failed to load active users:', error);
-      toast.error('Network error while loading active users');
+    const response = await fetch(`${API_BASE_URL}/users/active`, {
+      headers: headers,
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      setActiveUsers(data.activeUsers);
+    } else {
+      toast.error(data.error || 'Failed to load active users');
     }
-  };
+  } catch (error) {
+    console.error('Failed to load active users:', error);
+    toast.error('Network error while loading active users');
+  }
+};
 
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
@@ -240,53 +258,142 @@ const handleFirstFaceAssignment = async () => {
     return byDepartment;
   };
 
-  const handleSaveUser = async () => {
-    if (!isAdmin) return toast.error('Only Admin can add or edit users!');
-    if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
-
-    if (!editingUser) {
-      if (!formData.password) return toast.error('Password is required');
-      if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
-      const method = editingUser ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast.success(data.message);
-        setFormData({
-          name: '',
-          username: '',
-          email: '',
-          password: '',
-          role: 'user',
-          department: '',
-          status: 'active'
-        });
-        setShowAddModal(false);
-        setEditingUser(null);
-        loadUsers();
-      } else {
-        toast.error(data.error || 'Failed to save user');
-      }
-    } catch (error) {
-      toast.error('Failed to save user');
-      console.error(error);
-    }
+const testUserCreation = async () => {
+  const testUser = {
+    name: "Test User Frontend",
+    username: "testfrontend@example.com", 
+    email: "testfrontend@example.com",
+    password: "Test123!",
+    role: "user",
+    department: "IT & Innovation",
+    status: "active"
   };
+
+  try {
+    console.log('🧪 Testing User Creation from Frontend...');
+    
+    const response = await fetch('http://127.0.0.1:8000/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(testUser)
+    });
+
+    const text = await response.text();
+    console.log('🧪 Response Status:', response.status);
+    console.log('🧪 Full Response:', text);
+
+    if (response.ok) {
+      try {
+        const data = JSON.parse(text);
+        console.log('✅ SUCCESS:', data);
+        toast.success('User created successfully!');
+      } catch (e) {
+        console.error('❌ JSON Parse Error:', e);
+        toast.error('Response is not valid JSON');
+      }
+    } else {
+      console.error('❌ SERVER ERROR:', text);
+      toast.error('Server error: ' + response.status);
+    }
+
+  } catch (error) {
+    console.error('❌ NETWORK ERROR:', error);
+    toast.error('Network error: ' + error.message);
+  }
+};
+
+ const handleSaveUser = async () => {
+  if (!isAdmin) return toast.error('Only Admin can add or edit users!');
+  if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
+
+  if (!editingUser) {
+    if (!formData.password) return toast.error('Password is required');
+    if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
+    const method = editingUser ? 'PUT' : 'POST';
+
+    // 🔍 DEBUG: Enhanced logging
+    console.log('🔵 SAVE USER DEBUG:', {
+      url,
+      method,
+      formData,
+      editingUser,
+      API_BASE_URL
+    });
+
+    // 🔥 TEMPORARILY REMOVE AUTHORIZATION HEADER
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    // Only add Authorization if token exists and routes are protected
+    // if (token) {
+    //   headers['Authorization'] = `Bearer ${token}`;
+    // }
+
+    const response = await fetch(url, {
+      method: method,
+      headers: headers,
+      body: JSON.stringify(formData),
+    });
+
+    // 🔍 Check response before parsing
+    const responseText = await response.text();
+    console.log('🟡 RAW RESPONSE:', {
+      status: response.status,
+      statusText: response.statusText,
+      first200Chars: responseText.substring(0, 200)
+    });
+
+    // Check if response is HTML error page
+    if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+      console.error('🔴 HTML ERROR PAGE RECEIVED');
+      throw new Error('Server returned HTML page. Check API endpoint.');
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('🔴 JSON PARSE ERROR:', parseError);
+      console.error('🔴 FULL RESPONSE:', responseText);
+      throw new Error('Server returned invalid JSON: ' + responseText.substring(0, 100));
+    }
+
+    console.log('🟢 PARSED RESPONSE:', data);
+
+    if (data.success) {
+      toast.success(data.message);
+      setFormData({
+        name: '',
+        username: '',
+        email: '',
+        password: '',
+        role: 'user',
+        department: '',
+        status: 'active'
+      });
+      setShowAddModal(false);
+      setEditingUser(null);
+      loadUsers();
+    } else {
+      console.error('🔴 BACKEND ERROR:', data);
+      toast.error(data.error || 'Failed to save user');
+    }
+  } catch (error) {
+    console.error('🔴 SAVE USER ERROR:', error);
+    toast.error(error.message || 'Failed to save user');
+  }
+};
+
 
   const handleEditUser = userId => {
     if (!isAdmin) return toast.error('Only Admin can edit users!');
@@ -510,28 +617,37 @@ const handleFirstFaceAssignment = async () => {
                     {isAdmin ? 'Add and manage Team Leaders and Users' : 'View team members (Read-only access)'}
                   </small>
                 </div>
-                {isAdmin && (
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-warning btn-sm"
-                      onClick={() => setShowFirstFaceModal(true)}
-                    >
-                      <FaUserCheck className="me-1" />
-                      First Face
-                    </button>
-                    <button
-                      className="btn btn-light btn-sm"
-                      onClick={() => {
-                        setEditingUser(null);
-                        setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
-                        setShowAddModal(true);
-                      }}
-                    >
-                      <FaUserPlus className="me-1" />
-                      <span>Add New User</span>
-                    </button>
-                  </div>
-                )}
+               {isAdmin && (
+  <div className="d-flex gap-2">
+    <button
+      className="btn btn-warning btn-sm"
+      onClick={() => setShowFirstFaceModal(true)}
+    >
+      <FaUserCheck className="me-1" />
+      First Face
+    </button>
+    
+    {/* 🔥 ADD TEST BUTTON */}
+    <button
+      className="btn btn-success btn-sm"
+      onClick={testUserCreation}
+    >
+      Test API
+    </button>
+    
+    <button
+      className="btn btn-light btn-sm"
+      onClick={() => {
+        setEditingUser(null);
+        setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
+        setShowAddModal(true);
+      }}
+    >
+      <FaUserPlus className="me-1" />
+      <span>Add New User</span>
+    </button>
+  </div>
+)}
               </div>
             </div>
 
@@ -918,7 +1034,7 @@ const handleFirstFaceAssignment = async () => {
                     />
                   </div>
                   
-                  <div className="col-md-6">
+                  {/* <div className="col-md-6">
                     <label className="form-label fw-semibold">Email *</label>
                     <input 
                       type="email" 
@@ -940,7 +1056,32 @@ const handleFirstFaceAssignment = async () => {
                       placeholder="john@example.com" 
                     />
                     <small className="text-muted">Username will be auto-generated from email</small>
-                  </div>
+                  </div> */}
+
+                  <div className="col-md-6">
+  <label className="form-label fw-semibold">Email *</label>
+  <input
+    type="email"
+    className="form-control"
+    name="email"
+    value={formData.email}
+    onChange={(e) => {
+      handleInputChange(e);
+
+      const emailValue = e.target.value;
+
+      if (!editingUser) {
+        setFormData(prev => ({
+          ...prev,
+          username: emailValue   // 👈 email = username exactly same
+        }));
+      }
+    }}
+    placeholder="john@example.com"
+  />
+  <small className="text-muted">Username will mirror your email automatically</small>
+</div>
+
 
                   <div className="col-md-6">
                     <label className="form-label fw-semibold">Username *</label>
@@ -1002,6 +1143,7 @@ const handleFirstFaceAssignment = async () => {
                     >
                       <option value="user">User (Employee)</option>
                       <option value="team_leader">Team Leader</option>
+                      <option value="admin">Admin</option>
                     </select>
                   </div>
                   <div className="col-md-6">

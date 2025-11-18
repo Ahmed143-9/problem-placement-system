@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { autoAssignProblem } from '../utils/autoAssign'; // ✅ এই import টি যোগ করুন
 
 const SERVICES = [
   'Bulk SMS',
@@ -81,90 +82,149 @@ export default function ProblemForm() {
     }));
   };
 
-  // 🔥 COMPLETE AUTO FIRST FACE ASSIGNMENT FUNCTION
+  // ✅ handleSubmit ফাংশন - পুরোটা রিপ্লেস করুন
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-      
-      // 🔥 AUTO FIRST FACE ASSIGNMENT LOGIC
-      const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-      let autoAssignedTo = '';
-      
-      // Check for specific department first face
-      const deptFirstFace = firstFaceAssignments.find(ff => 
-        ff.department === formData.department
-      );
-      
-      // Check for all department first face (if no specific found)
-      const allDeptFirstFace = firstFaceAssignments.find(ff => ff.department === 'all');
-      
-      if (deptFirstFace) {
-        autoAssignedTo = deptFirstFace.userName;
-      } else if (allDeptFirstFace) {
-        autoAssignedTo = allDeptFirstFace.userName;
+      // Validate required fields
+      if (!formData.department || !formData.service || !formData.priority || !formData.statement.trim()) {
+        toast.error('Please fill all required fields');
+        setLoading(false);
+        return;
       }
+
+      // ✅ Auto assignment logic - NEW VERSION
+      const assignmentResult = autoAssignProblem(formData.department);
+      const autoAssignedTo = assignmentResult.assignedTo;
+      const assignmentStatus = assignmentResult.status;
+      const assignmentType = assignmentResult.type;
+
+      // Extract only image URLs, not the entire object
+      const imageUrls = formData.images && formData.images.length > 0 
+        ? formData.images.map(img => img.url) 
+        : [];
+
+      // Prepare data for Laravel Backend
+      const problemData = {
+        department: formData.department,
+        service: formData.service,
+        priority: formData.priority,
+        statement: formData.statement,
+        client: formData.client || '',
+        images: imageUrls,
+        created_by: user?.name || 'Unknown User',
+        status: assignmentStatus, // ✅ Use auto-assignment status
+        assigned_to: autoAssignedTo, // ✅ Send assigned person to Laravel
+        assignment_type: assignmentType // ✅ Send assignment type
+      };
+
+      console.log('📤 Sending data to Laravel:', problemData);
+
+      // Use full API URL
+      const API_BASE_URL = 'http://localhost:8000/api';
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      // Send to Laravel backend
+      const response = await fetch(`${API_BASE_URL}/problems`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(problemData)
+      });
+
+      console.log('📨 Response status:', response.status);
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Non-JSON response:', text.substring(0, 500));
+        
+        if (response.status === 404) {
+          throw new Error(`API endpoint not found. Please make sure Laravel server is running on port 8000.`);
+        } else {
+          throw new Error('Server returned HTML instead of JSON. Check your API routes.');
+        }
+      }
+
+      const result = await response.json();
+      console.log('📦 API response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || result.message || `Server error: ${response.status}`);
+      }
+
+      // ALSO save to localStorage for auto-assignment logic
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
 
       const newProblem = {
         id: problems.length + 1,
         ...formData,
-        status: 'pending', // 🔥 ALWAYS KEEP AS PENDING (even if assigned)
+        laravel_id: result.problem?.id, // Store Laravel ID for reference
+        status: assignmentStatus, // ✅ Use auto-assignment status
         createdBy: user?.name || 'Unknown User',
-        assignedTo: autoAssignedTo, // 🔥 AUTO ASSIGNED BUT STATUS PENDING
+        assignedTo: autoAssignedTo,
+        assignmentType: assignmentType, // ✅ Store assignment type
         createdAt: new Date().toISOString(),
         comments: [],
         actionHistory: [{
           action: 'Problem Created',
           by: user?.name || 'Unknown User',
           timestamp: new Date().toISOString(),
-          comment: autoAssignedTo 
-            ? `Auto assigned to ${autoAssignedTo} (First Face) - Status: Pending`
+          comment: assignmentType !== 'NOT_ASSIGNED' 
+            ? `Auto assigned to ${autoAssignedTo} (${assignmentType}) - Status: ${assignmentStatus}`
             : 'Problem ticket submitted - Waiting for assignment'
         }]
       };
       
       problems.push(newProblem);
       localStorage.setItem('problems', JSON.stringify(problems));
-      
-      // Show appropriate success message
-      if (autoAssignedTo) {
-        toast.success(`Problem submitted and auto-assigned to ${autoAssignedTo}! (Status: Pending)`);
+
+      // ✅ Show appropriate message based on assignment type
+      if (assignmentType === 'PRE_ASSIGNED') {
+        toast.success(`Problem submitted and auto-assigned to ${autoAssignedTo} (In Progress)!`);
+      } else if (assignmentType.includes('FIRST_FACE')) {
+        toast.success(`Problem submitted and assigned to ${autoAssignedTo} via First Face!`);
       } else {
-        toast.success('Problem submitted! Will be assigned manually.');
+        toast.info('Problem submitted. No auto-assignment found - status: Pending');
       }
       
+      // Reset form
       setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
       setPreviewImages([]);
       
-      // Role-based redirect - FIXED
+      // Redirect
       setTimeout(() => {
         if (user?.role === 'admin' || user?.role === 'team_leader') {
-          navigate('/dashboard'); // Admin dashboard
+          navigate('/problems');
         } else {
-          navigate('/employee-dashboard'); // Employee dashboard
+          navigate('/employee-dashboard');
         }
       }, 1000);
       
     } catch (error) {
-      toast.error('Failed to submit problem');
-      console.error(error);
+      console.error('❌ Submission error:', error);
+      toast.error(error.message || 'Failed to submit problem to server');
     } finally {
       setLoading(false);
     }
   };
 
+  // বাকি কোডগুলো একই থাকবে (toggleSidebar, getDashboardPath, return statement ইত্যাদি)
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
   };
 
-  // 🔥 FIXED: Get correct dashboard path based on user role
   const getDashboardPath = () => {
     if (user?.role === 'admin' || user?.role === 'team_leader') {
-      return '/dashboard'; // Admin dashboard
+      return '/dashboard';
     } else {
-      return '/employee-dashboard'; // Employee dashboard
+      return '/employee-dashboard';
     }
   };
 
@@ -214,7 +274,7 @@ export default function ProblemForm() {
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
                 <Link 
-                  to={getDashboardPath()} // 🔥 FIXED: Dynamic dashboard path
+                  to={getDashboardPath()}
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="Dashboard"
@@ -237,7 +297,6 @@ export default function ProblemForm() {
                 </Link>
               </li>
               
-              {/* Only show All Problems for Admin/Team Leader in Sidebar */}
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <li className="nav-item mb-2">
                   <Link 
