@@ -1,17 +1,19 @@
-// src/utils/api.js - Create this file
+// src/utils/api.js - UPDATED VERSION
 const API_BASE_URL = 'http://localhost:8000/api';
 
-// Get auth headers
+// Get auth headers with token
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
+  console.log('🔑 Token being sent:', token); // Debug log
+  
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Authorization': `Bearer ${token}`,
+    'Authorization': token ? `Bearer ${token}` : '',
   };
 };
 
-// Main API request function
+// Main API request function - FIXED
 export const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -27,10 +29,19 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     console.log(`🟡 API CALL: ${config.method || 'GET'} ${url}`);
+    console.log('🔑 Headers:', config.headers); // Debug headers
     
     const response = await fetch(url, config);
     
     console.log(`🔵 API RESPONSE: ${response.status} ${response.statusText}`);
+
+    // Handle unauthorized
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      throw new Error('Authentication failed. Please login again.');
+    }
 
     // Check if response is JSON
     const contentType = response.headers.get('content-type');
@@ -74,7 +85,7 @@ export const problemAPI = {
 };
 
 export const firstFaceAPI = {
-  getAssignments: () => apiRequest('/first-face-assignments'), // ✅ FIXED ROUTE
+  getAssignments: () => apiRequest('/first-face-assignments'),
   createAssignment: (data) => apiRequest('/first-face-assignments', { 
     method: 'POST', 
     body: data 

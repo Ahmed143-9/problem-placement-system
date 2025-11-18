@@ -1,10 +1,11 @@
+// src/MyComponents/ProblemForm.js - UPDATED IMPORTS
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { autoAssignProblem } from '../utils/autoAssign'; // ✅ এই import টি যোগ করুন
+import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle } from 'react-icons/fa';
+// Remove unused imports: FaUsersCog, autoAssignProblem
 
 const SERVICES = [
   'Bulk SMS',
@@ -82,7 +83,7 @@ export default function ProblemForm() {
     }));
   };
 
-  // ✅ handleSubmit ফাংশন - পুরোটা রিপ্লেস করুন
+  // ✅ FIXED: handleSubmit function with proper API call
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -95,13 +96,15 @@ export default function ProblemForm() {
         return;
       }
 
-      // ✅ Auto assignment logic - NEW VERSION
-      const assignmentResult = autoAssignProblem(formData.department);
-      const autoAssignedTo = assignmentResult.assignedTo;
-      const assignmentStatus = assignmentResult.status;
-      const assignmentType = assignmentResult.type;
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      console.log('🔑 Token for problem creation:', token);
 
-      // Extract only image URLs, not the entire object
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
+      // Extract only image URLs
       const imageUrls = formData.images && formData.images.length > 0 
         ? formData.images.map(img => img.url) 
         : [];
@@ -114,26 +117,21 @@ export default function ProblemForm() {
         statement: formData.statement,
         client: formData.client || '',
         images: imageUrls,
-        created_by: user?.name || 'Unknown User',
-        status: assignmentStatus, // ✅ Use auto-assignment status
-        assigned_to: autoAssignedTo, // ✅ Send assigned person to Laravel
-        assignment_type: assignmentType // ✅ Send assignment type
+        created_by: user?.name || 'Unknown User'
       };
 
       console.log('📤 Sending data to Laravel:', problemData);
 
-      // Use full API URL
+      // ✅ FIXED: Use fetch directly instead of undefined apiRequest
       const API_BASE_URL = 'http://localhost:8000/api';
       
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      // Send to Laravel backend
       const response = await fetch(`${API_BASE_URL}/problems`, {
         method: 'POST',
-        headers: headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(problemData)
       });
 
@@ -159,63 +157,65 @@ export default function ProblemForm() {
         throw new Error(result.error || result.message || `Server error: ${response.status}`);
       }
 
-      // ALSO save to localStorage for auto-assignment logic
-      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      if (result.success) {
+        // ALSO save to localStorage for auto-assignment logic
+        const problems = JSON.parse(localStorage.getItem('problems') || '[]');
 
-      const newProblem = {
-        id: problems.length + 1,
-        ...formData,
-        laravel_id: result.problem?.id, // Store Laravel ID for reference
-        status: assignmentStatus, // ✅ Use auto-assignment status
-        createdBy: user?.name || 'Unknown User',
-        assignedTo: autoAssignedTo,
-        assignmentType: assignmentType, // ✅ Store assignment type
-        createdAt: new Date().toISOString(),
-        comments: [],
-        actionHistory: [{
-          action: 'Problem Created',
-          by: user?.name || 'Unknown User',
-          timestamp: new Date().toISOString(),
-          comment: assignmentType !== 'NOT_ASSIGNED' 
-            ? `Auto assigned to ${autoAssignedTo} (${assignmentType}) - Status: ${assignmentStatus}`
-            : 'Problem ticket submitted - Waiting for assignment'
-        }]
-      };
-      
-      problems.push(newProblem);
-      localStorage.setItem('problems', JSON.stringify(problems));
+        const newProblem = {
+          id: problems.length + 1,
+          ...formData,
+          laravel_id: result.problem?.id,
+          status: 'pending',
+          createdBy: user?.name || 'Unknown User',
+          assignedTo: null,
+          assignmentType: 'NOT_ASSIGNED',
+          createdAt: new Date().toISOString(),
+          comments: [],
+          actionHistory: [{
+            action: 'Problem Created',
+            by: user?.name || 'Unknown User',
+            timestamp: new Date().toISOString(),
+            comment: 'Problem ticket submitted'
+          }]
+        };
+        
+        problems.push(newProblem);
+        localStorage.setItem('problems', JSON.stringify(problems));
 
-      // ✅ Show appropriate message based on assignment type
-      if (assignmentType === 'PRE_ASSIGNED') {
-        toast.success(`Problem submitted and auto-assigned to ${autoAssignedTo} (In Progress)!`);
-      } else if (assignmentType.includes('FIRST_FACE')) {
-        toast.success(`Problem submitted and assigned to ${autoAssignedTo} via First Face!`);
+        toast.success('Problem submitted successfully!');
+        
+        // Reset form
+        setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
+        setPreviewImages([]);
+        
+        // Redirect
+        setTimeout(() => {
+          if (user?.role === 'admin' || user?.role === 'team_leader') {
+            navigate('/problems');
+          } else {
+            navigate('/employee-dashboard');
+          }
+        }, 1000);
       } else {
-        toast.info('Problem submitted. No auto-assignment found - status: Pending');
+        throw new Error(result.error || 'Failed to create problem');
       }
-      
-      // Reset form
-      setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
-      setPreviewImages([]);
-      
-      // Redirect
-      setTimeout(() => {
-        if (user?.role === 'admin' || user?.role === 'team_leader') {
-          navigate('/problems');
-        } else {
-          navigate('/employee-dashboard');
-        }
-      }, 1000);
       
     } catch (error) {
       console.error('❌ Submission error:', error);
-      toast.error(error.message || 'Failed to submit problem to server');
+      
+      if (error.message.includes('Unauthenticated') || error.message.includes('Authentication failed')) {
+        toast.error('Session expired. Please login again.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+      } else {
+        toast.error(error.message || 'Failed to submit problem to server');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // বাকি কোডগুলো একই থাকবে (toggleSidebar, getDashboardPath, return statement ইত্যাদি)
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
   };
@@ -309,7 +309,7 @@ export default function ProblemForm() {
                   >
                     <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-                  </Link>
+                </Link>
                 </li>
               )}
               
