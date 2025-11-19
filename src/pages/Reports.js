@@ -546,7 +546,7 @@ export default function Reports() {
               {/* Problems Table */}
               <div className="card-body p-4">
                 <div className="table-responsive">
-                  <table className="table table-hover table-striped">
+                  <table className="table  table-striped">
                     <thead className="table-dark">
                       <tr>
                         <th>Problem ID</th>

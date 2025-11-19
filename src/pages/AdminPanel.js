@@ -109,50 +109,35 @@ export default function AdminPanelUserManagement() {
   };
 
   // ✅ FIXED: Load First Face Assignments with Authorization
-  const loadFirstFaceAssignments = async () => {
-    try {
-      console.log('🔄 Loading first face assignments...');
-      
-      const token = localStorage.getItem('token');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+const loadFirstFaceAssignments = async () => {
+  try {
+    console.log('🔄 Loading first face assignments...');
+    
+    const response = await fetch(`${API_BASE_URL}/first-face-assignments`);
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('🟢 First Face API Response:', data);
 
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/first-face`, {
-        headers: headers,
-      });
-
-      console.log('🔵 First Face Response Status:', response.status);
-
-      if (response.status === 401) {
-        console.error('🔴 Authentication failed');
-        toast.error('Please login again');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('🟢 First Face API Response:', data);
-
-      if (data.success) {
-        setFirstFaceAssignments(data.firstFaceAssignments || []);
-        console.log('✅ First Face Assignments loaded:', data.firstFaceAssignments?.length || 0);
-      } else {
-        console.error('🔴 First Face API Error:', data.error);
-        toast.error(data.error || 'Failed to load first face assignments');
-        setFirstFaceAssignments([]);
-      }
-    } catch (error) {
-      console.error('🔴 Failed to load first face assignments:', error);
-      toast.error('Network error while loading first face assignments');
+    if (data.success) {
+      setFirstFaceAssignments(data.firstFaceAssignments || []);
+      console.log('✅ First Face Assignments loaded:', data.firstFaceAssignments?.length || 0);
+    } else {
+      console.error('🔴 First Face API Error:', data.error);
+      toast.error(data.error || 'Failed to load first face assignments');
       setFirstFaceAssignments([]);
     }
-  };
+  } catch (error) {
+    console.error('🔴 Failed to load first face assignments:', error);
+    toast.error('Failed to load first face assignments: ' + error.message);
+    setFirstFaceAssignments([]);
+  }
+};
+
+
 
   // ✅ FIXED: Load Active Users with Authorization
   const loadActiveUsers = async () => {
@@ -201,105 +186,98 @@ export default function AdminPanelUserManagement() {
   };
 
   // ✅ FIXED: Handle First Face Assignment with Authorization
-  const handleFirstFaceAssignment = async () => {
-    if (!selectedFirstFace) {
-      toast.error('Please select a First Face');
+ const handleFirstFaceAssignment = async () => {
+  if (!selectedFirstFace) {
+    toast.error('Please select a First Face');
+    return;
+  }
+
+  try {
+    console.log('🔄 Assigning First Face...');
+    
+    const response = await fetch(`${API_BASE_URL}/first-face-assignments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: parseInt(selectedFirstFace),
+        department: selectedDepartment,
+        type: selectedDepartment === 'all' ? 'all' : 'specific'
+      }),
+    });
+
+    const data = await response.json();
+    console.log('🟢 First Face Response:', data);
+
+    if (data.success) {
+      toast.success(`✅ ${data.assignment.user.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
+      setShowFirstFaceModal(false);
+      setSelectedFirstFace('');
+      setSelectedDepartment('all');
+      loadFirstFaceAssignments();
+    } else {
+      throw new Error(data.error || 'Failed to assign First Face');
+    }
+  } catch (error) {
+    console.error('🔴 First Face Assignment Error:', error);
+    toast.error('Failed to assign First Face: ' + error.message);
+  }
+};
+
+  // ✅ FIXED: Handle Remove First Face with Authorization
+// ✅ FIXED: Handle Remove First Face with CORRECT URL
+const handleRemoveFirstFace = async (assignmentId) => {
+  try {
+    console.log('🔄 Removing First Face Assignment:', assignmentId);
+    
+    if (!window.confirm('Are you sure you want to remove this First Face assignment?')) {
       return;
     }
 
-    try {
-      console.log('🔄 Assigning First Face...');
-      
-      const token = localStorage.getItem('token');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+    const token = localStorage.getItem('token');
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
 
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/first-face`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          user_id: parseInt(selectedFirstFace),
-          department: selectedDepartment,
-          type: selectedDepartment === 'all' ? 'all' : 'specific'
-        }),
-      });
-
-      console.log('🔵 First Face Response Status:', response.status);
-
-      if (response.status === 401) {
-        console.error('🔴 Authentication failed');
-        toast.error('Please login again');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('🟢 First Face Response:', data);
-
-      if (data.success) {
-        toast.success(`✅ ${data.assignment.userName} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
-        setShowFirstFaceModal(false);
-        setSelectedFirstFace('');
-        setSelectedDepartment('all');
-        loadFirstFaceAssignments();
-      } else {
-        toast.error(data.error || 'Failed to assign First Face');
-      }
-    } catch (error) {
-      console.error('🔴 First Face Assignment Error:', error);
-      toast.error('Failed to assign First Face: ' + error.message);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-  };
 
-  // ✅ FIXED: Handle Remove First Face with Authorization
-  const handleRemoveFirstFace = async (assignmentId) => {
+    // ✅ CORRECT URL: first-face-assignments (not first-face)
+    const response = await fetch(`${API_BASE_URL}/first-face-assignments/${assignmentId}`, {
+      method: 'DELETE',
+      headers: headers,
+    });
+
+    console.log('🔵 Remove First Face Response Status:', response.status);
+
+    const responseText = await response.text();
+    console.log('📄 Raw Response:', responseText);
+
+    let data;
     try {
-      console.log('🔄 Removing First Face Assignment:', assignmentId);
-      
-      const token = localStorage.getItem('token');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/first-face/${assignmentId}`, {
-        method: 'DELETE',
-        headers: headers,
-      });
-
-      console.log('🔵 Remove First Face Response Status:', response.status);
-
-      if (response.status === 401) {
-        console.error('🔴 Authentication failed');
-        toast.error('Please login again');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('🟢 Remove First Face Response:', data);
-
-      if (data.success) {
-        toast.success('First Face assignment removed!');
-        loadFirstFaceAssignments();
-      } else {
-        toast.error(data.error || 'Failed to remove First Face');
-      }
-    } catch (error) {
-      console.error('🔴 Remove First Face Error:', error);
-      toast.error('Failed to remove First Face: ' + error.message);
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON Parse Error:', parseError);
+      throw new Error('Server returned invalid JSON');
     }
-  };
+
+    console.log('🟢 Remove First Face Response:', data);
+
+    if (data.success) {
+      toast.success('First Face assignment removed successfully!');
+      loadFirstFaceAssignments(); // Refresh the list
+    } else {
+      throw new Error(data.error || 'Failed to remove First Face');
+    }
+  } catch (error) {
+    console.error('🔴 Remove First Face Error:', error);
+    toast.error('Failed to remove First Face: ' + error.message);
+  }
+};
 
   // ✅ FIXED: Handle Save User with Authorization
   const handleSaveUser = async () => {
@@ -387,6 +365,36 @@ export default function AdminPanelUserManagement() {
     }
   };
 
+  const forceRefreshFirstFace = async () => {
+  try {
+    // 1. প্রথমে সব assignments deactivate করুন
+    await fetch(`${API_BASE_URL}/first-face-assignments/deactivate-all`, {
+      method: 'POST'
+    });
+
+    // 2. তারপর নতুন assignment create করুন
+    const response = await fetch(`${API_BASE_URL}/first-face-assignments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: parseInt(selectedFirstFace), // আপনার selected user
+        department: selectedDepartment,
+        type: selectedDepartment === 'all' ? 'all' : 'specific'
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      toast.success('First Face updated successfully!');
+      loadFirstFaceAssignments();
+    }
+  } catch (error) {
+    console.error('Force refresh failed:', error);
+  }
+};
   // ✅ FIXED: Handle Delete User with Authorization
   const handleDeleteUser = async userId => {
     if (!isAdmin) return toast.error('Only Admin can delete users!');
@@ -783,9 +791,9 @@ export default function AdminPanelUserManagement() {
                       users.map(u => (
                         <tr key={u.id} className="align-middle">
                           <td className="fw-semibold">
-                            {u.role === 'admin' && <span className="me-2">⚡</span>}
-                            {u.role === 'team_leader' && <span className="me-2">👑</span>}
-                            {u.role === 'user' && <span className="me-2">👨‍💼</span>}
+                            {u.role === 'admin' && <span className="me-2"></span>}
+                            {u.role === 'team_leader' && <span className="me-2"></span>}
+                            {u.role === 'user' && <span className="me-2"></span>}
                             {u.name}
                             {firstFaceAssignments.some(ff => ff.user_id === u.id) && (
                               <span className="badge bg-warning text-dark ms-1" title="First Face">FF</span>
@@ -808,9 +816,9 @@ export default function AdminPanelUserManagement() {
                           </td>
                           <td>
                             <span className={`badge ${getRoleBadge(u.role)}`}>
-                              {u.role === 'admin' ? '⚡ Admin' : 
-                              u.role === 'team_leader' ? '👑 Team Leader' : 
-                              '👨‍💼 User'}
+                              {u.role === 'admin' ? ' Admin' : 
+                              u.role === 'team_leader' ? ' Team Leader' : 
+                              ' User'}
                             </span>
                           </td>
                           <td>{u.department}</td>
@@ -935,10 +943,10 @@ export default function AdminPanelUserManagement() {
                       activeUsers.map(user => (
                         <option key={user.id} value={user.id}>
                           {user.name} 
-                          {user.role === 'team_leader' && ' 👑'} 
-                          {user.role === 'user' && ' 👨‍💼'} 
+                          {user.role === 'team_leader' && ' '} 
+                          {user.role === 'user' && ' '} 
                           - {user.department}
-                          {user.role === 'admin' && ' ⚡'}
+                          {user.role === 'admin' && ' '}
                         </option>
                       ))
                     ) : (
@@ -962,10 +970,10 @@ export default function AdminPanelUserManagement() {
                     value={selectedDepartment}
                     onChange={(e) => setSelectedDepartment(e.target.value)}
                   >
-                    <option value="all">🎯 All Departments</option>
-                    <option value="IT & Innovation">💻 IT & Innovation Department</option>
-                    <option value="Business">📊 Business Department</option>
-                    <option value="Accounts">💰 Accounts Department</option>
+                    <option value="all">All Departments</option>
+                    <option value="IT & Innovation">IT & Innovation Department</option>
+                    <option value="Business">Business Department</option>
+                    <option value="Accounts">Accounts Department</option>
                   </select>
                   <small className="text-muted">
                     {selectedDepartment === 'all' 
@@ -975,7 +983,7 @@ export default function AdminPanelUserManagement() {
                   </small>
                 </div>
 
-                <div className="p-3 bg-light rounded">
+                {/* <div className="p-3 bg-light rounded">
                   <div className="row text-center">
                     <div className="col-12">
                       <h5 className="text-warning mb-2">Assignment Summary</h5>
@@ -995,7 +1003,7 @@ export default function AdminPanelUserManagement() {
                       </p>
                     </div>
                   </div>
-                </div>
+                </div> */}
 
                 <div className="d-flex gap-2 mt-4">
                   <button 

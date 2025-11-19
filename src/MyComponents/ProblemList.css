@@ -1,0 +1,13 @@
+/* 🚫 Disable hover, zoom & animation only for table */
+.table,
+.table * {
+  transition: none !important;
+  transform: none !important;
+}
+
+/* 🚫 Disable hover highlight */
+.table-hover tbody tr:hover {
+  background-color: inherit !important;
+  cursor: default !important;
+}
+    

@@ -5,9 +5,10 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import './ProblemList.css';
 
 export default function ProblemList() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { notifyAssignment, notifyTransfer } = useNotifications();
   const API_BASE_URL = 'http://localhost:8000/api';
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function ProblemList() {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(10);
   
   // Modal states
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -32,23 +33,32 @@ export default function ProblemList() {
   const [selectedProblemStatement, setSelectedProblemStatement] = useState('');
   const [problems, setProblems] = useState([]);
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated && !loading) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, loading, navigate]);
+
   // Load all data
   useEffect(() => {
-    const loadAllData = async () => {
-      try {
-        setLoading(true);
-        await loadProblems();
-        await fetchTeamMembers();
-      } catch (error) {
-        console.error('Error loading data:', error);
-        toast.error('Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (isAuthenticated) {
+      const loadAllData = async () => {
+        try {
+          setLoading(true);
+          await loadProblems();
+          await fetchTeamMembers();
+        } catch (error) {
+          console.error('Error loading data:', error);
+          toast.error('Failed to load data');
+        } finally {
+          setLoading(false);
+        }
+      };
 
-    loadAllData();
-  }, []);
+      loadAllData();
+    }
+  }, [isAuthenticated]);
 
   // Create sample problems in localStorage
   const createSampleProblems = () => {
@@ -90,58 +100,7 @@ export default function ProblemList() {
     toast.info('Created sample problems to get you started!');
   };
 
-  // Create sample problems via API
-  const createSampleProblemsInAPI = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const sampleProblems = [
-        {
-          department: 'Tech',
-          priority: 'High',
-          statement: 'Server downtime affecting user login functionality',
-          created_by: user?.name || 'Admin'
-        },
-        {
-          department: 'Business',
-          priority: 'Medium',
-          statement: 'Update pricing page with new product features',
-          created_by: user?.name || 'Admin'
-        },
-        {
-          department: 'Accounts',
-          priority: 'Low',
-          statement: 'Fix calculation error in monthly reports',
-          created_by: user?.name || 'Admin'
-        }
-      ];
-
-      console.log('📝 Creating sample problems via API...');
-      
-      for (const problemData of sampleProblems) {
-        const response = await fetch(`${API_BASE_URL}/problems`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(problemData)
-        });
-
-        if (response.ok) {
-          console.log('✅ Created sample problem:', problemData.statement);
-        } else {
-          console.error('❌ Failed to create sample problem:', await response.text());
-        }
-      }
-
-      toast.success('Sample problems created successfully via API!');
-    } catch (error) {
-      console.error('Error creating sample problems via API:', error);
-      toast.error('Failed to create sample problems via API');
-    }
-  };
-
-  // Main load problems function
+  // Main load problems function - FIXED DATA PERSISTENCE
   const loadProblems = async () => {
     try {
       console.log('🔄 Starting to load problems...');
@@ -163,7 +122,6 @@ export default function ProblemList() {
           });
 
           console.log('📡 API Response status:', response.status);
-          console.log('📡 API Response ok:', response.ok);
 
           if (response.ok) {
             const data = await response.json();
@@ -197,16 +155,12 @@ export default function ProblemList() {
 
               setProblems(transformedProblems);
               localStorage.setItem('problems', JSON.stringify(transformedProblems));
-              toast.success(`Loaded ${transformedProblems.length} problems from server`);
+              console.log(`✅ Loaded ${transformedProblems.length} problems from server`);
               return;
-            } else {
-              console.log('📝 No problems found in API, creating sample data via API...');
-              await createSampleProblemsInAPI();
-              // Don't return here, let it fall through to load again
             }
           }
         } catch (apiError) {
-          console.warn('API call failed, using fallback:', apiError);
+          console.warn('API call failed, using localStorage:', apiError);
         }
       }
 
@@ -235,13 +189,42 @@ export default function ProblemList() {
     }
   };
 
+  // Fixed: Fetch team members from API
   const fetchTeamMembers = async () => {
     try {
-      // Try localStorage first
+      const token = localStorage.getItem('token');
+      
+      // Try API first
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/users`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              const members = data.users.filter(u => 
+                u.username !== 'Admin' && u.status === 'active'
+              );
+              setTeamMembers(members);
+              console.log(`✅ Loaded ${members.length} team members from API`);
+              return;
+            }
+          }
+        } catch (apiError) {
+          console.warn('API call failed, using localStorage:', apiError);
+        }
+      }
+
+      // Fallback to localStorage
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
       
       if (storedUsers.length === 0) {
-        // Create sample team members if none exist
+        // Create sample team members
         const sampleMembers = [
           { id: 1, name: 'John Doe', role: 'team_leader', department: 'Tech', status: 'active', username: 'john' },
           { id: 2, name: 'Jane Smith', role: 'user', department: 'Business', status: 'active', username: 'jane' },
@@ -279,13 +262,17 @@ export default function ProblemList() {
     setShowProblemModal(true);
   };
 
-  const handleAssignSubmit = () => {
+  // Fixed: Assign/Transfer function - BETTER DATA PERSISTENCE
+  const handleAssignSubmit = async () => {
     if (!selectedMember) {
       toast.error('Please select a team member');
       return;
     }
 
     try {
+      const token = localStorage.getItem('token');
+      
+      // Update localStorage FIRST for immediate UI update
       const updatedProblems = problems.map(p => {
         if (p.id === selectedProblem.id) {
           const updatedProblem = { 
@@ -314,8 +301,32 @@ export default function ProblemList() {
         return p;
       });
       
+      // Update state immediately
       setProblems(updatedProblems);
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
+      
+      // Then try API update
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/problems/${selectedProblem.id}/assign`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              assigned_to: selectedMember,
+              is_transfer: isTransfer
+            }),
+          });
+
+          if (response.ok) {
+            console.log('✅ Assignment updated via API');
+          }
+        } catch (apiError) {
+          console.warn('API assignment failed, data saved locally:', apiError);
+        }
+      }
       
       toast.success(
         isTransfer 
@@ -332,13 +343,38 @@ export default function ProblemList() {
     }
   };
 
-  const handleDelete = (problemId) => {
+  // Fixed: Delete function - BETTER DATA PERSISTENCE
+  const handleDelete = async (problemId) => {
     if (window.confirm(`Are you sure you want to delete Problem #${problemId}?`)) {
       try {
+        const token = localStorage.getItem('token');
+        
+        // Update localStorage FIRST
         const updatedProblems = problems.filter(p => p.id !== problemId);
         setProblems(updatedProblems);
         localStorage.setItem('problems', JSON.stringify(updatedProblems));
+        
+        // Then try API delete
+        if (token) {
+          try {
+            const response = await fetch(`${API_BASE_URL}/problems/${problemId}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (response.ok) {
+              console.log(`✅ Problem #${problemId} deleted from API`);
+            }
+          } catch (apiError) {
+            console.warn('API delete failed, data deleted locally:', apiError);
+          }
+        }
+        
         toast.success(`Problem #${problemId} deleted!`);
+        
       } catch (error) {
         toast.error('Failed to delete problem');
         console.error(error);
@@ -394,12 +430,12 @@ export default function ProblemList() {
     return matchesStatus && matchesDepartment && matchesPriority && matchesSearch;
   });
 
-  // Pagination Logic
-  const reversedProblems = [...filteredProblems].reverse();
+  // FIXED: Pagination - Show newest first and 10 per page
+  const sortedProblems = [...filteredProblems].sort((a, b) => b.id - a.id);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentProblems = reversedProblems.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(reversedProblems.length / itemsPerPage);
+  const currentProblems = sortedProblems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedProblems.length / itemsPerPage);
 
   const paginate = (pageNumber) => {
     setCurrentPage(pageNumber);
@@ -630,13 +666,6 @@ export default function ProblemList() {
                 </div>
               </div>
 
-              {/* Debug Info */}
-              <div className="alert alert-info py-2 mb-3" style={{ fontSize: '0.8rem' }}>
-                <strong>Debug Info:</strong> Loaded {problems.length} problems | 
-                Filtered: {filteredProblems.length} | 
-                API: {API_BASE_URL}
-              </div>
-
               {/* Compact Filters */}
               <div className="row g-2 mb-3">
                 <div className="col-md-3 col-sm-6">
@@ -695,24 +724,23 @@ export default function ProblemList() {
               </div>
 
               {/* Compact Table */}
-              <div className="table-responsive" style={{ maxHeight: '65vh' }}>
-                <table className="table table-sm table-hover table-striped mb-2">
-                  <thead className="table-dark position-sticky top-0">
+              <div className="table-responsive" style={{ maxHeight: '65vh', overflow: 'auto' }}>
+                <table className="table table-sm table-striped mb-2">
+                  <thead style={{ position: 'sticky', top: 0, backgroundColor: '#bdcfe1ff', color: '#ecf0f1', zIndex: 10 }}>
                     <tr>
-                      <th style={{ width: '10%' }}>ID</th>
-                      <th style={{ width: '15%' }}>Department</th>
-                      <th style={{ width: '12%' }}>Priority</th>
-                      <th style={{ width: '15%' }}>Status</th>
-                      <th style={{ width: '15%' }}>Created By</th>
-                      <th style={{ width: '15%' }}>Assigned To</th>
-                      <th style={{ width: '8%', textAlign: 'center' }}>View</th>
-                      <th style={{ width: '20%', textAlign: 'center' }}>Actions</th>
+                      <th className="text-center" style={{ width: '15%' }}>Department</th>
+                      <th className="text-center" style={{ width: '12%' }}>Priority</th>
+                      <th className="text-center" style={{ width: '15%' }}>Status</th>
+                      <th className="text-center" style={{ width: '15%' }}>Created By</th>
+                      <th className="text-center" style={{ width: '15%' }}>Assigned To</th>
+                      <th className="text-center" style={{ width: '8%' }}>View</th>
+                      <th className="text-center" style={{ width: '20%' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {currentProblems.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="text-center py-4 text-muted">
+                        <td colSpan="7" className="text-center py-4 text-muted">
                           <div className="py-3">
                             <i className="bi bi-inbox display-6 text-muted"></i>
                             <p className="mt-2 mb-2">
@@ -735,35 +763,32 @@ export default function ProblemList() {
                     ) : (
                       currentProblems.map((problem) => (
                         <tr key={problem.id} className="align-middle">
-                          <td>
-                            <span className="fw-bold text-primary">#{problem.id}</span>
-                          </td>
-                          <td>
+                          <td className="text-center">
                             <span className="fw-semibold" style={{ fontSize: '0.95rem' }}>
                               {problem.department}
                             </span>
                           </td>
-                          <td>
+                          <td className="text-center">
                             <span className={`badge ${getPriorityBadge(problem.priority)}`}>
                               {problem.priority}
                             </span>
                           </td>
-                          <td>
+                          <td className="text-center">
                             <span className={`badge ${getStatusBadge(problem.status)}`}>
                               {formatStatus(problem.status)}
                             </span>
                           </td>
-                          <td>
+                          <td className="text-center">
                             <span style={{ fontSize: '0.95rem' }}>{problem.createdBy}</span>
                           </td>
-                          <td>
+                          <td className="text-center">
                             {problem.assignedTo ? (
                               <span className="badge bg-info text-white">{problem.assignedTo}</span>
                             ) : (
                               <span className="badge bg-secondary">Unassigned</span>
                             )}
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td className="text-center">
                             <button
                               className="btn btn-sm btn-outline-primary"
                               onClick={() => openProblemModal(problem)}
@@ -773,8 +798,9 @@ export default function ProblemList() {
                               <i className="bi bi-eye-fill" style={{ fontSize: '1rem' }}></i>
                             </button>
                           </td>
-                          <td>
-                            <div className="d-flex gap-2 justify-content-center">
+                          <td className="text-center">
+                            <div className="d-flex gap-2 justify-content-center flex-wrap">
+                              {/* View Details Button */}
                               <button
                                 className="btn btn-sm btn-outline-secondary"
                                 onClick={() => navigate(`/problem/${problem.id}`)}
@@ -784,6 +810,7 @@ export default function ProblemList() {
                                 <i className="bi bi-info-circle-fill" style={{ fontSize: '1rem' }}></i>
                               </button>
 
+                              {/* Assign/Reassign Buttons */}
                               {canAssign() && problem.status !== 'done' && !problem.assignedTo && (
                                 <button
                                   className="btn btn-sm btn-outline-success"
@@ -806,6 +833,7 @@ export default function ProblemList() {
                                 </button>
                               )}
 
+                              {/* Transfer Button */}
                               {canTransfer(problem) && (
                                 <button
                                   className="btn btn-sm btn-outline-info"
@@ -817,6 +845,7 @@ export default function ProblemList() {
                                 </button>
                               )}
 
+                              {/* Delete Button */}
                               {user?.role === 'admin' && (
                                 <button
                                   className="btn btn-sm btn-outline-danger"
@@ -840,7 +869,7 @@ export default function ProblemList() {
               {totalPages > 1 && (
                 <div className="d-flex justify-content-between align-items-center mt-3">
                   <small className="text-muted">
-                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, reversedProblems.length)} of {reversedProblems.length}
+                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, sortedProblems.length)} of {sortedProblems.length}
                   </small>
                   
                   <nav>
