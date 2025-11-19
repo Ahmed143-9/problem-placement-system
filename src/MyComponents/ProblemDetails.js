@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -12,6 +11,7 @@ export default function ProblemDetails() {
   const { user } = useAuth();
   const { notifyStatusChange, notifyCompletion } = useNotifications();
   const navigate = useNavigate();
+
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
@@ -27,7 +27,6 @@ export default function ProblemDetails() {
     try {
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       const foundProblem = problems.find(p => p.id === parseInt(id));
-      
       if (foundProblem) {
         setProblem(foundProblem);
       } else {
@@ -42,24 +41,49 @@ export default function ProblemDetails() {
   };
 
   const handleStatusChange = (newStatus) => {
+    // Check if marking as done and require comment
+    if (newStatus === 'done' || newStatus === 'pending_approval') {
+      if (!comment.trim()) {
+        toast.error('Please add a comment before marking as solved');
+        return;
+      }
+    }
+
     if (newStatus === 'done' && !canApprove()) {
       newStatus = 'pending_approval';
     }
 
     try {
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-      const updatedProblems = problems.map(p =>
-        p.id === parseInt(id) ? { 
-          ...p, 
-          status: newStatus,
-          ...(newStatus === 'pending_approval' && {
-            submittedForApprovalBy: user?.name,
-            submittedForApprovalAt: new Date().toISOString()
-          })
-        } : p
-      );
+      const updatedProblems = problems.map(p => {
+        if (p.id === parseInt(id)) {
+          const updatedProblem = {
+            ...p,
+            status: newStatus,
+            ...(newStatus === 'pending_approval' && {
+              submittedForApprovalBy: user?.name,
+              submittedForApprovalAt: new Date().toISOString()
+            })
+          };
+
+          // Add the comment when marking as solved
+          if ((newStatus === 'done' || newStatus === 'pending_approval') && comment.trim()) {
+            const newComment = {
+              id: (p.comments?.length || 0) + 1,
+              comment: comment.trim(),
+              user: { name: user?.name, email: user?.email },
+              created_at: new Date().toISOString()
+            };
+            updatedProblem.comments = [...(p.comments || []), newComment];
+          }
+
+          return updatedProblem;
+        }
+        return p;
+      });
+
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
-      
+
       if (newStatus === 'pending_approval') {
         const users = JSON.parse(localStorage.getItem('system_users') || '[]');
         users.forEach(u => {
@@ -70,16 +94,17 @@ export default function ProblemDetails() {
       } else if (problem.assignedTo && newStatus !== 'done') {
         notifyStatusChange(problem.id, newStatus, user?.name, problem.assignedTo);
       }
-      
+
       if (newStatus === 'done' && canApprove()) {
         notifyCompletion(problem.id, user?.name);
       }
-      
-      const statusMsg = newStatus === 'pending_approval' 
+
+      const statusMsg = newStatus === 'pending_approval'
         ? 'Submitted for approval! Admin/Team Leader will review.'
         : 'Status updated successfully!';
       
       toast.success(statusMsg);
+      setComment(''); // Clear comment after submission
       fetchProblemDetails();
     } catch (error) {
       toast.error('Failed to update status');
@@ -95,21 +120,23 @@ export default function ProblemDetails() {
     try {
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       const updatedProblems = problems.map(p =>
-        p.id === parseInt(id) ? { 
-          ...p, 
-          status: 'done',
-          approvedBy: user?.name,
-          approvedAt: new Date().toISOString()
-        } : p
+        p.id === parseInt(id)
+          ? {
+              ...p,
+              status: 'done',
+              approvedBy: user?.name,
+              approvedAt: new Date().toISOString()
+            }
+          : p
       );
+
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
-      
       notifyCompletion(problem.id, user?.name);
-      
+
       if (problem.submittedForApprovalBy) {
         notifyStatusChange(problem.id, 'done', user?.name, problem.submittedForApprovalBy);
       }
-      
+
       toast.success('Problem marked as completed!');
       fetchProblemDetails();
     } catch (error) {
@@ -120,24 +147,27 @@ export default function ProblemDetails() {
 
   const handleRejectCompletion = () => {
     const reason = prompt('Reason for rejection (optional):');
-    
+
     try {
       const problems = JSON.parse(localStorage.getItem('problems') || '[]');
       const updatedProblems = problems.map(p =>
-        p.id === parseInt(id) ? { 
-          ...p, 
-          status: 'in_progress',
-          rejectionReason: reason || 'Needs more work',
-          rejectedBy: user?.name,
-          rejectedAt: new Date().toISOString()
-        } : p
+        p.id === parseInt(id)
+          ? {
+              ...p,
+              status: 'in_progress',
+              rejectionReason: reason || 'Needs more work',
+              rejectedBy: user?.name,
+              rejectedAt: new Date().toISOString()
+            }
+          : p
       );
+
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
-      
+
       if (problem.submittedForApprovalBy) {
         notifyStatusChange(problem.id, 'in_progress', user?.name, problem.submittedForApprovalBy);
       }
-      
+
       toast.warning('Completion rejected. Status changed to In Progress.');
       fetchProblemDetails();
     } catch (error) {
@@ -161,20 +191,14 @@ export default function ProblemDetails() {
           const newComment = {
             id: (p.comments?.length || 0) + 1,
             comment: comment.trim(),
-            user: {
-              name: user?.name,
-              email: user?.email
-            },
+            user: { name: user?.name, email: user?.email },
             created_at: new Date().toISOString()
           };
-          return {
-            ...p,
-            comments: [...(p.comments || []), newComment]
-          };
+          return { ...p, comments: [...(p.comments || []), newComment] };
         }
         return p;
       });
-      
+
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       toast.success('Comment added successfully!');
       setComment('');
@@ -247,7 +271,7 @@ export default function ProblemDetails() {
     return (
       <div>
         <Navbar />
-        <div className="container mt-5 text-center">
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '80vh' }}>
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
@@ -261,13 +285,11 @@ export default function ProblemDetails() {
       <div>
         <Navbar />
         <div className="container mt-5 text-center">
-          <div className="alert alert-danger">
-            <h4>Problem not found</h4>
-            <p>The problem you're looking for doesn't exist or has been deleted.</p>
-            <button className="btn btn-primary" onClick={() => navigate('/problems')}>
-              Back to Problems List
-            </button>
-          </div>
+          <h2 className="text-danger">Problem not found</h2>
+          <p className="text-muted">The problem you're looking for doesn't exist or has been deleted.</p>
+          <button className="btn btn-primary mt-3" onClick={() => navigate('/problems')}>
+            Back to Problems List
+          </button>
         </div>
       </div>
     );
