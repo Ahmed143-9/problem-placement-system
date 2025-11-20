@@ -263,7 +263,8 @@ export default function ProblemList() {
   };
 
   // Fixed: Assign/Transfer function - BETTER DATA PERSISTENCE
-  const handleAssignSubmit = async () => {
+ // Fixed: Assign/Transfer function - PROPER NAME RESOLUTION
+const handleAssignSubmit = async () => {
   if (!selectedMember) {
     toast.error('Please select a team member');
     return;
@@ -272,13 +273,23 @@ export default function ProblemList() {
   try {
     console.log('🔄 Starting assignment process...');
     
+    // ✅ Find the selected member to get NAME
+    const selectedUser = teamMembers.find(member => member.id === parseInt(selectedMember));
+    
+    if (!selectedUser) {
+      toast.error('Selected team member not found');
+      return;
+    }
+
+    console.log('👤 Selected user:', selectedUser.name);
+
     // Update localStorage FIRST for immediate UI update
     const updatedProblems = problems.map(p => {
       if (p.id === selectedProblem.id) {
         const updatedProblem = { 
           ...p, 
-          assignedTo: selectedMember,
-          assignedToName: selectedMember, // Store name as well
+          assignedTo: selectedUser.id, // ✅ Store ID for reference
+          assignedToName: selectedUser.name, // ✅ Store NAME for display
           status: p.status === 'pending' ? 'in_progress' : p.status
         };
         
@@ -286,15 +297,15 @@ export default function ProblemList() {
           updatedProblem.transferHistory = [
             ...(p.transferHistory || []),
             {
-              from: p.assignedTo,
-              to: selectedMember,
+              from: p.assignedToName || p.assignedTo, // ✅ Use name if available
+              to: selectedUser.name, // ✅ Store name in transfer history
               date: new Date().toISOString(),
               by: user?.name || 'Admin'
             }
           ];
-          notifyTransfer(p.id, p.assignedTo, selectedMember, user?.name);
+          notifyTransfer(p.id, p.assignedToName || p.assignedTo, selectedUser.name, user?.name);
         } else {
-          notifyAssignment(p.id, selectedMember, user?.name);
+          notifyAssignment(p.id, selectedUser.name, user?.name);
         }
         
         return updatedProblem;
@@ -310,8 +321,8 @@ export default function ProblemList() {
     
     toast.success(
       isTransfer 
-        ? `Problem #${selectedProblem.id} transferred to ${selectedMember}!`
-        : `Problem #${selectedProblem.id} assigned to ${selectedMember}!`
+        ? `Problem #${selectedProblem.id} transferred to ${selectedUser.name}!`
+        : `Problem #${selectedProblem.id} assigned to ${selectedUser.name}!`
     );
     
     setShowAssignModal(false);
@@ -761,14 +772,14 @@ export default function ProblemList() {
                           <td className="text-center">
                             <span style={{ fontSize: '0.95rem' }}>{problem.createdBy}</span>
                           </td>
-                          <td className="text-center">
-                            {problem.assignedTo ? (
-                              <span className="badge bg-info text-white">{problem.assignedTo}</span>
-                            ) : (
-                              <span className="badge bg-secondary">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="text-center">
+                                <td className="text-center">
+                                        {problem.assignedToName ? ( // ✅ Use assignedToName instead of assignedTo
+                                          <span className="badge bg-info text-white">{problem.assignedToName}</span>
+                                        ) : (
+                                          <span className="badge bg-secondary">Unassigned</span>
+                                        )}
+                                      </td>
+                                <td className="text-center">
                             <button
                               className="btn btn-sm btn-outline-primary"
                               onClick={() => openProblemModal(problem)}
@@ -976,26 +987,26 @@ export default function ProblemList() {
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label small fw-semibold mb-1">
-                    {isTransfer ? 'Transfer to:' : 'Assign to:'}
-                  </label>
-                  <select
-                    className="form-control form-control-sm"
-                    value={selectedMember}
-                    onChange={(e) => setSelectedMember(e.target.value)}
-                  >
-                    <option value="">-- Select Team Member --</option>
-                    {teamMembers.map(member => (
-                      <option 
-                        key={member.id} 
-                        value={member.name}
-                        disabled={member.name === selectedProblem?.assignedTo}
-                      >
-                        {member.name} ({member.role === 'team_leader' ? 'Team Leader' : 'User'}) - {member.department}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+  <label className="form-label small fw-semibold mb-1">
+    {isTransfer ? 'Transfer to:' : 'Assign to:'}
+  </label>
+  <select
+    className="form-control form-control-sm"
+    value={selectedMember}
+    onChange={(e) => setSelectedMember(e.target.value)}
+  >
+    <option value="">-- Select Team Member --</option>
+    {teamMembers.map(member => (
+      <option 
+        key={member.id} 
+        value={member.id}
+        disabled={member.id === selectedProblem?.assignedTo}
+      >
+        {member.name} ({member.role === 'team_leader' ? 'Team Leader' : 'User'}) - {member.department}
+      </option>
+    ))}
+  </select>
+</div>
 
                 <div className="d-flex gap-2">
                   <button 

@@ -8,18 +8,18 @@ import Navbar from '../components/Navbar';
 import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle } from 'react-icons/fa';
 
 const SERVICES = [
-  'Bulk SMS',
-  'Topup',
-  'Whatsapp Solution',
-  'Email Solution',
-  'Push-Pull',
-  'Games',
-  'DCB',
-  'Emergency Balance Service',
-  'International SMS',
-  'Invoice Solution',
-  'Campaign',
-  'Web Solution'
+  'Bulk SMS -> WinText',
+  'Topup -> Winfin',
+  'Whatsapp Solution -> Infobip <-> Omnichannel channel',
+  'Email Solution -> Infobip <-> Omnichannel channel',
+  'Push-Pull -> VAS',
+  'Games -> VAS',
+  'DCB -> VAS',
+  'Emergency Balance Service -> platform(Win vantage)',
+  'International SMS -> infoBip <--> international channel',
+  'Invoice Solution -> Win Vantage (platform)',
+  'Campaign -> Customized development',
+  'Web Solution -> Customized development',
 ];
 
 export default function ProblemForm() {
