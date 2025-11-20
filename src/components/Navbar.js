@@ -195,7 +195,7 @@ export default function Navbar() {
               )}
 
               {/* Show My Issues only for Regular Users (NOT Admin/Team Leader) */}
-              {isRegularUser && (
+              {/* {isRegularUser && (
                 <li className="nav-item">
                   <Link 
                     className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
@@ -218,7 +218,7 @@ export default function Navbar() {
                     My Issues
                   </Link>
                 </li>
-              )}
+              )} */}
 
               {/* Show All Problems only for Admin/Team Leader */}
               {isAdminOrLeader && (

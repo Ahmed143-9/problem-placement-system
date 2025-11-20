@@ -193,7 +193,7 @@ export default function Login() {
                     }}
                     onClick={() => setShowPassword(prev => !prev)}
                   >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    {showPassword ? <FaEye /> : <FaEyeSlash />}
                   </span>
                 </div>
 

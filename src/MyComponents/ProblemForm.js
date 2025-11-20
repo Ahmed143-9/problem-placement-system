@@ -1,3 +1,5 @@
+// ProblemForm.js - Complete Fixed Code with Auto Assignment Notification
+
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -34,6 +36,29 @@ export default function ProblemForm() {
   const [loading, setLoading] = useState(false);
   const [previewImages, setPreviewImages] = useState([]);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+
+  // Generate 5-digit auto-increment ID
+  const generateProblemId = () => {
+  try {
+    const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+    
+    if (problems.length === 0) {
+      return 10001; // প্রথম ID: 10001
+    }
+    
+    // সবচেয়ে বড় ID খুঁজে বের করুন
+    const maxId = problems.reduce((max, problem) => {
+      return problem.id > max ? problem.id : max;
+    }, 10000);
+    
+    console.log('📊 Current max ID:', maxId);
+    return maxId + 1;
+    
+  } catch (error) {
+    console.error('❌ Error generating problem ID:', error);
+    return 10001; // Fallback to 10001
+  }
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -81,16 +106,16 @@ export default function ProblemForm() {
     }));
   };
 
-  // ✅ FIXED: Auto Assignment to First Face
+  // Auto Assignment to First Face with Name Resolution
   const getAutoAssignedUser = (department) => {
     try {
       console.log('🔄 Checking First Face assignments for department:', department);
       
-      // First, check localStorage for First Face assignments
+      // Check localStorage for First Face assignments
       const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
       console.log('📋 First Face assignments from localStorage:', firstFaceAssignments);
       
-      // Also check system_users for active First Face assignments
+      // Check system_users for user details
       const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
       console.log('👥 System users:', systemUsers);
 
@@ -111,18 +136,20 @@ export default function ProblemForm() {
 
       if (deptFirstFace) {
         // Find user details from system_users
-        const userDetails = systemUsers.find(u => u.id === deptFirstFace.userId || u.name === deptFirstFace.userName);
+        const userDetails = systemUsers.find(u => u.id === deptFirstFace.userId);
         assignedUser = {
           userId: deptFirstFace.userId,
           userName: userDetails ? userDetails.name : deptFirstFace.userName,
+          userEmail: userDetails ? userDetails.email : '',
           type: 'FIRST_FACE_DEPARTMENT'
         };
       } else if (globalFirstFace) {
         // Find user details from system_users
-        const userDetails = systemUsers.find(u => u.id === globalFirstFace.userId || u.name === globalFirstFace.userName);
+        const userDetails = systemUsers.find(u => u.id === globalFirstFace.userId);
         assignedUser = {
           userId: globalFirstFace.userId,
           userName: userDetails ? userDetails.name : globalFirstFace.userName,
+          userEmail: userDetails ? userDetails.email : '',
           type: 'FIRST_FACE_GLOBAL'
         };
       }
@@ -136,7 +163,38 @@ export default function ProblemForm() {
     }
   };
 
-  // ✅ FIXED: handleSubmit function with proper auto-assignment
+  // Send Problem Assignment Notification
+  const sendProblemAssignmentNotification = (problem, assignedUser) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: assignedUser.userId,
+        userName: assignedUser.userName,
+        type: 'problem_assigned',
+        title: '🎯 New Problem Assigned',
+        message: `You have been assigned a new problem (#${problem.id}): ${problem.statement.substring(0, 50)}...`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        problemId: problem.id,
+        problem: problem,
+        assignedBy: 'System (Auto Assignment)'
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 Problem assignment notification sent:', notification);
+      
+      // Show toast notification
+      toast.info(`📨 Problem assigned to ${assignedUser.userName}`);
+    } catch (error) {
+      console.error('❌ Failed to send problem assignment notification:', error);
+    }
+  };
+
+  // Handle Submit with Auto Assignment and Notification
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -159,15 +217,18 @@ export default function ProblemForm() {
         ? formData.images.map(img => img.url) 
         : [];
 
+      // Generate 5-digit auto-increment ID
+      const newProblemId = generateProblemId();
+
       // Create new problem object
       const newProblem = {
-        id: Date.now(),
+        id: newProblemId,
         ...formData,
         images: imageUrls,
         status: autoAssignedUser ? 'assigned' : 'pending',
         createdBy: user?.name || 'Unknown User',
         assignedTo: autoAssignedUser ? autoAssignedUser.userId : null,
-        assignedToName: autoAssignedUser ? autoAssignedUser.userName : null,
+        assignedToName: autoAssignedUser ? autoAssignedUser.userName : 'Not Assigned', // ✅ Name instead of ID
         assignmentType: autoAssignedUser ? autoAssignedUser.type : 'NOT_ASSIGNED',
         createdAt: new Date().toISOString(),
         comments: [],
@@ -181,7 +242,7 @@ export default function ProblemForm() {
         ...(autoAssignedUser && {
           assignmentHistory: [{
             assignedTo: autoAssignedUser.userId,
-            assignedToName: autoAssignedUser.userName,
+            assignedToName: autoAssignedUser.userName, // ✅ Name instead of ID
             assignedBy: 'System (First Face)',
             assignedAt: new Date().toISOString(),
             type: autoAssignedUser.type
@@ -198,11 +259,16 @@ export default function ProblemForm() {
 
       console.log('💾 Problem saved to localStorage');
 
+      // Send notification if auto-assigned
+      if (autoAssignedUser) {
+        sendProblemAssignmentNotification(newProblem, autoAssignedUser);
+      }
+
       // Show success message with assignment info
       if (autoAssignedUser) {
-        toast.success(`Problem submitted successfully! Auto-assigned to ${autoAssignedUser.userName} (First Face)`);
+        toast.success(`Problem #${newProblemId} submitted successfully! Auto-assigned to ${autoAssignedUser.userName} (First Face)`);
       } else {
-        toast.success('Problem submitted successfully! Will be assigned manually.');
+        toast.success(`Problem #${newProblemId} submitted successfully! Will be assigned manually.`);
       }
       
       // Reset form

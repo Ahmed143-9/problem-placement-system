@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaRobot, FaTasks, FaArrowRight, FaUserCheck, FaLayerGroup, FaUserTie } from 'react-icons/fa';
+import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaRobot, FaTasks, FaArrowRight, FaUserCheck, FaLayerGroup, FaUserTie, FaSpinner, FaInfoCircle, FaSync, FaBell } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
@@ -25,6 +25,12 @@ export default function AdminPanelUserManagement() {
   const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const [activeUsers, setActiveUsers] = useState([]);
+  
+  // Loading states
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingFirstFace, setLoadingFirstFace] = useState(false);
+  const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
+  const [savingFirstFace, setSavingFirstFace] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -45,8 +51,9 @@ export default function AdminPanelUserManagement() {
     loadActiveUsers();
   }, [API_BASE_URL]);
 
-  // ✅ FIXED: Load Users with Authorization
+  // Load Users with Loading State
   const loadUsers = async () => {
+    setLoadingUsers(true);
     try {
       const token = localStorage.getItem('token');
       
@@ -68,16 +75,21 @@ export default function AdminPanelUserManagement() {
       if (data.success) {
         setUsers(data.users);
         console.log('✅ Users loaded successfully:', data.users.length);
+        
+        // Save users to localStorage for name resolution
+        localStorage.setItem('system_users', JSON.stringify(data.users));
       } else {
         toast.error(data.error || 'Failed to load users');
       }
     } catch (error) {
       console.error('Failed to load users:', error);
       toast.error('Network error while loading users');
+    } finally {
+      setLoadingUsers(false);
     }
   };
 
-  // ✅ FIXED: Load Problems with Authorization
+  // Load Problems
   const loadProblems = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -108,39 +120,40 @@ export default function AdminPanelUserManagement() {
     }
   };
 
-  // ✅ FIXED: Load First Face Assignments with Authorization
-const loadFirstFaceAssignments = async () => {
-  try {
-    console.log('🔄 Loading first face assignments...');
-    
-    const response = await fetch(`${API_BASE_URL}/first-face-assignments`);
-    
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
+  // Load First Face Assignments with Name Resolution
+  const loadFirstFaceAssignments = async () => {
+    setLoadingFirstFace(true);
+    try {
+      console.log('🔄 Loading first face assignments...');
+      
+      // Load from localStorage first for immediate display
+      const localAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      
+      // Resolve user names
+      const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const assignmentsWithNames = localAssignments.map(assignment => {
+        const user = systemUsers.find(u => u.id === assignment.userId);
+        return {
+          ...assignment,
+          userName: user ? user.name : assignment.userName || 'Unknown User',
+          userEmail: user ? user.email : assignment.userEmail || ''
+        };
+      });
+
+      console.log('📋 First Face Assignments with Names:', assignmentsWithNames);
+      setFirstFaceAssignments(assignmentsWithNames);
+
+    } catch (error) {
+      console.error('🔴 Failed to load first face assignments:', error);
+      toast.error('Failed to load first face assignments');
+    } finally {
+      setLoadingFirstFace(false);
     }
-    
-    const data = await response.json();
-    console.log('🟢 First Face API Response:', data);
+  };
 
-    if (data.success) {
-      setFirstFaceAssignments(data.firstFaceAssignments || []);
-      console.log('✅ First Face Assignments loaded:', data.firstFaceAssignments?.length || 0);
-    } else {
-      console.error('🔴 First Face API Error:', data.error);
-      toast.error(data.error || 'Failed to load first face assignments');
-      setFirstFaceAssignments([]);
-    }
-  } catch (error) {
-    console.error('🔴 Failed to load first face assignments:', error);
-    toast.error('Failed to load first face assignments: ' + error.message);
-    setFirstFaceAssignments([]);
-  }
-};
-
-
-
-  // ✅ FIXED: Load Active Users with Authorization
+  // Load Active Users with Loading State
   const loadActiveUsers = async () => {
+    setLoadingActiveUsers(true);
     try {
       console.log('🔄 Loading active users...');
       
@@ -175,134 +188,192 @@ const loadFirstFaceAssignments = async () => {
         console.log('✅ Active users loaded:', data.activeUsers?.length || 0);
       } else {
         console.error('🔴 Active Users API Error:', data.error);
-        toast.error(data.error || 'Failed to load active users');
-        setActiveUsers([]);
+        // Fallback to all users if active users endpoint fails
+        const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+        const activeUsers = allUsers.filter(u => u.status === 'active');
+        setActiveUsers(activeUsers);
+        console.log('📋 Using fallback active users:', activeUsers.length);
       }
     } catch (error) {
       console.error('🔴 Failed to load active users:', error);
-      toast.error('Network error while loading active users');
-      setActiveUsers([]);
+      // Fallback to localStorage users
+      const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const activeUsers = allUsers.filter(u => u.status === 'active');
+      setActiveUsers(activeUsers);
+      console.log('📋 Using localStorage active users:', activeUsers.length);
+    } finally {
+      setLoadingActiveUsers(false);
     }
   };
 
-  // ✅ FIXED: Handle First Face Assignment with Authorization
- const handleFirstFaceAssignment = async () => {
-  if (!selectedFirstFace) {
-    toast.error('Please select a First Face');
-    return;
-  }
-
-  try {
-    console.log('🔄 Starting First Face assignment...');
-    
-    // Get user details from activeUsers
-    const selectedUser = activeUsers.find(u => u.id == selectedFirstFace);
-    
-    if (!selectedUser) {
-      toast.error('Selected user not found');
+  // Handle First Face Assignment with Notification Setup
+  const handleFirstFaceAssignment = async () => {
+    if (!selectedFirstFace) {
+      toast.error('Please select a First Face');
       return;
     }
 
-    console.log('👤 Selected user:', selectedUser);
-
-    const newAssignment = {
-      id: Date.now(),
-      userId: parseInt(selectedFirstFace),
-      userName: selectedUser.name,
-      department: selectedDepartment,
-      type: selectedDepartment === 'all' ? 'all' : 'specific',
-      isActive: true,
-      assignedAt: new Date().toISOString(),
-      assignedBy: user.name
-    };
-
-    console.log('📝 New assignment:', newAssignment);
-
-    // Save to localStorage for frontend auto-assignment
-    const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-    console.log('📋 Existing assignments:', existingAssignments);
-    
-    // Deactivate previous assignments for same department
-    const updatedAssignments = existingAssignments.map(assignment => 
-      assignment.department === selectedDepartment 
-        ? { ...assignment, isActive: false }
-        : assignment
-    );
-
-    // Add new assignment
-    updatedAssignments.push(newAssignment);
-    localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
-
-    console.log('💾 Saved to localStorage:', updatedAssignments);
-
-    toast.success(`✅ ${selectedUser.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
-    setShowFirstFaceModal(false);
-    setSelectedFirstFace('');
-    setSelectedDepartment('all');
-    
-    // Reload assignments to show in UI
-    loadFirstFaceAssignments();
-  } catch (error) {
-    console.error('❌ First Face Assignment Error:', error);
-    toast.error('Failed to assign First Face: ' + error.message);
-  }
-};
-
-  // ✅ FIXED: Handle Remove First Face with Authorization
-// ✅ FIXED: Handle Remove First Face with CORRECT URL
-const handleRemoveFirstFace = async (assignmentId) => {
-  try {
-    console.log('🔄 Removing First Face Assignment:', assignmentId);
-    
-    if (!window.confirm('Are you sure you want to remove this First Face assignment?')) {
-      return;
-    }
-
-    const token = localStorage.getItem('token');
-    
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    // ✅ CORRECT URL: first-face-assignments (not first-face)
-    const response = await fetch(`${API_BASE_URL}/first-face-assignments/${assignmentId}`, {
-      method: 'DELETE',
-      headers: headers,
-    });
-
-    console.log('🔵 Remove First Face Response Status:', response.status);
-
-    const responseText = await response.text();
-    console.log('📄 Raw Response:', responseText);
-
-    let data;
+    setSavingFirstFace(true);
     try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON Parse Error:', parseError);
-      throw new Error('Server returned invalid JSON');
+      console.log('🔄 Starting First Face assignment...');
+      
+      // Get user details
+      let selectedUser = activeUsers.find(u => u.id == selectedFirstFace);
+      
+      if (!selectedUser) {
+        // Fallback: check all users from localStorage
+        const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+        selectedUser = allUsers.find(u => u.id == selectedFirstFace);
+      }
+
+      if (!selectedUser) {
+        toast.error('Selected user not found');
+        return;
+      }
+
+      console.log('👤 Selected user:', selectedUser);
+
+      const newAssignment = {
+        id: Date.now(), // Unique ID
+        userId: parseInt(selectedFirstFace),
+        userName: selectedUser.name,
+        userEmail: selectedUser.email,
+        department: selectedDepartment,
+        type: selectedDepartment === 'all' ? 'all' : 'specific',
+        isActive: true,
+        assignedAt: new Date().toISOString(),
+        assignedBy: user.name,
+        assignedById: user.id
+      };
+
+      console.log('📝 New assignment:', newAssignment);
+
+      // Save to localStorage for frontend auto-assignment
+      const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      console.log('📋 Existing assignments:', existingAssignments);
+      
+      // Deactivate previous assignments for same department
+      const updatedAssignments = existingAssignments.map(assignment => 
+        assignment.department === selectedDepartment 
+          ? { ...assignment, isActive: false }
+          : assignment
+      );
+
+      // Add new assignment
+      updatedAssignments.push(newAssignment);
+      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+
+      console.log('💾 Saved to localStorage:', updatedAssignments);
+
+      // Send notification to the assigned user
+      sendFirstFaceAssignmentNotification(newAssignment);
+
+      toast.success(`✅ ${selectedUser.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
+      setShowFirstFaceModal(false);
+      setSelectedFirstFace('');
+      setSelectedDepartment('all');
+      
+      // Reload assignments to show in UI
+      await loadFirstFaceAssignments();
+    } catch (error) {
+      console.error('❌ First Face Assignment Error:', error);
+      toast.error('Failed to assign First Face: ' + error.message);
+    } finally {
+      setSavingFirstFace(false);
     }
+  };
 
-    console.log('🟢 Remove First Face Response:', data);
+  // Send Notification for First Face Assignment
+  const sendFirstFaceAssignmentNotification = (assignment) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: assignment.userId,
+        userName: assignment.userName,
+        type: 'first_face_assignment',
+        title: '🎯 First Face Assignment',
+        message: `You have been assigned as First Face for ${assignment.department === 'all' ? 'All Departments' : assignment.department}. New problems will be automatically assigned to you.`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        assignment: assignment
+      };
 
-    if (data.success) {
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 First Face assignment notification sent:', notification);
+      
+      // Show toast notification
+      toast.info(`📨 Notification sent to ${assignment.userName}`);
+    } catch (error) {
+      console.error('❌ Failed to send notification:', error);
+    }
+  };
+
+  // Handle Remove First Face with Notification
+  const handleRemoveFirstFace = async (assignmentId) => {
+    try {
+      console.log('🔄 Removing First Face Assignment:', assignmentId);
+      
+      if (!window.confirm('Are you sure you want to remove this First Face assignment?')) {
+        return;
+      }
+
+      // Find assignment details before removal
+      const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      const assignmentToRemove = existingAssignments.find(a => a.id === assignmentId);
+      
+      // Remove from localStorage
+      const updatedAssignments = existingAssignments.filter(assignment => assignment.id !== assignmentId);
+      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+
+      console.log('✅ Removed from localStorage');
+
+      // Send removal notification
+      if (assignmentToRemove) {
+        sendFirstFaceRemovalNotification(assignmentToRemove);
+      }
+
       toast.success('First Face assignment removed successfully!');
       loadFirstFaceAssignments(); // Refresh the list
-    } else {
-      throw new Error(data.error || 'Failed to remove First Face');
+    } catch (error) {
+      console.error('🔴 Remove First Face Error:', error);
+      toast.error('Failed to remove First Face: ' + error.message);
     }
-  } catch (error) {
-    console.error('🔴 Remove First Face Error:', error);
-    toast.error('Failed to remove First Face: ' + error.message);
-  }
-};
+  };
 
-  // ✅ FIXED: Handle Save User with Authorization
+  // Send Notification for First Face Removal
+  const sendFirstFaceRemovalNotification = (assignment) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: assignment.userId,
+        userName: assignment.userName,
+        type: 'first_face_removal',
+        title: '❌ First Face Assignment Removed',
+        message: `Your First Face assignment for ${assignment.department === 'all' ? 'All Departments' : assignment.department} has been removed.`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        assignment: assignment
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 First Face removal notification sent:', notification);
+      
+      // Show toast notification
+      toast.info(`📨 Removal notification sent to ${assignment.userName}`);
+    } catch (error) {
+      console.error('❌ Failed to send removal notification:', error);
+    }
+  };
+
+  // Handle Save User with Notification
   const handleSaveUser = async () => {
     if (!isAdmin) return toast.error('Only Admin can add or edit users!');
     if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
@@ -346,6 +417,13 @@ const handleRemoveFirstFace = async (assignmentId) => {
       console.log('🟢 PARSED RESPONSE:', data);
 
       if (data.success) {
+        // Send notification for user creation/update
+        if (editingUser) {
+          sendUserUpdateNotification(editingUser, formData);
+        } else {
+          sendUserCreationNotification(formData);
+        }
+
         toast.success(data.message);
         setFormData({
           name: '',
@@ -359,6 +437,7 @@ const handleRemoveFirstFace = async (assignmentId) => {
         setShowAddModal(false);
         setEditingUser(null);
         loadUsers();
+        
       } else {
         console.error('🔴 BACKEND ERROR:', data);
         toast.error(data.error || 'Failed to save user');
@@ -369,7 +448,60 @@ const handleRemoveFirstFace = async (assignmentId) => {
     }
   };
 
-  // ✅ FIXED: Handle Edit User
+  // Send Notification for User Creation
+  const sendUserCreationNotification = (userData) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: Date.now(), // Temporary ID for new user
+        userName: userData.name,
+        type: 'user_created',
+        title: '👤 New User Created',
+        message: `New user "${userData.name}" has been created with role: ${userData.role}`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        userData: userData
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 User creation notification sent:', notification);
+    } catch (error) {
+      console.error('❌ Failed to send user creation notification:', error);
+    }
+  };
+
+  // Send Notification for User Update
+  const sendUserUpdateNotification = (oldUser, newUserData) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: oldUser.id,
+        userName: oldUser.name,
+        type: 'user_updated',
+        title: '✏️ User Updated',
+        message: `User "${oldUser.name}" profile has been updated`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        oldData: oldUser,
+        newData: newUserData
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 User update notification sent:', notification);
+    } catch (error) {
+      console.error('❌ Failed to send user update notification:', error);
+    }
+  };
+
+  // Handle Edit User
   const handleEditUser = userId => {
     if (!isAdmin) return toast.error('Only Admin can edit users!');
     const userToEdit = users.find(u => u.id === userId);
@@ -388,42 +520,14 @@ const handleRemoveFirstFace = async (assignmentId) => {
     }
   };
 
-  const forceRefreshFirstFace = async () => {
-  try {
-    // 1. প্রথমে সব assignments deactivate করুন
-    await fetch(`${API_BASE_URL}/first-face-assignments/deactivate-all`, {
-      method: 'POST'
-    });
-
-    // 2. তারপর নতুন assignment create করুন
-    const response = await fetch(`${API_BASE_URL}/first-face-assignments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: parseInt(selectedFirstFace), // আপনার selected user
-        department: selectedDepartment,
-        type: selectedDepartment === 'all' ? 'all' : 'specific'
-      }),
-    });
-
-    const data = await response.json();
-    
-    if (data.success) {
-      toast.success('First Face updated successfully!');
-      loadFirstFaceAssignments();
-    }
-  } catch (error) {
-    console.error('Force refresh failed:', error);
-  }
-};
-  // ✅ FIXED: Handle Delete User with Authorization
+  // Handle Delete User with Notification
   const handleDeleteUser = async userId => {
     if (!isAdmin) return toast.error('Only Admin can delete users!');
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
     try {
+      const userToDelete = users.find(u => u.id === userId);
+      
       const token = localStorage.getItem('token');
       
       const headers = {
@@ -443,6 +547,9 @@ const handleRemoveFirstFace = async (assignmentId) => {
       const data = await response.json();
 
       if (data.success) {
+        // Send deletion notification
+        sendUserDeletionNotification(userToDelete);
+        
         toast.success('User deleted successfully!');
         loadUsers();
       } else {
@@ -454,10 +561,39 @@ const handleRemoveFirstFace = async (assignmentId) => {
     }
   };
 
-  // ✅ FIXED: Handle Toggle Status with Authorization
+  // Send Notification for User Deletion
+  const sendUserDeletionNotification = (user) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: user.id,
+        userName: user.name,
+        type: 'user_deleted',
+        title: '🗑️ User Deleted',
+        message: `User "${user.name}" has been deleted from the system`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        userData: user
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 User deletion notification sent:', notification);
+    } catch (error) {
+      console.error('❌ Failed to send user deletion notification:', error);
+    }
+  };
+
+  // Handle Toggle Status with Notification
   const handleToggleStatus = async userId => {
     if (!isAdmin) return toast.error('Only Admin can change user status!');
     try {
+      const userToUpdate = users.find(u => u.id === userId);
+      const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
+      
       const token = localStorage.getItem('token');
       
       const headers = {
@@ -477,6 +613,9 @@ const handleRemoveFirstFace = async (assignmentId) => {
       const data = await response.json();
 
       if (data.success) {
+        // Send status change notification
+        sendUserStatusNotification(userToUpdate, newStatus);
+        
         toast.success('User status updated!');
         loadUsers();
       } else {
@@ -485,6 +624,33 @@ const handleRemoveFirstFace = async (assignmentId) => {
     } catch (error) {
       toast.error('Failed to update status');
       console.error(error);
+    }
+  };
+
+  // Send Notification for User Status Change
+  const sendUserStatusNotification = (user, newStatus) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      
+      const notification = {
+        id: Date.now(),
+        userId: user.id,
+        userName: user.name,
+        type: 'user_status_changed',
+        title: newStatus === 'active' ? '✅ User Activated' : '⏸️ User Deactivated',
+        message: `User "${user.name}" has been ${newStatus === 'active' ? 'activated' : 'deactivated'}`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        oldStatus: user.status,
+        newStatus: newStatus
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 User status notification sent:', notification);
+    } catch (error) {
+      console.error('❌ Failed to send user status notification:', error);
     }
   };
 
@@ -676,9 +842,19 @@ const handleRemoveFirstFace = async (assignmentId) => {
                     <button
                       className="btn btn-warning btn-sm"
                       onClick={() => setShowFirstFaceModal(true)}
+                      disabled={loadingActiveUsers}
                     >
-                      <FaUserCheck className="me-1" />
-                      First Face
+                      {loadingActiveUsers ? (
+                        <>
+                          <FaSpinner className="me-1 fa-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <FaUserCheck className="me-1" />
+                          First Face
+                        </>
+                      )}
                     </button>
                     
                     <button
@@ -704,190 +880,225 @@ const handleRemoveFirstFace = async (assignmentId) => {
                 </div>
               )}
 
-              {/* First Face Assignments Section */}
-              {isAdmin && firstFaceAssignments.length > 0 && (
-                <div className="card border-warning mb-4">
-                  <div className="card-header bg-warning text-dark">
-                    <h6 className="mb-0">
-                      <FaUserCheck className="me-2" />
-                      Active First Face Assignments
-                    </h6>
-                  </div>
-                  <div className="card-body p-3">
-                    <div className="row g-2">
-                      {firstFaceAssignments.map(assignment => (
-                        <div key={assignment.id} className="col-md-6">
-                          <div className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
-                            <div>
-                              <strong>{assignment.user?.name}</strong>
-                              <small className="text-muted d-block">
-                                {assignment.department === 'all' ? 'All Departments' : assignment.department}
-                              </small>
-                            </div>
-                            <button
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleRemoveFirstFace(assignment.id)}
-                              title="Remove First Face"
-                            >
-                              <FaTrash />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              {/* Loading States for Users Table */}
+              {loadingUsers ? (
+                <div className="text-center py-5">
+                  <FaSpinner className="fa-spin fs-1 text-primary mb-3" />
+                  <p className="text-muted">Loading users...</p>
                 </div>
-              )}
-
-              {/* Stats Cards */}
-              <div className="row g-3 mb-4">
-                <div className="col-md-3">
-                  <div className="card border-primary text-center h-100">
-                    <div className="card-body">
-                      <h3 className="text-primary mb-0">{users.filter(u => u.role === 'team_leader').length}</h3>
-                      <small className="text-muted">Team Leaders</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="card border-info text-center h-100">
-                    <div className="card-body">
-                      <h3 className="text-info mb-0">{users.filter(u => u.role === 'user').length}</h3>
-                      <small className="text-muted">Users</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="card border-success text-center h-100">
-                    <div className="card-body">
-                      <h3 className="text-success mb-0">{users.filter(u => u.status === 'active').length}</h3>
-                      <small className="text-muted">Active Users</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-3">
-                  <div className="card border-warning text-center h-100">
-                    <div className="card-body">
-                      <h3 className="text-warning mb-0">{firstFaceAssignments.length}</h3>
-                      <small className="text-muted">First Face Assignments</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Users Table */}
-              <div className="table-responsive">
-                <table className="table table-hover table-striped">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>Name</th>
-                      <th>Username</th>
-                      <th style={{ textAlign: 'center' }}>Email</th>
-                      <th>Role</th>
-                      <th>Department</th>
-                      <th>Status</th>
-                      <th style={{ textAlign: 'center' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="text-center py-5">
-                          <FaUsers className="fs-1 text-muted mb-3 d-block mx-auto" />
-                          <p className="text-muted mb-3">No users found.</p>
-                          {isAdmin && (
-                            <button 
-                              className="btn btn-primary" 
-                              onClick={() => {
-                                setEditingUser(null);
-                                setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
-                                setShowAddModal(true);
-                              }}
-                            >
-                              <FaUserPlus className="me-2" /> 
-                              Add User
-                            </button>
+              ) : (
+                <>
+                  {/* First Face Assignments Section with Loading */}
+                  {isAdmin && (
+                    <div className="card border-warning mb-4">
+                      <div className="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h6 className="mb-0">
+                          <FaUserCheck className="me-2" />
+                          Active First Face Assignments
+                          {loadingFirstFace && (
+                            <FaSpinner className="fa-spin ms-2" />
                           )}
-                        </td>
-                      </tr>
-                    ) : (
-                      users.map(u => (
-                        <tr key={u.id} className="align-middle">
-                          <td className="fw-semibold">
-                            {u.role === 'admin' && <span className="me-2"></span>}
-                            {u.role === 'team_leader' && <span className="me-2"></span>}
-                            {u.role === 'user' && <span className="me-2"></span>}
-                            {u.name}
-                            {firstFaceAssignments.some(ff => ff.user_id === u.id) && (
-                              <span className="badge bg-warning text-dark ms-1" title="First Face">FF</span>
-                            )}
-                          </td>
-                          <td>
-                            <code className="bg-light px-2 py-1 rounded d-inline-block">
-                              {u.username}
-                            </code>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button
-                              className="btn btn-sm btn-outline-info"
-                              onClick={() => handleViewEmail(u.email)}
-                              title="View Email"
-                              style={{ padding: '6px 10px' }}
-                            >
-                              <FaEye />
-                            </button>
-                          </td>
-                          <td>
-                            <span className={`badge ${getRoleBadge(u.role)}`}>
-                              {u.role === 'admin' ? ' Admin' : 
-                              u.role === 'team_leader' ? ' Team Leader' : 
-                              ' User'}
-                            </span>
-                          </td>
-                          <td>{u.department}</td>
-                          <td>
-                            <span className={`badge ${getStatusBadge(u.status)}`}>
-                              {u.status}
-                            </span>
-                          </td>
-                          <td>
-                            {isAdmin ? (
-                              <div className="d-flex gap-1 justify-content-center">
-                                <button 
-                                  className="btn btn-sm btn-outline-primary" 
-                                  onClick={() => handleEditUser(u.id)} 
-                                  title="Edit"
-                                  style={{ padding: '6px 10px' }}
-                                >
-                                  <FaEdit />
-                                </button>
-                                <button 
-                                  className={`btn btn-sm btn-outline-${u.status === 'active' ? 'warning' : 'success'}`} 
-                                  onClick={() => handleToggleStatus(u.id)} 
-                                  title={u.status === 'active' ? 'Deactivate' : 'Activate'}
-                                  style={{ padding: '6px 10px' }}
-                                >
-                                  {u.status === 'active' ? '⏸' : '▶'}
-                                </button>
-                                <button 
-                                  className="btn btn-sm btn-outline-danger" 
-                                  onClick={() => handleDeleteUser(u.id)} 
-                                  title="Delete"
-                                  style={{ padding: '6px 10px' }}
-                                >
-                                  <FaTrash />
-                                </button>
+                        </h6>
+                        <button 
+                          className="btn btn-sm btn-outline-dark"
+                          onClick={loadFirstFaceAssignments}
+                          disabled={loadingFirstFace}
+                        >
+                          <FaSync className={loadingFirstFace ? 'fa-spin' : ''} />
+                        </button>
+                      </div>
+                      <div className="card-body p-3">
+                        {loadingFirstFace ? (
+                          <div className="text-center py-3">
+                            <FaSpinner className="fa-spin text-warning me-2" />
+                            Loading First Face assignments...
+                          </div>
+                        ) : firstFaceAssignments.filter(ff => ff.isActive).length > 0 ? (
+                          <div className="row g-2">
+                            {firstFaceAssignments.filter(ff => ff.isActive).map(assignment => (
+                              <div key={assignment.id} className="col-md-6">
+                                <div className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                  <div>
+                                    <strong>{assignment.userName}</strong>
+                                    <small className="text-muted d-block">
+                                      {assignment.department === 'all' ? 'All Departments' : assignment.department}
+                                    </small>
+                                    <small className="text-muted">
+                                      Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}
+                                    </small>
+                                  </div>
+                                  <button
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => handleRemoveFirstFace(assignment.id)}
+                                    title="Remove First Face"
+                                    disabled={savingFirstFace}
+                                  >
+                                    <FaTrash />
+                                  </button>
+                                </div>
                               </div>
-                            ) : (
-                              <span className="badge bg-secondary">View Only</span>
-                            )}
-                          </td>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center text-muted py-2">
+                            <FaInfoCircle className="me-2" />
+                            No active First Face assignments
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stats Cards */}
+                  <div className="row g-3 mb-4">
+                    <div className="col-md-3">
+                      <div className="card border-primary text-center h-100">
+                        <div className="card-body">
+                          <h3 className="text-primary mb-0">{users.filter(u => u.role === 'team_leader').length}</h3>
+                          <small className="text-muted">Team Leaders</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="card border-info text-center h-100">
+                        <div className="card-body">
+                          <h3 className="text-info mb-0">{users.filter(u => u.role === 'user').length}</h3>
+                          <small className="text-muted">Users</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="card border-success text-center h-100">
+                        <div className="card-body">
+                          <h3 className="text-success mb-0">{users.filter(u => u.status === 'active').length}</h3>
+                          <small className="text-muted">Active Users</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-md-3">
+                      <div className="card border-warning text-center h-100">
+                        <div className="card-body">
+                          <h3 className="text-warning mb-0">{firstFaceAssignments.filter(ff => ff.isActive).length}</h3>
+                          <small className="text-muted">First Face Assignments</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Users Table */}
+                  <div className="table-responsive">
+                    <table className="table table-striped">
+                      <thead className="table-dark">
+                        <tr>
+                          <th>Name</th>
+                          <th>Username</th>
+                          <th style={{ textAlign: 'center' }}>Email</th>
+                          <th>Role</th>
+                          <th>Department</th>
+                          <th>Status</th>
+                          <th style={{ textAlign: 'center' }}>Actions</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {users.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="text-center py-5">
+                              <FaUsers className="fs-1 text-muted mb-3 d-block mx-auto" />
+                              <p className="text-muted mb-3">No users found.</p>
+                              {isAdmin && (
+                                <button 
+                                  className="btn btn-primary" 
+                                  onClick={() => {
+                                    setEditingUser(null);
+                                    setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
+                                    setShowAddModal(true);
+                                  }}
+                                >
+                                  <FaUserPlus className="me-2" /> 
+                                  Add User
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ) : (
+                          users.map(u => (
+                            <tr key={u.id} className="align-middle">
+                              <td className="fw-semibold">
+                                {u.name}
+                                {firstFaceAssignments.some(ff => (ff.userId === u.id) && ff.isActive) && (
+                                  <span className="badge bg-warning text-dark ms-1" title="First Face">
+                                    <FaBell className="me-1" /> FF
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <code className="bg-light px-2 py-1 rounded d-inline-block">
+                                  {u.username}
+                                </code>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <button
+                                  className="btn btn-sm btn-outline-info"
+                                  onClick={() => handleViewEmail(u.email)}
+                                  title="View Email"
+                                  style={{ padding: '6px 10px' }}
+                                >
+                                  <FaEye />
+                                </button>
+                              </td>
+                              <td>
+                                <span className={`badge ${getRoleBadge(u.role)}`}>
+                                  {u.role === 'admin' ? ' Admin' : 
+                                  u.role === 'team_leader' ? ' Team Leader' : 
+                                  ' User'}
+                                </span>
+                              </td>
+                              <td>{u.department}</td>
+                              <td>
+                                <span className={`badge ${getStatusBadge(u.status)}`}>
+                                  {u.status}
+                                </span>
+                              </td>
+                              <td>
+                                {isAdmin ? (
+                                  <div className="d-flex gap-1 justify-content-center">
+                                    <button 
+                                      className="btn btn-sm btn-outline-primary" 
+                                      onClick={() => handleEditUser(u.id)} 
+                                      title="Edit"
+                                      style={{ padding: '6px 10px' }}
+                                    >
+                                      <FaEdit />
+                                    </button>
+                                    <button 
+                                      className={`btn btn-sm btn-outline-${u.status === 'active' ? 'warning' : 'success'}`} 
+                                      onClick={() => handleToggleStatus(u.id)} 
+                                      title={u.status === 'active' ? 'Deactivate' : 'Activate'}
+                                      style={{ padding: '6px 10px' }}
+                                    >
+                                      {u.status === 'active' ? '⏸' : '▶'}
+                                    </button>
+                                    <button 
+                                      className="btn btn-sm btn-outline-danger" 
+                                      onClick={() => handleDeleteUser(u.id)} 
+                                      title="Delete"
+                                      style={{ padding: '6px 10px' }}
+                                    >
+                                      <FaTrash />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="badge bg-secondary">View Only</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -947,6 +1158,7 @@ const handleRemoveFirstFace = async (assignmentId) => {
                     setSelectedFirstFace('');
                     setSelectedDepartment('all');
                   }}
+                  disabled={savingFirstFace}
                 ></button>
               </div>
               <div className="modal-body">
@@ -956,33 +1168,38 @@ const handleRemoveFirstFace = async (assignmentId) => {
                 
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Select First Face User:</label>
-                  <select
-                    className="form-control"
-                    value={selectedFirstFace}
-                    onChange={(e) => setSelectedFirstFace(e.target.value)}
-                  >
-                    <option value="">-- Select User --</option>
-                    {activeUsers.length > 0 ? (
-                      activeUsers.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.name} 
-                          {user.role === 'team_leader' && ' '} 
-                          {user.role === 'user' && ' '} 
-                          - {user.department}
-                          {user.role === 'admin' && ' '}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>Loading users...</option>
-                    )}
-                  </select>
-                  <small className="text-muted">
-                    You can select any active user (Admin, Team Leader or Regular User)
-                  </small>
-                  {activeUsers.length === 0 && (
-                    <div className="text-danger small mt-1">
-                      No active users found. Please check if users are created and active.
+                  {loadingActiveUsers ? (
+                    <div className="text-center py-3">
+                      <FaSpinner className="fa-spin text-warning me-2" />
+                      Loading active users...
                     </div>
+                  ) : (
+                    <>
+                      <select
+                        className="form-control"
+                        value={selectedFirstFace}
+                        onChange={(e) => setSelectedFirstFace(e.target.value)}
+                        disabled={savingFirstFace}
+                      >
+                        <option value="">-- Select User --</option>
+                        {activeUsers.length > 0 ? (
+                          activeUsers.map(user => (
+                            <option key={user.id} value={user.id}>
+                              {user.name} 
+                              {user.role === 'team_leader' && ' '} 
+                              {user.role === 'user' && ' '} 
+                              - {user.department}
+                              {user.role === 'admin' && ' '}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>No active users available</option>
+                        )}
+                      </select>
+                      <small className="text-muted">
+                        You can select any active user (Admin, Team Leader or Regular User)
+                      </small>
+                    </>
                   )}
                 </div>
 
@@ -992,6 +1209,7 @@ const handleRemoveFirstFace = async (assignmentId) => {
                     className="form-control"
                     value={selectedDepartment}
                     onChange={(e) => setSelectedDepartment(e.target.value)}
+                    disabled={savingFirstFace}
                   >
                     <option value="all">All Departments</option>
                     <option value="IT & Innovation">IT & Innovation Department</option>
@@ -1006,36 +1224,23 @@ const handleRemoveFirstFace = async (assignmentId) => {
                   </small>
                 </div>
 
-                {/* <div className="p-3 bg-light rounded">
-                  <div className="row text-center">
-                    <div className="col-12">
-                      <h5 className="text-warning mb-2">Assignment Summary</h5>
-                      <p className="mb-1">
-                        <strong>
-                          {selectedFirstFace 
-                            ? activeUsers.find(u => u.id == selectedFirstFace)?.name 
-                            : 'Selected User'
-                          }
-                        </strong> will receive:
-                      </p>
-                      <p className="mb-0 text-success">
-                        {selectedDepartment === 'all' 
-                          ? 'ALL new problems from ANY department'
-                          : `NEW problems only from ${selectedDepartment} department`
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div> */}
-
                 <div className="d-flex gap-2 mt-4">
                   <button 
                     className="btn btn-warning flex-grow-1"
                     onClick={handleFirstFaceAssignment}
-                    disabled={!selectedFirstFace || activeUsers.length === 0}
+                    disabled={!selectedFirstFace || activeUsers.length === 0 || savingFirstFace}
                   >
-                    <FaUserCheck className="me-2" />
-                    Set as First Face
+                    {savingFirstFace ? (
+                      <>
+                        <FaSpinner className="fa-spin me-2" />
+                        Assigning...
+                      </>
+                    ) : (
+                      <>
+                        <FaUserCheck className="me-2" />
+                        Set as First Face
+                      </>
+                    )}
                   </button>
                   <button 
                     className="btn btn-secondary"
@@ -1044,9 +1249,25 @@ const handleRemoveFirstFace = async (assignmentId) => {
                       setSelectedFirstFace('');
                       setSelectedDepartment('all');
                     }}
+                    disabled={savingFirstFace}
                   >
                     Cancel
                   </button>
+                </div>
+
+                {/* Process Explanation */}
+                <div className="mt-4 p-3 bg-light rounded">
+                  <h6 className="text-warning mb-2">
+                    <FaInfoCircle className="me-2" />
+                    How First Face Works:
+                  </h6>
+                  <ol className="small mb-0">
+                    <li>Select a user and department above</li>
+                    <li>Click "Set as First Face" to save the assignment</li>
+                    <li>New problems in selected department will auto-assign to this user</li>
+                    <li>First Face users get priority for new problem assignments</li>
+                    <li>You can have different First Face users for different departments</li>
+                  </ol>
                 </div>
               </div>
             </div>
@@ -1142,7 +1363,7 @@ const handleRemoveFirstFace = async (assignmentId) => {
                       style={{cursor:'pointer', marginTop: '12px'}} 
                       onClick={() => setShowPassword(prev => !prev)}
                     >
-                      {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      {showPassword ? <FaEye /> : <FaEyeSlash />}
                     </span>
                     
                     {showPasswordRequirements && (
@@ -1167,7 +1388,7 @@ const handleRemoveFirstFace = async (assignmentId) => {
                       onChange={handleInputChange}
                     >
                       <option value="user">User (Employee)</option>
-                      <option value="team_leader">Team Leader</option>
+                      {/* <option value="team_leader">Team Leader</option> */}
                       <option value="admin">Admin</option>
                     </select>
                   </div>

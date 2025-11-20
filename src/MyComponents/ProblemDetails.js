@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { FaChevronLeft, FaChevronRight, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaArrowLeft, FaTimes } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaArrowLeft, FaTimes, FaClock, FaExchangeAlt, FaComments, FaPaperPlane } from 'react-icons/fa';
 
 export default function ProblemDetails() {
   const { id } = useParams();
@@ -20,6 +20,7 @@ export default function ProblemDetails() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [showSolutionComment, setShowSolutionComment] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
+  const [rightSidebarMinimized, setRightSidebarMinimized] = useState(false);
 
   useEffect(() => {
     fetchProblemDetails();
@@ -62,11 +63,16 @@ export default function ProblemDetails() {
     const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     
-    return `${days}d ${hours}h ${minutes}m`;
+    if (days > 0) {
+      return `${days} days ${hours} hours`;
+    } else if (hours > 0) {
+      return `${hours} hours ${minutes} minutes`;
+    } else {
+      return `${minutes} minutes`;
+    }
   };
 
   const handleStatusChange = (newStatus) => {
-    // Check if marking as done and require comment
     if ((newStatus === 'done' || newStatus === 'pending_approval') && !comment.trim()) {
       toast.error('Please add a comment explaining the solution before marking as solved');
       setShowSolutionComment(true);
@@ -94,13 +100,19 @@ export default function ProblemDetails() {
             })
           };
 
-          // Add the comment when marking as solved
           if ((newStatus === 'done' || newStatus === 'pending_approval') && comment.trim()) {
             const newComment = {
-              id: (p.comments?.length || 0) + 1,
-              comment: comment.trim(),
-              user: { name: user?.name, email: user?.email },
-              created_at: new Date().toISOString(),
+              id: Date.now(),
+              text: comment.trim(),
+              author: user?.name,
+              authorRole: user?.role,
+              timestamp: new Date().toISOString(),
+              date: new Date().toLocaleDateString('en-BD'),
+              time: new Date().toLocaleTimeString('en-BD', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+              }),
               type: 'solution'
             };
             updatedProblem.comments = [...(p.comments || []), newComment];
@@ -133,7 +145,7 @@ export default function ProblemDetails() {
         : 'Status updated successfully!';
       
       toast.success(statusMsg);
-      setComment(''); // Clear comment after submission
+      setComment('');
       setShowSolutionComment(false);
       setPendingStatus(null);
       fetchProblemDetails();
@@ -229,13 +241,23 @@ export default function ProblemDetails() {
       const updatedProblems = problems.map(p => {
         if (p.id === parseInt(id)) {
           const newComment = {
-            id: (p.comments?.length || 0) + 1,
-            comment: comment.trim(),
-            user: { name: user?.name, email: user?.email },
-            created_at: new Date().toISOString(),
+            id: Date.now(),
+            text: comment.trim(),
+            author: user?.name,
+            authorRole: user?.role,
+            timestamp: new Date().toISOString(),
+            date: new Date().toLocaleDateString('en-BD'),
+            time: new Date().toLocaleTimeString('en-BD', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: true 
+            }),
             type: 'general'
           };
-          return { ...p, comments: [...(p.comments || []), newComment] };
+          return { 
+            ...p, 
+            comments: [...(p.comments || []), newComment] 
+          };
         }
         return p;
       });
@@ -285,8 +307,12 @@ export default function ProblemDetails() {
     }
   };
 
-  const toggleSidebar = () => {
+  const toggleLeftSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
+  };
+
+  const toggleRightSidebar = () => {
+    setRightSidebarMinimized(!rightSidebarMinimized);
   };
 
   const getStatusBadge = (status) => {
@@ -308,7 +334,6 @@ export default function ProblemDetails() {
     return badges[priority] || 'bg-secondary';
   };
 
-  // Fix image display - handle both string URLs and image objects
   const getImageUrl = (img) => {
     if (typeof img === 'string') {
       return img;
@@ -319,6 +344,11 @@ export default function ProblemDetails() {
     }
     return '';
   };
+
+  // Calculate resolution duration for display
+  const resolutionDuration = problem?.createdAt && problem?.resolvedAt 
+    ? calculateDuration(problem.createdAt, problem.resolvedAt)
+    : null;
 
   if (loading) {
     return (
@@ -353,7 +383,7 @@ export default function ProblemDetails() {
       <Navbar />
       
       <div className="d-flex flex-grow-1">
-        {/* Sidebar */}
+        {/* Left Sidebar */}
         <div 
           className="bg-dark text-white position-relative"
           style={{ 
@@ -363,7 +393,7 @@ export default function ProblemDetails() {
           }}
         >
           <button
-            onClick={toggleSidebar}
+            onClick={toggleLeftSidebar}
             className="position-absolute d-flex align-items-center justify-content-center"
             style={{
               top: '10px',
@@ -445,7 +475,7 @@ export default function ProblemDetails() {
                   >
                     <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
-                  </a>
+                </a>
                 </li>
               )}
             </ul>
@@ -493,7 +523,7 @@ export default function ProblemDetails() {
                       </div>
                     )}
 
-                    {/* Images Section with Modal - FIXED IMAGE DISPLAY */}
+                    {/* Images Section */}
                     {problem.images && problem.images.length > 0 && (
                       <div className="mb-4">
                         <h6 className="mb-3" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#495057' }}>
@@ -560,45 +590,7 @@ export default function ProblemDetails() {
                       </div>
                     )}
 
-                    {/* Transfer History */}
-                    {problem.transferHistory && problem.transferHistory.length > 0 && (
-                      <div className="card border-info mb-4">
-                        <div className="card-header bg-info text-white">
-                          <h6 className="mb-0">🔄 Transfer History</h6>
-                        </div>
-                        <div className="card-body">
-                          {problem.transferHistory.map((transfer, index) => (
-                            <div key={index} className="mb-2 pb-2 border-bottom">
-                              <div className="d-flex justify-content-between">
-                                <span><strong>From:</strong> {getUserName(transfer.from)}</span>
-                                <span><strong>To:</strong> {getUserName(transfer.to)}</span>
-                              </div>
-                              <small className="text-muted">
-                                Transferred by {transfer.by} on {new Date(transfer.date).toLocaleString()}
-                              </small>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Duration Tracking */}
-                    {problem.status === 'done' && problem.createdAt && (
-                      <div className="alert alert-info mb-3">
-                        <h6 className="mb-2">⏱️ Problem Resolution Duration</h6>
-                        <p className="mb-1">
-                          <strong>Created:</strong> {new Date(problem.createdAt).toLocaleString()}<br/>
-                          {problem.resolvedAt && <strong>Resolved:</strong>} {problem.resolvedAt && new Date(problem.resolvedAt).toLocaleString()}
-                        </p>
-                        {problem.createdAt && problem.resolvedAt && (
-                          <p className="mb-0">
-                            <strong>Total Time:</strong> {calculateDuration(problem.createdAt, problem.resolvedAt)}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Solution Comment Required - FIXED COMMENT INPUT */}
+                    {/* Solution Comment Required */}
                     {showSolutionComment && (
                       <div className="alert alert-warning mb-3">
                         <h6 className="mb-2">💬 Solution Comment Required</h6>
@@ -644,7 +636,7 @@ export default function ProblemDetails() {
                       </div>
                     )}
 
-                    {/* Basic Info - Professional Grid */}
+                    {/* Basic Info */}
                     <div className="row g-3 mb-4">
                       <div className="col-md-6">
                         <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
@@ -775,137 +767,194 @@ export default function ProblemDetails() {
                     )}
                   </div>
                 </div>
-                
-                {/* Comments Section */}
-                <div className="card shadow-sm border-0 mb-4">
-                  <div className="card-header"
-                    style={{ 
-                      background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
-                      color: 'white',
-                      padding: '1rem 1.5rem'
-                    }}
-                  >
-                    <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
-                      💬 Comments
-                    </h5>
-                  </div>
-                  <div className="card-body" style={{ padding: '1.5rem' }}>
-                    {/* Comment Form */}
-                    <form onSubmit={handleAddComment} className="mb-4">
-                      <div className="mb-3">
-                        <label htmlFor="comment" className="form-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                          Add a Comment
-                        </label>
-                        <textarea
-                          id="comment"
-                          className="form-control"
-                          rows="3"
-                          value={comment}
-                          onChange={(e) => setComment(e.target.value)}
-                          style={{ fontSize: '0.9rem' }}
-                          placeholder="Add your comment..."
-                        ></textarea>
-                      </div>
-                      <button 
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={submittingComment}
-                        style={{ fontSize: '0.9rem', padding: '0.5rem 1.2rem' }}
+              </div>
+
+              {/* Right Sidebar - Activity & Comments */}
+              {!rightSidebarMinimized ? (
+                <div className="col-lg-4">
+                  <div className="card shadow-sm border-0 mb-4">
+                    <div className="card-header d-flex justify-content-between align-items-center"
+                      style={{ 
+                        background: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
+                        color: 'white',
+                        padding: '1rem 1.5rem'
+                      }}
+                    >
+                      <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
+                        <FaComments className="me-2" />
+                        Activity & Discussion
+                      </h5>
+                      {/* <button 
+                        className="btn btn-sm btn-outline-light"
+                        onClick={toggleRightSidebar}
+                        title="Minimize sidebar"
                       >
-                        {submittingComment ? 'Submitting...' : 'Submit Comment'}
-                      </button>
-                    </form>
-                    {/* Comments List */}
-                    {problem.comments && problem.comments.length > 0 ? (
-                      <div>
-                        {problem.comments.map(c => (
-                          <div key={c.id} className="mb-3 pb-3 border-bottom" style={{ fontSize: '0.9rem' }}>
-                            <div className="d-flex justify-content-between align-items-center mb-1">
-                              <div>
-                                <strong style={{ fontSize: '0.95rem' }}>{c.user.name}</strong>
-                                {c.type === 'solution' && (
-                                  <span className="badge bg-success ms-2">Solution</span>
-                                )}
+                        <FaChevronRight size={12} />
+                      </button> */}
+                    </div>
+                    <div className="card-body p-0">
+                      {/* Resolution Duration */}
+                      {resolutionDuration && (
+                        <div className="p-3 border-bottom">
+                          <div className="d-flex align-items-center mb-2">
+                            <FaClock className="text-success me-2" />
+                            <h6 className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Resolution Duration</h6>
+                          </div>
+                          <div className="bg-light rounded p-2">
+                            <div className="text-center">
+                              <div className="fw-bold text-success" style={{ fontSize: '1.1rem' }}>
+                                {resolutionDuration}
                               </div>
-                              <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                {new Date(c.created_at).toLocaleString()}
+                              <small className="text-muted">
+                                Created: {new Date(problem.createdAt).toLocaleDateString()}<br/>
+                                Resolved: {new Date(problem.resolvedAt).toLocaleDateString()}
                               </small>
                             </div>
-                            <div style={{ color: '#495057', lineHeight: '1.5' }}>
-                              {c.comment}
-                            </div>
                           </div>
-                        ))}
+                        </div>
+                      )}
+
+                      {/* Transfer History */}
+                      {problem.transferHistory && problem.transferHistory.length > 0 && (
+                        <div className="p-3 border-bottom">
+                          <div className="d-flex align-items-center mb-2">
+                            <FaExchangeAlt className="text-info me-2" />
+                            <h6 className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Transfer History</h6>
+                          </div>
+                          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            {problem.transferHistory.map((transfer, index) => (
+                              <div key={index} className="mb-2 pb-2 border-bottom">
+                                <div className="d-flex justify-content-between align-items-start">
+                                  <div>
+                                    <small className="fw-semibold d-block">{getUserName(transfer.from)}</small>
+                                    <small className="text-muted">to {getUserName(transfer.to)}</small>
+                                  </div>
+                                  <small className="text-muted text-end">
+                                    {new Date(transfer.date).toLocaleDateString()}<br/>
+                                    {new Date(transfer.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                  </small>
+                                </div>
+                                <small className="text-muted">
+                                  By {transfer.by}
+                                </small>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chat-style Comments */}
+                      <div className="p-3">
+                        <div className="d-flex align-items-center mb-3">
+                          <FaComments className="text-primary me-2" />
+                          <h6 className="mb-0" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Live Discussion</h6>
+                        </div>
+                        
+                        {/* Comments List - Chat Style */}
+                        <div style={{ height: '300px', overflowY: 'auto', border: '1px solid #e9ecef', borderRadius: '8px', padding: '1rem', backgroundColor: '#f8f9fa' }}>
+                          {problem.comments && problem.comments.length > 0 ? (
+                            <div className="chat-messages">
+                              {problem.comments.map(comment => (
+                                <div key={comment.id} className="mb-3">
+                                  <div className="d-flex gap-2">
+                                    <div className="flex-shrink-0">
+                                      <div 
+                                        className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                        style={{ 
+                                          width: '32px', 
+                                          height: '32px', 
+                                          backgroundColor: comment.authorRole === 'admin' ? '#dc3545' : 
+                                                        comment.authorRole === 'team_leader' ? '#0d6efd' : '#6c757d',
+                                          fontSize: '0.8rem'
+                                        }}
+                                      >
+                                        {comment.author?.charAt(0)?.toUpperCase() || 'U'}
+                                      </div>
+                                    </div>
+                                    <div className="flex-grow-1">
+                                      <div className="bg-white rounded p-2 shadow-sm">
+                                        <div className="d-flex justify-content-between align-items-start mb-1">
+                                          <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>
+                                            {comment.author}
+                                            {comment.authorRole === 'admin' && (
+                                              <span className="badge bg-danger ms-1" style={{ fontSize: '0.6rem' }}>ADMIN</span>
+                                            )}
+                                            {comment.authorRole === 'team_leader' && (
+                                              <span className="badge bg-primary ms-1" style={{ fontSize: '0.6rem' }}>LEADER</span>
+                                            )}
+                                            {comment.type === 'solution' && (
+                                              <span className="badge bg-success ms-1" style={{ fontSize: '0.6rem' }}>SOLUTION</span>
+                                            )}
+                                          </span>
+                                          <small className="text-muted">
+                                            {comment.time}
+                                          </small>
+                                        </div>
+                                        <p className="mb-0" style={{ fontSize: '0.8rem', lineHeight: '1.4' }}>
+                                          {comment.text || comment.comment}
+                                        </p>
+                                      </div>
+                                      <small className="text-muted ms-2">
+                                        {comment.date}
+                                      </small>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center text-muted py-4">
+                              <FaComments size={32} className="mb-2" />
+                              <p className="mb-0" style={{ fontSize: '0.9rem' }}>No comments yet</p>
+                              <small>Start the discussion</small>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add Comment Form */}
+                        <form onSubmit={handleAddComment} className="mt-3">
+                          <div className="input-group">
+                            <textarea
+                              className="form-control form-control-sm"
+                              rows="2"
+                              placeholder="Type your message..."
+                              value={comment}
+                              onChange={(e) => setComment(e.target.value)}
+                              style={{ fontSize: '0.8rem', resize: 'none' }}
+                            ></textarea>
+                            <button
+                              type="submit"
+                              className="btn btn-primary btn-sm"
+                              disabled={submittingComment || !comment.trim()}
+                              style={{ fontSize: '0.8rem' }}
+                            >
+                              <FaPaperPlane size={12} />
+                            </button>
+                          </div>
+                        </form>
                       </div>
-                    ) : (
-                      <p className="text-muted" style={{ fontSize: '0.9rem' }}>No comments yet. Be the first to comment!</p>
-                    )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              {/* Sidebar - Problem Metadata */}
-              <div className="col-lg-4">
-                <div className="card shadow-sm border-0 mb-4">
-                  <div className="card-header"
-                    style={{ 
-                      background: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)',
-                      color: 'white',
-                      padding: '1rem 1.5rem'
-                    }}
-                  >
-                    <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
-                      🗂 Problem Details
-                    </h5>
-                  </div>
-                  <div className="card-body" style={{ padding: '1.5rem' }}>
-                    <ul className="list-group list-group-flush">
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Problem ID:</strong></span>
-                        <span>{problem.id}</span>
-                      </li>
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Department:</strong></span>
-                        <span>{problem.department}</span>
-                      </li>
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Priority:</strong></span>
-                        <span>{problem.priority}</span>
-                      </li>
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Status:</strong></span>
-                        <span className={getStatusBadge(problem.status)} style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>
-                          {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </li>
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Created At:</strong></span>
-                        <span>{new Date(problem.createdAt).toLocaleString()}</span>
-                      </li>
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Created By:</strong></span>
-                        <span>{problem.createdBy}</span>
-                      </li>
-                      <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                        <span><strong>Assigned To:</strong></span>
-                        <span>{getUserName(problem.assignedTo) || 'Unassigned'}</span>
-                      </li>
-                      {problem.resolvedAt && (
-                        <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                          <span><strong>Resolved At:</strong></span>
-                          <span>{new Date(problem.resolvedAt).toLocaleString()}</span>
-                        </li>
-                      )}
-                      {problem.approvedBy && (
-                        <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-                          <span><strong>Approved By:</strong></span>
-                          <span>{problem.approvedBy}</span>
-                        </li>
-                      )}
-                    </ul>
+              ) : (
+                /* Minimized Right Sidebar */
+                <div className="col-lg-1">
+                  <div className="card shadow-sm border-0">
+                    <div className="card-body text-center p-3">
+                      <button 
+                        className="btn btn-outline-primary btn-sm mb-3"
+                        onClick={toggleRightSidebar}
+                        title="Expand activity panel"
+                      >
+                        <FaComments />
+                      </button>
+                      <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                        <small className="text-muted">Activity</small>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -922,16 +971,25 @@ export default function ProblemDetails() {
           }}
           onClick={() => setSelectedImage(null)}
         >
-          <img 
-            src={selectedImage}
-            alt="Full Size"
-            style={{ 
-              maxWidth: '90%',
-              maxHeight: '90%',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-              borderRadius: '10px'
-            }}
-          />
+          <div className="position-relative">
+            <button
+              className="btn btn-danger btn-sm position-absolute top-0 end-0 m-2"
+              onClick={() => setSelectedImage(null)}
+              style={{ zIndex: 1051 }}
+            >
+              <FaTimes />
+            </button>
+            <img 
+              src={selectedImage}
+              alt="Full Size"
+              style={{ 
+                maxWidth: '90%',
+                maxHeight: '90%',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                borderRadius: '10px'
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

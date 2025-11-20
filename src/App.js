@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react"; // useEffect import করুন
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -19,8 +19,15 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import ProblemCreate from "./pages/ProblemCreate";
 import FirstFaceAssignment from "./components/FirstFaceAssignment";
+import { migrateExistingProblems } from './utils/migration';
 
 function App() {
+  useEffect(() => {
+    // App load হওয়ার সময় migration run করুন
+    const migrationResult = migrateExistingProblems();
+    console.log('Migration result:', migrationResult);
+  }, []);
+
   return (
     <AuthProvider>
       <NotificationProvider>
@@ -100,6 +107,16 @@ function App() {
               }
             />
 
+            {/* First Face Assignment Route */}
+            <Route
+              path="/first-face-assignments"
+              element={
+                <AdminRoute>
+                  <FirstFaceAssignment />
+                </AdminRoute>
+              }
+            />
+
             {/* Default redirect based on role */}
             <Route
               path="/"
@@ -116,8 +133,23 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/problem/create" element={<ProblemCreate />} />
-            <Route path="/first-face-assignments" element={<FirstFaceAssignment />} />
+
+            {/* Catch all route - redirect to appropriate dashboard */}
+            <Route
+              path="*"
+              element={
+                <ProtectedRoute>
+                  <Navigate
+                    to={
+                      JSON.parse(localStorage.getItem("current_user"))?.role === "admin"
+                        ? "/dashboard"
+                        : "/employee-dashboard"
+                    }
+                    replace
+                  />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </Router>
       </NotificationProvider>
