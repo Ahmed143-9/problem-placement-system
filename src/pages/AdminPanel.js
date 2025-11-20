@@ -193,34 +193,57 @@ const loadFirstFaceAssignments = async () => {
   }
 
   try {
-    console.log('🔄 Assigning First Face...');
+    console.log('🔄 Starting First Face assignment...');
     
-    const response = await fetch(`${API_BASE_URL}/first-face-assignments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: parseInt(selectedFirstFace),
-        department: selectedDepartment,
-        type: selectedDepartment === 'all' ? 'all' : 'specific'
-      }),
-    });
-
-    const data = await response.json();
-    console.log('🟢 First Face Response:', data);
-
-    if (data.success) {
-      toast.success(`✅ ${data.assignment.user.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
-      setShowFirstFaceModal(false);
-      setSelectedFirstFace('');
-      setSelectedDepartment('all');
-      loadFirstFaceAssignments();
-    } else {
-      throw new Error(data.error || 'Failed to assign First Face');
+    // Get user details from activeUsers
+    const selectedUser = activeUsers.find(u => u.id == selectedFirstFace);
+    
+    if (!selectedUser) {
+      toast.error('Selected user not found');
+      return;
     }
+
+    console.log('👤 Selected user:', selectedUser);
+
+    const newAssignment = {
+      id: Date.now(),
+      userId: parseInt(selectedFirstFace),
+      userName: selectedUser.name,
+      department: selectedDepartment,
+      type: selectedDepartment === 'all' ? 'all' : 'specific',
+      isActive: true,
+      assignedAt: new Date().toISOString(),
+      assignedBy: user.name
+    };
+
+    console.log('📝 New assignment:', newAssignment);
+
+    // Save to localStorage for frontend auto-assignment
+    const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+    console.log('📋 Existing assignments:', existingAssignments);
+    
+    // Deactivate previous assignments for same department
+    const updatedAssignments = existingAssignments.map(assignment => 
+      assignment.department === selectedDepartment 
+        ? { ...assignment, isActive: false }
+        : assignment
+    );
+
+    // Add new assignment
+    updatedAssignments.push(newAssignment);
+    localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+
+    console.log('💾 Saved to localStorage:', updatedAssignments);
+
+    toast.success(`✅ ${selectedUser.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
+    setShowFirstFaceModal(false);
+    setSelectedFirstFace('');
+    setSelectedDepartment('all');
+    
+    // Reload assignments to show in UI
+    loadFirstFaceAssignments();
   } catch (error) {
-    console.error('🔴 First Face Assignment Error:', error);
+    console.error('❌ First Face Assignment Error:', error);
     toast.error('Failed to assign First Face: ' + error.message);
   }
 };

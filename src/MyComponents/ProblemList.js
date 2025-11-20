@@ -264,84 +264,64 @@ export default function ProblemList() {
 
   // Fixed: Assign/Transfer function - BETTER DATA PERSISTENCE
   const handleAssignSubmit = async () => {
-    if (!selectedMember) {
-      toast.error('Please select a team member');
-      return;
-    }
+  if (!selectedMember) {
+    toast.error('Please select a team member');
+    return;
+  }
 
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Update localStorage FIRST for immediate UI update
-      const updatedProblems = problems.map(p => {
-        if (p.id === selectedProblem.id) {
-          const updatedProblem = { 
-            ...p, 
-            assignedTo: selectedMember,
-            status: p.status === 'pending' ? 'in_progress' : p.status
-          };
-          
-          if (isTransfer && p.assignedTo) {
-            updatedProblem.transferHistory = [
-              ...(p.transferHistory || []),
-              {
-                from: p.assignedTo,
-                to: selectedMember,
-                date: new Date().toISOString(),
-                by: user?.name || 'Admin'
-              }
-            ];
-            notifyTransfer(p.id, p.assignedTo, selectedMember, user?.name);
-          } else {
-            notifyAssignment(p.id, selectedMember, user?.name);
-          }
-          
-          return updatedProblem;
+  try {
+    console.log('🔄 Starting assignment process...');
+    
+    // Update localStorage FIRST for immediate UI update
+    const updatedProblems = problems.map(p => {
+      if (p.id === selectedProblem.id) {
+        const updatedProblem = { 
+          ...p, 
+          assignedTo: selectedMember,
+          assignedToName: selectedMember, // Store name as well
+          status: p.status === 'pending' ? 'in_progress' : p.status
+        };
+        
+        if (isTransfer && p.assignedTo) {
+          updatedProblem.transferHistory = [
+            ...(p.transferHistory || []),
+            {
+              from: p.assignedTo,
+              to: selectedMember,
+              date: new Date().toISOString(),
+              by: user?.name || 'Admin'
+            }
+          ];
+          notifyTransfer(p.id, p.assignedTo, selectedMember, user?.name);
+        } else {
+          notifyAssignment(p.id, selectedMember, user?.name);
         }
-        return p;
-      });
-      
-      // Update state immediately
-      setProblems(updatedProblems);
-      localStorage.setItem('problems', JSON.stringify(updatedProblems));
-      
-      // Then try API update
-      if (token) {
-        try {
-          const response = await fetch(`${API_BASE_URL}/problems/${selectedProblem.id}/assign`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              assigned_to: selectedMember,
-              is_transfer: isTransfer
-            }),
-          });
-
-          if (response.ok) {
-            console.log('✅ Assignment updated via API');
-          }
-        } catch (apiError) {
-          console.warn('API assignment failed, data saved locally:', apiError);
-        }
+        
+        return updatedProblem;
       }
-      
-      toast.success(
-        isTransfer 
-          ? `Problem #${selectedProblem.id} transferred to ${selectedMember}!`
-          : `Problem #${selectedProblem.id} assigned to ${selectedMember}!`
-      );
-      
-      setShowAssignModal(false);
-      setSelectedProblem(null);
-      setSelectedMember('');
-    } catch (error) {
-      toast.error('Failed to assign problem');
-      console.error(error);
-    }
-  };
+      return p;
+    });
+    
+    // Update state immediately
+    setProblems(updatedProblems);
+    localStorage.setItem('problems', JSON.stringify(updatedProblems));
+    
+    console.log('✅ Assignment saved to localStorage');
+    
+    toast.success(
+      isTransfer 
+        ? `Problem #${selectedProblem.id} transferred to ${selectedMember}!`
+        : `Problem #${selectedProblem.id} assigned to ${selectedMember}!`
+    );
+    
+    setShowAssignModal(false);
+    setSelectedProblem(null);
+    setSelectedMember('');
+  } catch (error) {
+    console.error('❌ Assignment error:', error);
+    toast.error('Failed to assign problem');
+  }
+};
 
   // Fixed: Delete function - BETTER DATA PERSISTENCE
   const handleDelete = async (problemId) => {

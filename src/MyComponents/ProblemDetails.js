@@ -18,6 +18,8 @@ export default function ProblemDetails() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showSolutionComment, setShowSolutionComment] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
 
   useEffect(() => {
     fetchProblemDetails();
@@ -40,13 +42,36 @@ export default function ProblemDetails() {
     }
   };
 
+  // Helper function to get user name from ID
+  const getUserName = (userId) => {
+    if (!userId) return 'Unassigned';
+    const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+    const user = users.find(u => u.id === userId || u.name === userId);
+    return user ? user.name : userId;
+  };
+
+  // Calculate duration between two dates
+  const calculateDuration = (start, end) => {
+    if (!start || !end) return 'N/A';
+    
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffMs = endDate - startDate;
+    
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    return `${days}d ${hours}h ${minutes}m`;
+  };
+
   const handleStatusChange = (newStatus) => {
     // Check if marking as done and require comment
-    if (newStatus === 'done' || newStatus === 'pending_approval') {
-      if (!comment.trim()) {
-        toast.error('Please add a comment before marking as solved');
-        return;
-      }
+    if ((newStatus === 'done' || newStatus === 'pending_approval') && !comment.trim()) {
+      toast.error('Please add a comment explaining the solution before marking as solved');
+      setShowSolutionComment(true);
+      setPendingStatus(newStatus);
+      return;
     }
 
     if (newStatus === 'done' && !canApprove()) {
@@ -63,6 +88,9 @@ export default function ProblemDetails() {
             ...(newStatus === 'pending_approval' && {
               submittedForApprovalBy: user?.name,
               submittedForApprovalAt: new Date().toISOString()
+            }),
+            ...(newStatus === 'done' && {
+              resolvedAt: new Date().toISOString()
             })
           };
 
@@ -72,7 +100,8 @@ export default function ProblemDetails() {
               id: (p.comments?.length || 0) + 1,
               comment: comment.trim(),
               user: { name: user?.name, email: user?.email },
-              created_at: new Date().toISOString()
+              created_at: new Date().toISOString(),
+              type: 'solution'
             };
             updatedProblem.comments = [...(p.comments || []), newComment];
           }
@@ -105,11 +134,22 @@ export default function ProblemDetails() {
       
       toast.success(statusMsg);
       setComment(''); // Clear comment after submission
+      setShowSolutionComment(false);
+      setPendingStatus(null);
       fetchProblemDetails();
     } catch (error) {
       toast.error('Failed to update status');
       console.error(error);
     }
+  };
+
+  const handleSubmitSolution = () => {
+    if (!comment.trim()) {
+      toast.error('Please add a comment explaining the solution');
+      return;
+    }
+
+    handleStatusChange(pendingStatus);
   };
 
   const handleApproveCompletion = () => {
@@ -192,7 +232,8 @@ export default function ProblemDetails() {
             id: (p.comments?.length || 0) + 1,
             comment: comment.trim(),
             user: { name: user?.name, email: user?.email },
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            type: 'general'
           };
           return { ...p, comments: [...(p.comments || []), newComment] };
         }
@@ -265,6 +306,18 @@ export default function ProblemDetails() {
       Low: 'bg-success'
     };
     return badges[priority] || 'bg-secondary';
+  };
+
+  // Fix image display - handle both string URLs and image objects
+  const getImageUrl = (img) => {
+    if (typeof img === 'string') {
+      return img;
+    } else if (img && img.url) {
+      return img.url;
+    } else if (img && img.data) {
+      return img.data;
+    }
+    return '';
   };
 
   if (loading) {
@@ -401,40 +454,6 @@ export default function ProblemDetails() {
 
         {/* Main Content */}
         <div className="flex-grow-1 position-relative" style={{ overflowY: 'auto' }}>
-          {/* Floating Back Button - Middle of page vertically */}
-          {/* <button 
-            onClick={() => navigate(-1)}
-            className="position-fixed shadow"
-            style={{
-              top: '50%',
-              left: sidebarMinimized ? '90px' : '270px',
-              transform: 'translateY(-50%)',
-              backdropFilter: 'blur(10px)',
-              backgroundColor: 'rgba(255, 255, 255, 0.85)',
-              border: '1px solid rgba(0,0,0,0.1)',
-              borderRadius: '50px',
-              padding: '10px 24px',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              transition: 'all 0.3s',
-              color: '#495057',
-              zIndex: 100,
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-50%) translateX(5px)';
-              e.target.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)';
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(-50%)';
-              e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
-            }}
-          >
-            <FaArrowLeft className="me-2" /> Back
-          </button> */}
-
           <div className="p-4">
             <div className="row">
               {/* Main Problem Details */}
@@ -474,64 +493,145 @@ export default function ProblemDetails() {
                       </div>
                     )}
 
-                    {/* Images Section with Modal */}
+                    {/* Images Section with Modal - FIXED IMAGE DISPLAY */}
                     {problem.images && problem.images.length > 0 && (
                       <div className="mb-4">
                         <h6 className="mb-3" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#495057' }}>
-                          📎 Attached Screenshots
+                          📎 Attached Screenshots ({problem.images.length})
                         </h6>
                         <div className="row g-3">
-                          {problem.images.map((img, index) => (
-                            <div key={index} className="col-md-4 col-6">
-                              <div 
-                                className="position-relative overflow-hidden"
-                                style={{
-                                  borderRadius: '10px',
-                                  cursor: 'pointer',
-                                  transition: 'transform 0.2s, box-shadow 0.2s',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                }}
-                                onClick={() => setSelectedImage(img.url)}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1.05)';
-                                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                                }}
-                              >
-                                <img 
-                                  src={img.url} 
-                                  alt={`Screenshot ${index + 1}`}
-                                  className="img-fluid"
-                                  style={{ 
-                                    width: '100%', 
-                                    height: '150px', 
-                                    objectFit: 'cover',
-                                    borderRadius: '10px'
-                                  }}
-                                />
+                          {problem.images.map((img, index) => {
+                            const imageUrl = getImageUrl(img);
+                            return imageUrl ? (
+                              <div key={index} className="col-md-4 col-6">
                                 <div 
-                                  className="position-absolute bottom-0 start-0 end-0 text-center text-white"
+                                  className="position-relative overflow-hidden"
                                   style={{
-                                    background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
-                                    padding: '0.5rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '500',
-                                    borderBottomLeftRadius: '10px',
-                                    borderBottomRightRadius: '10px'
+                                    borderRadius: '10px',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s, box-shadow 0.2s',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                  }}
+                                  onClick={() => setSelectedImage(imageUrl)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
                                   }}
                                 >
-                                  Screenshot {index + 1}
+                                  <img 
+                                    src={imageUrl} 
+                                    alt={`Screenshot ${index + 1}`}
+                                    className="img-fluid"
+                                    style={{ 
+                                      width: '100%', 
+                                      height: '150px', 
+                                      objectFit: 'cover',
+                                      borderRadius: '10px'
+                                    }}
+                                    onError={(e) => {
+                                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjRjVGNUY1Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBNODAgODBIMTIwTTgwIDEwMEgxMjBNNjAgNjBWNzBNNjAgODBWNzBNNjAgMTAwVjcwTTE0MCA2MFY3ME0xNDAgODBWNzBNMTQwIDEwMFY3MCIgc3Ryb2tlPSIjQ0RDRENEIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+';
+                                    }}
+                                  />
+                                  <div 
+                                    className="position-absolute bottom-0 start-0 end-0 text-center text-white"
+                                    style={{
+                                      background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
+                                      padding: '0.5rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '500',
+                                      borderBottomLeftRadius: '10px',
+                                      borderBottomRightRadius: '10px'
+                                    }}
+                                  >
+                                    Screenshot {index + 1}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ) : null;
+                          })}
                         </div>
                         <small className="text-muted d-block mt-2" style={{ fontSize: '0.75rem' }}>
                           💡 Click on any image to view full size
                         </small>
+                      </div>
+                    )}
+
+                    {/* Transfer History */}
+                    {problem.transferHistory && problem.transferHistory.length > 0 && (
+                      <div className="card border-info mb-4">
+                        <div className="card-header bg-info text-white">
+                          <h6 className="mb-0">🔄 Transfer History</h6>
+                        </div>
+                        <div className="card-body">
+                          {problem.transferHistory.map((transfer, index) => (
+                            <div key={index} className="mb-2 pb-2 border-bottom">
+                              <div className="d-flex justify-content-between">
+                                <span><strong>From:</strong> {getUserName(transfer.from)}</span>
+                                <span><strong>To:</strong> {getUserName(transfer.to)}</span>
+                              </div>
+                              <small className="text-muted">
+                                Transferred by {transfer.by} on {new Date(transfer.date).toLocaleString()}
+                              </small>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Duration Tracking */}
+                    {problem.status === 'done' && problem.createdAt && (
+                      <div className="alert alert-info mb-3">
+                        <h6 className="mb-2">⏱️ Problem Resolution Duration</h6>
+                        <p className="mb-1">
+                          <strong>Created:</strong> {new Date(problem.createdAt).toLocaleString()}<br/>
+                          {problem.resolvedAt && <strong>Resolved:</strong>} {problem.resolvedAt && new Date(problem.resolvedAt).toLocaleString()}
+                        </p>
+                        {problem.createdAt && problem.resolvedAt && (
+                          <p className="mb-0">
+                            <strong>Total Time:</strong> {calculateDuration(problem.createdAt, problem.resolvedAt)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Solution Comment Required - FIXED COMMENT INPUT */}
+                    {showSolutionComment && (
+                      <div className="alert alert-warning mb-3">
+                        <h6 className="mb-2">💬 Solution Comment Required</h6>
+                        <p className="mb-2">Please explain how you solved this problem before marking it as completed.</p>
+                        <div className="mb-3">
+                          <textarea
+                            className="form-control"
+                            rows="3"
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="Describe your solution in detail..."
+                            style={{ fontSize: '0.9rem' }}
+                          ></textarea>
+                        </div>
+                        <div className="d-flex gap-2">
+                          <button 
+                            className="btn btn-success"
+                            onClick={handleSubmitSolution}
+                            disabled={!comment.trim()}
+                          >
+                            Submit Solution & Mark as {pendingStatus === 'done' ? 'Solved' : 'Pending Approval'}
+                          </button>
+                          <button 
+                            className="btn btn-secondary"
+                            onClick={() => {
+                              setShowSolutionComment(false);
+                              setPendingStatus(null);
+                              setComment('');
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -598,7 +698,7 @@ export default function ProblemDetails() {
                         <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
                           <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned To</small>
                           {problem.assignedTo ? (
-                            <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>{problem.assignedTo}</span>
+                            <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>{getUserName(problem.assignedTo)}</span>
                           ) : (
                             <span className="text-muted" style={{ fontSize: '0.85rem' }}>Not assigned yet</span>
                           )}
@@ -643,7 +743,7 @@ export default function ProblemDetails() {
                     )}
 
                     {/* Status Change Buttons */}
-                    {canChangeStatus() && problem.status !== 'pending_approval' && problem.status !== 'done' && (
+                    {canChangeStatus() && problem.status !== 'pending_approval' && problem.status !== 'done' && !showSolutionComment && (
                       <div className="mb-4">
                         <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Update Status</h6>
                         <div className="btn-group btn-group-sm" role="group">
@@ -675,6 +775,7 @@ export default function ProblemDetails() {
                     )}
                   </div>
                 </div>
+                
                 {/* Comments Section */}
                 <div className="card shadow-sm border-0 mb-4">
                   <div className="card-header"
@@ -702,6 +803,7 @@ export default function ProblemDetails() {
                           value={comment}
                           onChange={(e) => setComment(e.target.value)}
                           style={{ fontSize: '0.9rem' }}
+                          placeholder="Add your comment..."
                         ></textarea>
                       </div>
                       <button 
@@ -719,7 +821,12 @@ export default function ProblemDetails() {
                         {problem.comments.map(c => (
                           <div key={c.id} className="mb-3 pb-3 border-bottom" style={{ fontSize: '0.9rem' }}>
                             <div className="d-flex justify-content-between align-items-center mb-1">
-                              <strong style={{ fontSize: '0.95rem' }}>{c.user.name}</strong>
+                              <div>
+                                <strong style={{ fontSize: '0.95rem' }}>{c.user.name}</strong>
+                                {c.type === 'solution' && (
+                                  <span className="badge bg-success ms-2">Solution</span>
+                                )}
+                              </div>
                               <small className="text-muted" style={{ fontSize: '0.75rem' }}>
                                 {new Date(c.created_at).toLocaleString()}
                               </small>
@@ -736,6 +843,7 @@ export default function ProblemDetails() {
                   </div>
                 </div>
               </div>
+              
               {/* Sidebar - Problem Metadata */}
               <div className="col-lg-4">
                 <div className="card shadow-sm border-0 mb-4">
@@ -780,8 +888,20 @@ export default function ProblemDetails() {
                       </li>
                       <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
                         <span><strong>Assigned To:</strong></span>
-                        <span>{problem.assignedTo || 'Unassigned'}</span>
+                        <span>{getUserName(problem.assignedTo) || 'Unassigned'}</span>
                       </li>
+                      {problem.resolvedAt && (
+                        <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                          <span><strong>Resolved At:</strong></span>
+                          <span>{new Date(problem.resolvedAt).toLocaleString()}</span>
+                        </li>
+                      )}
+                      {problem.approvedBy && (
+                        <li className="list-group-item d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
+                          <span><strong>Approved By:</strong></span>
+                          <span>{problem.approvedBy}</span>
+                        </li>
+                      )}
                     </ul>
                   </div>
                 </div>
@@ -790,6 +910,7 @@ export default function ProblemDetails() {
           </div>
         </div>
       </div>
+      
       {/* Image Modal */}
       {selectedImage && (
         <div

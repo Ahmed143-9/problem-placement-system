@@ -1,11 +1,9 @@
-// src/MyComponents/ProblemForm.js - UPDATED IMPORTS
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle } from 'react-icons/fa';
-// Remove unused imports: FaUsersCog, autoAssignProblem
 
 const SERVICES = [
   'Bulk SMS',
@@ -83,7 +81,62 @@ export default function ProblemForm() {
     }));
   };
 
-  // ✅ FIXED: handleSubmit function with proper API call
+  // ✅ FIXED: Auto Assignment to First Face
+  const getAutoAssignedUser = (department) => {
+    try {
+      console.log('🔄 Checking First Face assignments for department:', department);
+      
+      // First, check localStorage for First Face assignments
+      const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      console.log('📋 First Face assignments from localStorage:', firstFaceAssignments);
+      
+      // Also check system_users for active First Face assignments
+      const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      console.log('👥 System users:', systemUsers);
+
+      // Check for department-specific first face
+      const deptFirstFace = firstFaceAssignments.find(ff => 
+        ff.department === department && ff.isActive === true
+      );
+      
+      // Check for global first face (all departments)
+      const globalFirstFace = firstFaceAssignments.find(ff => 
+        ff.department === 'all' && ff.isActive === true
+      );
+
+      console.log('🔍 Department First Face:', deptFirstFace);
+      console.log('🌍 Global First Face:', globalFirstFace);
+
+      let assignedUser = null;
+
+      if (deptFirstFace) {
+        // Find user details from system_users
+        const userDetails = systemUsers.find(u => u.id === deptFirstFace.userId || u.name === deptFirstFace.userName);
+        assignedUser = {
+          userId: deptFirstFace.userId,
+          userName: userDetails ? userDetails.name : deptFirstFace.userName,
+          type: 'FIRST_FACE_DEPARTMENT'
+        };
+      } else if (globalFirstFace) {
+        // Find user details from system_users
+        const userDetails = systemUsers.find(u => u.id === globalFirstFace.userId || u.name === globalFirstFace.userName);
+        assignedUser = {
+          userId: globalFirstFace.userId,
+          userName: userDetails ? userDetails.name : globalFirstFace.userName,
+          type: 'FIRST_FACE_GLOBAL'
+        };
+      }
+
+      console.log('✅ Auto assigned user:', assignedUser);
+      return assignedUser;
+      
+    } catch (error) {
+      console.error('❌ Error in auto assignment:', error);
+      return null;
+    }
+  };
+
+  // ✅ FIXED: handleSubmit function with proper auto-assignment
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -96,121 +149,78 @@ export default function ProblemForm() {
         return;
       }
 
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      console.log('🔑 Token for problem creation:', token);
+      console.log('🔄 Starting problem creation...');
 
-      if (!token) {
-        throw new Error('No authentication token found. Please login again.');
-      }
-
+      // Auto assignment logic
+      const autoAssignedUser = getAutoAssignedUser(formData.department);
+      
       // Extract only image URLs
       const imageUrls = formData.images && formData.images.length > 0 
         ? formData.images.map(img => img.url) 
         : [];
 
-      // Prepare data for Laravel Backend
-      const problemData = {
-        department: formData.department,
-        service: formData.service,
-        priority: formData.priority,
-        statement: formData.statement,
-        client: formData.client || '',
+      // Create new problem object
+      const newProblem = {
+        id: Date.now(),
+        ...formData,
         images: imageUrls,
-        created_by: user?.name || 'Unknown User'
+        status: autoAssignedUser ? 'assigned' : 'pending',
+        createdBy: user?.name || 'Unknown User',
+        assignedTo: autoAssignedUser ? autoAssignedUser.userId : null,
+        assignedToName: autoAssignedUser ? autoAssignedUser.userName : null,
+        assignmentType: autoAssignedUser ? autoAssignedUser.type : 'NOT_ASSIGNED',
+        createdAt: new Date().toISOString(),
+        comments: [],
+        transferHistory: [],
+        actionHistory: [{
+          action: 'Problem Created',
+          by: user?.name || 'Unknown User',
+          timestamp: new Date().toISOString(),
+          comment: 'Problem ticket submitted'
+        }],
+        ...(autoAssignedUser && {
+          assignmentHistory: [{
+            assignedTo: autoAssignedUser.userId,
+            assignedToName: autoAssignedUser.userName,
+            assignedBy: 'System (First Face)',
+            assignedAt: new Date().toISOString(),
+            type: autoAssignedUser.type
+          }]
+        })
       };
 
-      console.log('📤 Sending data to Laravel:', problemData);
+      console.log('📝 New problem data:', newProblem);
 
-      // ✅ FIXED: Use fetch directly instead of undefined apiRequest
-      const API_BASE_URL = 'http://localhost:8000/api';
-      
-      const response = await fetch(`${API_BASE_URL}/problems`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(problemData)
-      });
+      // Save to localStorage
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      problems.push(newProblem);
+      localStorage.setItem('problems', JSON.stringify(problems));
 
-      console.log('📨 Response status:', response.status);
+      console.log('💾 Problem saved to localStorage');
 
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text.substring(0, 500));
-        
-        if (response.status === 404) {
-          throw new Error(`API endpoint not found. Please make sure Laravel server is running on port 8000.`);
-        } else {
-          throw new Error('Server returned HTML instead of JSON. Check your API routes.');
-        }
-      }
-
-      const result = await response.json();
-      console.log('📦 API response:', result);
-
-      if (!response.ok) {
-        throw new Error(result.error || result.message || `Server error: ${response.status}`);
-      }
-
-      if (result.success) {
-        // ALSO save to localStorage for auto-assignment logic
-        const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-
-        const newProblem = {
-          id: problems.length + 1,
-          ...formData,
-          laravel_id: result.problem?.id,
-          status: 'pending',
-          createdBy: user?.name || 'Unknown User',
-          assignedTo: null,
-          assignmentType: 'NOT_ASSIGNED',
-          createdAt: new Date().toISOString(),
-          comments: [],
-          actionHistory: [{
-            action: 'Problem Created',
-            by: user?.name || 'Unknown User',
-            timestamp: new Date().toISOString(),
-            comment: 'Problem ticket submitted'
-          }]
-        };
-        
-        problems.push(newProblem);
-        localStorage.setItem('problems', JSON.stringify(problems));
-
-        toast.success('Problem submitted successfully!');
-        
-        // Reset form
-        setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
-        setPreviewImages([]);
-        
-        // Redirect
-        setTimeout(() => {
-          if (user?.role === 'admin' || user?.role === 'team_leader') {
-            navigate('/problems');
-          } else {
-            navigate('/employee-dashboard');
-          }
-        }, 1000);
+      // Show success message with assignment info
+      if (autoAssignedUser) {
+        toast.success(`Problem submitted successfully! Auto-assigned to ${autoAssignedUser.userName} (First Face)`);
       } else {
-        throw new Error(result.error || 'Failed to create problem');
+        toast.success('Problem submitted successfully! Will be assigned manually.');
       }
+      
+      // Reset form
+      setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
+      setPreviewImages([]);
+      
+      // Redirect
+      setTimeout(() => {
+        if (user?.role === 'admin' || user?.role === 'team_leader') {
+          navigate('/problems');
+        } else {
+          navigate('/employee-dashboard');
+        }
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Submission error:', error);
-      
-      if (error.message.includes('Unauthenticated') || error.message.includes('Authentication failed')) {
-        toast.error('Session expired. Please login again.');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/login');
-      } else {
-        toast.error(error.message || 'Failed to submit problem to server');
-      }
+      toast.error(error.message || 'Failed to submit problem');
     } finally {
       setLoading(false);
     }
