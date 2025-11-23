@@ -1,11 +1,10 @@
-// ProblemForm.js - Complete Fixed Code with Auto Assignment Notification
-
-import React, { useState } from 'react';
+// ProblemForm.js - COMPLETE FIXED CODE WITH MANUAL ASSIGNMENT
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle } from 'react-icons/fa';
+import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaUserPlus } from 'react-icons/fa';
 
 const SERVICES = [
   'Bulk SMS -> WinText',
@@ -25,40 +24,60 @@ const SERVICES = [
 export default function ProblemForm() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  
   const [formData, setFormData] = useState({
     department: '',
     service: '',
     priority: '',
     statement: '',
     client: '',
+    assignedTo: '', // 🔥 MANUAL ASSIGNMENT FIELD ADDED
     images: []
   });
+
   const [loading, setLoading] = useState(false);
   const [previewImages, setPreviewImages] = useState([]);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [showManualAssignment, setShowManualAssignment] = useState(false);
+
+  useEffect(() => {
+    loadTeamMembers();
+  }, []);
+
+  // Load team members for manual assignment
+  const loadTeamMembers = () => {
+    try {
+      const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const activeUsers = systemUsers.filter(u => u.status === 'active');
+      setTeamMembers(activeUsers);
+      console.log('👥 Team members loaded:', activeUsers.length);
+    } catch (error) {
+      console.error('Failed to load team members:', error);
+    }
+  };
 
   // Generate 5-digit auto-increment ID
   const generateProblemId = () => {
-  try {
-    const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-    
-    if (problems.length === 0) {
-      return 10001; // প্রথম ID: 10001
+    try {
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      
+      if (problems.length === 0) {
+        return 10001;
+      }
+      
+      const maxId = problems.reduce((max, problem) => {
+        return problem.id > max ? problem.id : max;
+      }, 10000);
+      
+      console.log('📊 Current max ID:', maxId);
+      return maxId + 1;
+      
+    } catch (error) {
+      console.error('❌ Error generating problem ID:', error);
+      return 10001;
     }
-    
-    // সবচেয়ে বড় ID খুঁজে বের করুন
-    const maxId = problems.reduce((max, problem) => {
-      return problem.id > max ? problem.id : max;
-    }, 10000);
-    
-    console.log('📊 Current max ID:', maxId);
-    return maxId + 1;
-    
-  } catch (error) {
-    console.error('❌ Error generating problem ID:', error);
-    return 10001; // Fallback to 10001
-  }
-};
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -106,55 +125,54 @@ export default function ProblemForm() {
     }));
   };
 
-  // Auto Assignment to First Face with Name Resolution
+  // 🔥 FIXED: Auto Assignment to First Face with PROPER LOGIC
   const getAutoAssignedUser = (department) => {
     try {
       console.log('🔄 Checking First Face assignments for department:', department);
       
-      // Check localStorage for First Face assignments
       const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-      console.log('📋 First Face assignments from localStorage:', firstFaceAssignments);
-      
-      // Check system_users for user details
       const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      console.log('👥 System users:', systemUsers);
 
-      // Check for department-specific first face
-      const deptFirstFace = firstFaceAssignments.find(ff => 
-        ff.department === department && ff.isActive === true
-      );
-      
-      // Check for global first face (all departments)
-      const globalFirstFace = firstFaceAssignments.find(ff => 
-        ff.department === 'all' && ff.isActive === true
-      );
+      console.log('First Face assignments:', firstFaceAssignments);
+      console.log('System users:', systemUsers);
 
-      console.log('🔍 Department First Face:', deptFirstFace);
-      console.log('🌍 Global First Face:', globalFirstFace);
+      // Filter active assignments only
+      const activeAssignments = firstFaceAssignments.filter(ff => ff.isActive === true);
+      console.log('Active assignments:', activeAssignments);
 
       let assignedUser = null;
 
+      // 1. Check for department-specific first face
+      const deptFirstFace = activeAssignments.find(ff => ff.department === department);
+      console.log('Department First Face:', deptFirstFace);
+
+      // 2. Check for global first face (all departments)
+      const globalFirstFace = activeAssignments.find(ff => ff.department === 'all');
+      console.log('Global First Face:', globalFirstFace);
+
+      // Priority: Department > Global
       if (deptFirstFace) {
-        // Find user details from system_users
-        const userDetails = systemUsers.find(u => u.id === deptFirstFace.userId);
+        const userDetails = systemUsers.find(u => u.id == deptFirstFace.userId);
         assignedUser = {
           userId: deptFirstFace.userId,
           userName: userDetails ? userDetails.name : deptFirstFace.userName,
           userEmail: userDetails ? userDetails.email : '',
           type: 'FIRST_FACE_DEPARTMENT'
         };
+        console.log('✅ Assigned to Department First Face:', assignedUser);
       } else if (globalFirstFace) {
-        // Find user details from system_users
-        const userDetails = systemUsers.find(u => u.id === globalFirstFace.userId);
+        const userDetails = systemUsers.find(u => u.id == globalFirstFace.userId);
         assignedUser = {
           userId: globalFirstFace.userId,
           userName: userDetails ? userDetails.name : globalFirstFace.userName,
           userEmail: userDetails ? userDetails.email : '',
           type: 'FIRST_FACE_GLOBAL'
         };
+        console.log('✅ Assigned to Global First Face:', assignedUser);
+      } else {
+        console.log('❌ No First Face found for assignment');
       }
 
-      console.log('✅ Auto assigned user:', assignedUser);
       return assignedUser;
       
     } catch (error) {
@@ -163,8 +181,29 @@ export default function ProblemForm() {
     }
   };
 
+  // 🔥 FIXED: Manual Assignment Logic
+  const getManualAssignedUser = () => {
+    if (!formData.assignedTo) return null;
+
+    try {
+      const selectedUser = teamMembers.find(user => user.id == formData.assignedTo);
+      if (selectedUser) {
+        return {
+          userId: selectedUser.id,
+          userName: selectedUser.name,
+          userEmail: selectedUser.email,
+          type: 'MANUAL_ASSIGNMENT'
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error in manual assignment:', error);
+      return null;
+    }
+  };
+
   // Send Problem Assignment Notification
-  const sendProblemAssignmentNotification = (problem, assignedUser) => {
+  const sendProblemAssignmentNotification = (problem, assignedUser, assignmentType) => {
     try {
       const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
       
@@ -179,7 +218,8 @@ export default function ProblemForm() {
         createdAt: new Date().toISOString(),
         problemId: problem.id,
         problem: problem,
-        assignedBy: 'System (Auto Assignment)'
+        assignedBy: assignmentType === 'MANUAL_ASSIGNMENT' ? user?.name : 'System (First Face)',
+        assignmentType: assignmentType
       };
 
       notifications.push(notification);
@@ -194,7 +234,7 @@ export default function ProblemForm() {
     }
   };
 
-  // Handle Submit with Auto Assignment and Notification
+  // 🔥 FIXED: Handle Submit with BOTH Auto and Manual Assignment
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -209,9 +249,24 @@ export default function ProblemForm() {
 
       console.log('🔄 Starting problem creation...');
 
-      // Auto assignment logic
-      const autoAssignedUser = getAutoAssignedUser(formData.department);
-      
+      // 🔥 ASSIGNMENT LOGIC: Manual > Auto
+      let assignedUser = null;
+      let assignmentType = 'NOT_ASSIGNED';
+
+      // 1. Check for manual assignment first
+      if (formData.assignedTo) {
+        assignedUser = getManualAssignedUser();
+        assignmentType = 'MANUAL_ASSIGNMENT';
+        console.log('🔧 Manual assignment:', assignedUser);
+      }
+
+      // 2. If no manual assignment, check for First Face auto assignment
+      if (!assignedUser) {
+        assignedUser = getAutoAssignedUser(formData.department);
+        assignmentType = assignedUser ? assignedUser.type : 'NOT_ASSIGNED';
+        console.log('🤖 Auto assignment:', assignedUser);
+      }
+
       // Extract only image URLs
       const imageUrls = formData.images && formData.images.length > 0 
         ? formData.images.map(img => img.url) 
@@ -220,16 +275,25 @@ export default function ProblemForm() {
       // Generate 5-digit auto-increment ID
       const newProblemId = generateProblemId();
 
-      // Create new problem object
+      // 🔥 FIXED: Create new problem object with PROPER assignment
       const newProblem = {
         id: newProblemId,
-        ...formData,
+        department: formData.department,
+        service: formData.service,
+        priority: formData.priority,
+        statement: formData.statement,
+        client: formData.client || '',
         images: imageUrls,
-        status: autoAssignedUser ? 'assigned' : 'pending',
+        status: assignedUser ? 'assigned' : 'pending',
         createdBy: user?.name || 'Unknown User',
-        assignedTo: autoAssignedUser ? autoAssignedUser.userId : null,
-        assignedToName: autoAssignedUser ? autoAssignedUser.userName : 'Not Assigned', // ✅ Name instead of ID
-        assignmentType: autoAssignedUser ? autoAssignedUser.type : 'NOT_ASSIGNED',
+        createdById: user?.id,
+        
+        // 🔥 CRITICAL: Assignment fields - MUST BE SET
+        assignedTo: assignedUser ? assignedUser.userId : null,
+        assignedToName: assignedUser ? assignedUser.userName : null,
+        assignedToEmail: assignedUser ? assignedUser.userEmail : null,
+        assignmentType: assignmentType,
+        
         createdAt: new Date().toISOString(),
         comments: [],
         transferHistory: [],
@@ -239,13 +303,13 @@ export default function ProblemForm() {
           timestamp: new Date().toISOString(),
           comment: 'Problem ticket submitted'
         }],
-        ...(autoAssignedUser && {
+        ...(assignedUser && {
           assignmentHistory: [{
-            assignedTo: autoAssignedUser.userId,
-            assignedToName: autoAssignedUser.userName, // ✅ Name instead of ID
-            assignedBy: 'System (First Face)',
+            assignedTo: assignedUser.userId,
+            assignedToName: assignedUser.userName,
+            assignedBy: assignmentType === 'MANUAL_ASSIGNMENT' ? user?.name : 'System (First Face)',
             assignedAt: new Date().toISOString(),
-            type: autoAssignedUser.type
+            type: assignmentType
           }]
         })
       };
@@ -258,22 +322,36 @@ export default function ProblemForm() {
       localStorage.setItem('problems', JSON.stringify(problems));
 
       console.log('💾 Problem saved to localStorage');
+      console.log('Total problems now:', problems.length);
 
-      // Send notification if auto-assigned
-      if (autoAssignedUser) {
-        sendProblemAssignmentNotification(newProblem, autoAssignedUser);
+      // Send notification if assigned
+      if (assignedUser) {
+        sendProblemAssignmentNotification(newProblem, assignedUser, assignmentType);
       }
 
       // Show success message with assignment info
-      if (autoAssignedUser) {
-        toast.success(`Problem #${newProblemId} submitted successfully! Auto-assigned to ${autoAssignedUser.userName} (First Face)`);
+      if (assignedUser) {
+        if (assignmentType === 'MANUAL_ASSIGNMENT') {
+          toast.success(`✅ Problem submitted and manually assigned to ${assignedUser.userName}`);
+        } else {
+          toast.success(`✅ Problem submitted and auto-assigned to ${assignedUser.userName}`);
+        }
       } else {
-        toast.success(`Problem #${newProblemId} submitted successfully! Will be assigned manually.`);
+        toast.success('Problem submitted successfully! Please assign manually.');
       }
       
       // Reset form
-      setFormData({ department: '', service: '', priority: '', statement: '', client: '', images: [] });
+      setFormData({ 
+        department: '', 
+        service: '', 
+        priority: '', 
+        statement: '', 
+        client: '', 
+        assignedTo: '',
+        images: [] 
+      });
       setPreviewImages([]);
+      setShowManualAssignment(false);
       
       // Redirect
       setTimeout(() => {
@@ -282,7 +360,7 @@ export default function ProblemForm() {
         } else {
           navigate('/employee-dashboard');
         }
-      }, 1000);
+      }, 1500);
       
     } catch (error) {
       console.error('❌ Submission error:', error);
@@ -501,6 +579,45 @@ export default function ProblemForm() {
                           placeholder="Enter client name..."
                         />
                       </div>
+                    </div>
+
+                    {/* 🔥 MANUAL ASSIGNMENT SECTION */}
+                    <div className="mt-3">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <label className="form-label fw-semibold mb-0">
+                          <FaUserPlus className="me-2" />
+                          Assign To <span className="text-muted">(Optional)</span>
+                        </label>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => setShowManualAssignment(!showManualAssignment)}
+                        >
+                          {showManualAssignment ? 'Hide' : 'Assign Manually'}
+                        </button>
+                      </div>
+                      
+                      {showManualAssignment && (
+                        <select
+                          className="form-control"
+                          name="assignedTo"
+                          value={formData.assignedTo}
+                          onChange={handleChange}
+                        >
+                          <option value="">-- Select Team Member --</option>
+                          {teamMembers.map(member => (
+                            <option key={member.id} value={member.id}>
+                              {member.name} ({member.department}) - {member.role}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <small className="text-muted">
+                        {showManualAssignment 
+                          ? 'Manual assignment will override First Face auto-assignment' 
+                          : 'Leave empty for First Face auto-assignment'
+                        }
+                      </small>
                     </div>
 
                     {/* Problem Statement */}

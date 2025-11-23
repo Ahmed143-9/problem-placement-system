@@ -321,8 +321,8 @@ const handleAssignSubmit = async () => {
     
     toast.success(
       isTransfer 
-        ? `Problem #${selectedProblem.id} transferred to ${selectedUser.name}!`
-        : `Problem #${selectedProblem.id} assigned to ${selectedUser.name}!`
+        ? `Transferred to ${selectedUser.name}!`
+        : `Assigned to ${selectedUser.name}!`
     );
     
     setShowAssignModal(false);

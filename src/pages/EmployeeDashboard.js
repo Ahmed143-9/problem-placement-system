@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react'; // useCallback import করুন
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaExchangeAlt } from 'react-icons/fa';
+import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaExchangeAlt, FaBell, FaUserCheck } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 const MOTIVATIONAL_QUOTES = [
@@ -28,52 +28,103 @@ export default function EmployeeDashboard() {
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [transferTo, setTransferTo] = useState('');
   const [teamMembers, setTeamMembers] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
-  // useCallback দিয়ে functions গুলো wrap করুন
+  // 🔥 FIXED: Fetch problems with PROPER assignment logic
   const fetchUserProblems = useCallback(() => {
     try {
-      const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      console.log('🔄 Fetching problems for user:', user?.name);
       
+      const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      console.log('📝 All problems from localStorage:', allProblems);
+
+      // 🔥 CRITICAL FIX: Check both assignedTo (ID) and assignedToName (Name)
+      const assignedToMe = allProblems.filter(p => {
+        const isAssignedById = p.assignedTo === user?.id;
+        const isAssignedByName = p.assignedToName === user?.name;
+        const isAssignedByCreatedBy = p.createdBy === user?.name; // Self-created issues
+        
+        console.log(`Problem ${p.id}:`, {
+          id: p.id,
+          assignedTo: p.assignedTo,
+          assignedToName: p.assignedToName,
+          createdBy: p.createdBy,
+          isAssignedById,
+          isAssignedByName,
+          isAssignedByCreatedBy
+        });
+
+        return isAssignedById || isAssignedByName || isAssignedByCreatedBy;
+      });
+
       // Problems created by user (Self Issues)
       const createdByMe = allProblems.filter(p => p.createdBy === user?.name);
       
-      // Problems assigned to user (for work)
-      const assignedToMe = allProblems.filter(p => p.assignedTo === user?.name);
-      
+      // Problems assigned to user (for work) - exclude self-created
+      const workAssignedToMe = assignedToMe.filter(p => p.createdBy !== user?.name);
+
+      console.log('✅ Created by me:', createdByMe.length);
+      console.log('✅ Work assigned to me:', workAssignedToMe.length);
+      console.log('✅ All assigned to me:', assignedToMe.length);
+
       setMyCreatedProblems(createdByMe);
-      setAssignedProblems(assignedToMe);
+      setAssignedProblems(workAssignedToMe);
       
       const statsData = {
         my_problems: createdByMe.length,
-        assigned_to_me: assignedToMe.length,
-        in_progress: assignedToMe.filter(p => p.status === 'in_progress').length,
-        completed: assignedToMe.filter(p => p.status === 'done').length
+        assigned_to_me: workAssignedToMe.length,
+        in_progress: workAssignedToMe.filter(p => p.status === 'in_progress').length,
+        completed: workAssignedToMe.filter(p => p.status === 'done').length,
+        total_assigned: assignedToMe.length
       };
       
       setStats(statsData);
+
     } catch (error) {
-      console.error('Failed to fetch problems:', error);
+      console.error('❌ Failed to fetch problems:', error);
     }
-  }, [user?.name]); // dependencies যোগ করুন
+  }, [user?.name, user?.id]); // dependencies যোগ করুন
+
+  // Load notifications
+  const fetchNotifications = useCallback(() => {
+    try {
+      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const userNotifications = allNotifications.filter(notification => 
+        notification.userId === user?.id || notification.userName === user?.name
+      );
+      setNotifications(userNotifications.filter(n => !n.isRead));
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    }
+  }, [user?.id, user?.name]);
 
   const fetchTeamMembers = useCallback(() => {
     try {
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
       // Filter out current user and inactive users
       const members = storedUsers.filter(u => 
-        u.username !== user?.name && u.status === 'active'
+        u.id !== user?.id && u.status === 'active'
       );
       setTeamMembers(members);
     } catch (error) {
       console.error('Failed to fetch team members:', error);
     }
-  }, [user?.name]); // dependencies যোগ করুন
+  }, [user?.id]);
 
   useEffect(() => {
     fetchUserProblems();
     fetchTeamMembers();
+    fetchNotifications();
     setRandomQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
-  }, [fetchUserProblems, fetchTeamMembers]); // dependencies যোগ করুন
+    
+    // Refresh every 5 seconds to catch new assignments
+    const interval = setInterval(() => {
+      fetchUserProblems();
+      fetchNotifications();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [fetchUserProblems, fetchTeamMembers, fetchNotifications]);
 
   const handleTransferClick = (problem) => {
     setSelectedProblem(problem);
@@ -91,16 +142,30 @@ export default function EmployeeDashboard() {
       const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
       const updatedProblems = allProblems.map(p => {
         if (p.id === selectedProblem.id) {
+          // Find the user being transferred to
+          const transferToUser = teamMembers.find(member => member.name === transferTo);
+          
           return {
             ...p,
-            assignedTo: transferTo,
+            assignedTo: transferToUser ? transferToUser.id : transferTo, // Keep name if user not found
+            assignedToName: transferTo,
             transferHistory: [
               ...(p.transferHistory || []),
               {
                 from: user?.name,
                 to: transferTo,
                 date: new Date().toISOString(),
-                by: user?.name
+                by: user?.name,
+                type: 'transfer'
+              }
+            ],
+            actionHistory: [
+              ...(p.actionHistory || []),
+              {
+                action: 'Transferred',
+                by: user?.name,
+                timestamp: new Date().toISOString(),
+                comment: `Transferred from ${user?.name} to ${transferTo}`
               }
             ]
           };
@@ -109,22 +174,121 @@ export default function EmployeeDashboard() {
       });
 
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
+      
+      // Send notification to the new assignee
+      sendTransferNotification(selectedProblem, transferTo);
+      
       setShowTransferModal(false);
       setTransferTo('');
       setSelectedProblem(null);
       fetchUserProblems();
-      toast.success('Work transferred successfully!');
+      toast.success(`Work transferred to ${transferTo} successfully!`);
     } catch (error) {
       console.error('Failed to transfer work:', error);
       toast.error('Failed to transfer work. Please try again.');
     }
   };
 
+  // Send transfer notification
+  const sendTransferNotification = (problem, newAssignee) => {
+    try {
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const newAssigneeUser = teamMembers.find(member => member.name === newAssignee);
+      
+      const notification = {
+        id: Date.now(),
+        userId: newAssigneeUser ? newAssigneeUser.id : null,
+        userName: newAssignee,
+        type: 'problem_transferred',
+        title: '🔄 Work Transferred to You',
+        message: `Problem #${problem.id} has been transferred to you by ${user?.name}`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        problemId: problem.id,
+        problem: problem,
+        transferredBy: user?.name
+      };
+
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      console.log('🔔 Transfer notification sent to:', newAssignee);
+    } catch (error) {
+      console.error('Failed to send transfer notification:', error);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationAsRead = (notificationId) => {
+    try {
+      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const updatedNotifications = allNotifications.map(notification =>
+        notification.id === notificationId ? { ...notification, isRead: true } : notification
+      );
+      localStorage.setItem('notifications', JSON.stringify(updatedNotifications));
+      fetchNotifications();
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  // Debug function to check assignment issues
+  const debugAssignment = () => {
+    console.log('🔍 === ASSIGNMENT DEBUG ===');
+    console.log('Current User:', user);
+    
+    const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+    console.log('All Problems:', allProblems);
+    
+    const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+    console.log('First Face Assignments:', firstFaceAssignments);
+    
+    const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+    console.log('System Users:', systemUsers);
+    
+    toast.info('Check console for debug information');
+  };
+
   return (
     <div>
       <Navbar />
-      {/* REMOVED: Sidebar completely */}
+      
       <div className="container mt-4">
+        {/* Header with Notifications */}
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h2 className="mb-1">Welcome, {user?.name}!</h2>
+            <p className="text-muted mb-0">Here's your work overview</p>
+          </div>
+          
+          {/* <div className="d-flex gap-2 align-items-center">
+           
+            {notifications.length > 0 && (
+              <div className="position-relative">
+                <button 
+                  className="btn btn-outline-primary position-relative"
+                  onClick={debugAssignment}
+                  title="Debug Assignment Issues"
+                >
+                  <FaBell />
+                  <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    {notifications.length}
+                  </span>
+                </button>
+              </div>
+            )}
+            
+           
+            <button 
+              className="btn btn-outline-warning btn-sm"
+              onClick={debugAssignment}
+              title="Debug Assignment Issues"
+            >
+              Debug
+            </button>
+          </div> */}
+        </div>
+
         {/* Motivational Banner */}
         <div className="alert alert-info mb-4 text-center" style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -135,6 +299,49 @@ export default function EmployeeDashboard() {
         }}>
           {randomQuote}
         </div>
+
+        {/* Notifications List */}
+        {/* {notifications.length > 0 && (
+          <div className="card border-warning mb-4">
+            <div className="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+              <h6 className="mb-0">
+                <FaBell className="me-2" />
+                New Notifications ({notifications.length})
+              </h6>
+              <small>Click to mark as read</small>
+            </div>
+            <div className="card-body p-2">
+              {notifications.slice(0, 3).map(notification => (
+                <div 
+                  key={notification.id}
+                  className="p-2 border-bottom cursor-pointer"
+                  onClick={() => markNotificationAsRead(notification.id)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="d-flex align-items-center">
+                    <div className="flex-grow-1">
+                      <strong>{notification.title}</strong>
+                      <p className="mb-0 small">{notification.message}</p>
+                      <small className="text-muted">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </small>
+                    </div>
+                    {notification.type === 'problem_assigned' && (
+                      <FaUserCheck className="text-success ms-2" />
+                    )}
+                  </div>
+                </div>
+              ))}
+              {notifications.length > 3 && (
+                <div className="text-center mt-2">
+                  <small className="text-muted">
+                    +{notifications.length - 3} more notifications
+                  </small>
+                </div>
+              )}
+            </div>
+          </div>
+        )} */}
 
         {/* Stats Cards */}
         {stats && (
@@ -217,6 +424,7 @@ export default function EmployeeDashboard() {
                       <table className="table table-hover table-sm">
                         <thead className="sticky-top bg-light">
                           <tr>
+                            <th>ID</th>
                             <th>Priority</th>
                             <th>Status</th>
                             <th>Assigned To</th>
@@ -226,6 +434,9 @@ export default function EmployeeDashboard() {
                         <tbody>
                           {myCreatedProblems.slice(0, 10).reverse().map(problem => (
                             <tr key={problem.id}>
+                              <td>
+                                <code>#{problem.id}</code>
+                              </td>
                               <td>
                                 <span className={`badge ${
                                   problem.priority === 'High' ? 'bg-danger' :
@@ -243,8 +454,8 @@ export default function EmployeeDashboard() {
                                 </span>
                               </td>
                               <td>
-                                {problem.assignedTo ? (
-                                  <span className="badge bg-info">{problem.assignedTo}</span>
+                                {problem.assignedToName ? (
+                                  <span className="badge bg-info">{problem.assignedToName}</span>
                                 ) : (
                                   <span className="badge bg-secondary">Not Assigned</span>
                                 )}
@@ -276,7 +487,12 @@ export default function EmployeeDashboard() {
           <div className="col-lg-6 mb-4">
             <div className="card shadow h-100">
               <div className="card-header bg-warning text-dark">
-                <h4 className="mb-0">Work Assigned to Me</h4>
+                <h4 className="mb-0">
+                  Work Assigned to Me 
+                  {/* {assignedProblems.length > 0 && (
+                    <span className="badge bg-danger ms-2">{assignedProblems.length}</span>
+                  )} */}
+                </h4>
                 <small>Problems I need to solve</small>
               </div>
               <div className="card-body">
@@ -291,6 +507,7 @@ export default function EmployeeDashboard() {
                     <table className="table table-hover table-sm">
                       <thead className="sticky-top bg-light">
                         <tr>
+                          <th>ID</th>
                           <th>Department</th>
                           <th>Priority</th>
                           <th>Status</th>
@@ -300,6 +517,9 @@ export default function EmployeeDashboard() {
                       <tbody>
                         {assignedProblems.slice(0, 10).reverse().map(problem => (
                           <tr key={problem.id}>
+                            <td>
+                              <code>#{problem.id}</code>
+                            </td>
                             <td>{problem.department}</td>
                             <td>
                               <span className={`badge ${

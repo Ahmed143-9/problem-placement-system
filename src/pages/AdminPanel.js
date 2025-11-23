@@ -375,78 +375,87 @@ export default function AdminPanelUserManagement() {
 
   // Handle Save User with Notification
   const handleSaveUser = async () => {
-    if (!isAdmin) return toast.error('Only Admin can add or edit users!');
-    if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
+  if (!isAdmin) return toast.error('Only Admin can add or edit users!');
+  if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
 
-    if (!editingUser) {
-      if (!formData.password) return toast.error('Password is required');
-      if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
+  // 🔥 Password validation শুধু new user এর জন্য
+  if (!editingUser) {
+    if (!formData.password) return toast.error('Password is required for new user');
+    if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
+  }
+
+  // 🔥 Edit mode এ password blank হলে remove করুন request থেকে
+  const submitData = { ...formData };
+  if (editingUser && !submitData.password) {
+    delete submitData.password; // 🔥 Password field remove করুন যদি blank থাকে
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
+    const method = editingUser ? 'PUT' : 'POST';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const response = await fetch(url, {
+      method: method,
+      headers: headers,
+      body: JSON.stringify(submitData), // 🔥 Updated data use করুন
+    });
+
+    const responseText = await response.text();
+    console.log('🟡 RAW RESPONSE:', responseText);
+
+    let data;
     try {
-      const token = localStorage.getItem('token');
-      const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
-      const method = editingUser ? 'PUT' : 'POST';
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, {
-        method: method,
-        headers: headers,
-        body: JSON.stringify(formData),
-      });
-
-      const responseText = await response.text();
-      console.log('🟡 RAW RESPONSE:', responseText);
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('🔴 JSON PARSE ERROR:', parseError);
-        throw new Error('Server returned invalid JSON');
-      }
-
-      console.log('🟢 PARSED RESPONSE:', data);
-
-      if (data.success) {
-        // Send notification for user creation/update
-        if (editingUser) {
-          sendUserUpdateNotification(editingUser, formData);
-        } else {
-          sendUserCreationNotification(formData);
-        }
-
-        toast.success(data.message);
-        setFormData({
-          name: '',
-          username: '',
-          email: '',
-          password: '',
-          role: 'user',
-          department: '',
-          status: 'active'
-        });
-        setShowAddModal(false);
-        setEditingUser(null);
-        loadUsers();
-        
-      } else {
-        console.error('🔴 BACKEND ERROR:', data);
-        toast.error(data.error || 'Failed to save user');
-      }
-    } catch (error) {
-      console.error('🔴 SAVE USER ERROR:', error);
-      toast.error(error.message || 'Failed to save user');
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('🔴 JSON PARSE ERROR:', parseError);
+      throw new Error('Server returned invalid JSON');
     }
-  };
+
+    console.log('🟢 PARSED RESPONSE:', data);
+
+    if (data.success) {
+      // Send notification for user creation/update
+      if (editingUser) {
+        sendUserUpdateNotification(editingUser, formData);
+        toast.success('User updated successfully!');
+      } else {
+        sendUserCreationNotification(formData);
+        toast.success('User created successfully!');
+      }
+
+      setFormData({
+        name: '',
+        username: '',
+        email: '',
+        password: '',
+        role: 'user',
+        department: '',
+        status: 'active'
+      });
+      setShowAddModal(false);
+      setEditingUser(null);
+      setShowPassword(false); // 🔥 Reset password visibility
+      loadUsers();
+      
+    } else {
+      console.error('🔴 BACKEND ERROR:', data);
+      toast.error(data.error || 'Failed to save user');
+    }
+  } catch (error) {
+    console.error('🔴 SAVE USER ERROR:', error);
+    toast.error(error.message || 'Failed to save user');
+  }
+};
 
   // Send Notification for User Creation
   const sendUserCreationNotification = (userData) => {
@@ -503,22 +512,23 @@ export default function AdminPanelUserManagement() {
 
   // Handle Edit User
   const handleEditUser = userId => {
-    if (!isAdmin) return toast.error('Only Admin can edit users!');
-    const userToEdit = users.find(u => u.id === userId);
-    if (userToEdit) {
-      setEditingUser(userToEdit);
-      setFormData({
-        name: userToEdit.name,
-        username: userToEdit.username,
-        email: userToEdit.email,
-        password: '',
-        role: userToEdit.role,
-        department: userToEdit.department,
-        status: userToEdit.status
-      });
-      setShowAddModal(true);
-    }
-  };
+  if (!isAdmin) return toast.error('Only Admin can edit users!');
+  const userToEdit = users.find(u => u.id === userId);
+  if (userToEdit) {
+    setEditingUser(userToEdit);
+    setFormData({
+      name: userToEdit.name,
+      username: userToEdit.username,
+      email: userToEdit.email,
+      password: '', // 🔥 Password blank রাখুন (security reason)
+      role: userToEdit.role,
+      department: userToEdit.department,
+      status: userToEdit.status
+    });
+    setShowAddModal(true);
+    setShowPassword(false); // 🔥 Reset password visibility
+  }
+};
 
   // Handle Delete User with Notification
   const handleDeleteUser = async userId => {
@@ -1343,41 +1353,60 @@ export default function AdminPanelUserManagement() {
                   </div>
 
                   <div className="col-md-6 position-relative">
-                    <label className="form-label fw-semibold">
-                      <FaKey className="me-1" /> 
-                      Password * 
-                      {editingUser && <small className="text-muted"> (Leave blank to keep current)</small>}
-                    </label>
-                    <input 
-                      type={showPassword ? 'text' : 'password'} 
-                      className="form-control" 
-                      name="password" 
-                      value={formData.password} 
-                      onChange={handleInputChange}
-                      onFocus={() => setShowPasswordRequirements(true)}
-                      onBlur={() => setShowPasswordRequirements(false)}
-                      placeholder="8+ chars, 1 uppercase, 1 number, 1 special char" 
-                    />
-                    <span 
-                      className="position-absolute top-50 end-0 translate-middle-y me-3" 
-                      style={{cursor:'pointer', marginTop: '12px'}} 
-                      onClick={() => setShowPassword(prev => !prev)}
-                    >
-                      {showPassword ? <FaEye /> : <FaEyeSlash />}
-                    </span>
-                    
-                    {showPasswordRequirements && (
-                      <div className="form-text">
-                        Password must contain:
-                        <ul className="small mb-0">
-                          <li>At least 8 characters</li>
-                          <li>1 uppercase letter</li>
-                          <li>1 number</li>
-                          <li>1 special character (@$!%*?&)</li>
-                        </ul>
+                      <label className="form-label fw-semibold">
+                        <FaKey className="me-1" /> 
+                        Password 
+                        {editingUser ? (
+                          <small className="text-muted"> (Leave blank to keep current password)</small>
+                        ) : (
+                          <span className="text-danger"> *</span>
+                        )}
+                      </label>
+                      
+                      <div className="input-group">
+                        <input 
+                          type={showPassword ? 'text' : 'password'} 
+                          className="form-control" 
+                          name="password" 
+                          value={formData.password} 
+                          onChange={handleInputChange}
+                          onFocus={() => setShowPasswordRequirements(true)}
+                          onBlur={() => setShowPasswordRequirements(false)}
+                          placeholder={
+                            editingUser 
+                              ? "Leave blank to keep current password" 
+                              : "8+ chars, 1 uppercase, 1 number, 1 special char"
+                          } 
+                        />
+                        <button 
+                          className="btn btn-outline-secondary"
+                          type="button"
+                          onClick={() => setShowPassword(prev => !prev)}
+                          title={showPassword ? "Hide Password" : "Show Password"}
+                        >
+                          {showPassword ? <FaEye /> : <FaEyeSlash />}
+                        </button>
                       </div>
-                    )}
-                  </div>
+                      
+                      {editingUser && formData.password && (
+                        <div className="form-text text-warning">
+                          <FaInfoCircle className="me-1" />
+                          New password will replace the current one
+                        </div>
+                      )}
+                      
+                      {showPasswordRequirements && !editingUser && (
+                        <div className="form-text">
+                          Password must contain:
+                          <ul className="small mb-0">
+                            <li>At least 8 characters</li>
+                            <li>1 uppercase letter</li>
+                            <li>1 number</li>
+                            <li>1 special character (@$!%*?&)</li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
 
                   <div className="col-md-6">
                     <label className="form-label fw-semibold">Role *</label>
