@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { FaChevronLeft, FaChevronRight, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaArrowLeft, FaTimes, FaClock, FaExchangeAlt, FaComments, FaPaperPlane } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaArrowLeft, FaTimes, FaClock, FaExchangeAlt, FaComments, FaPaperPlane, FaUser, FaBan } from 'react-icons/fa';
 
 export default function ProblemDetails() {
   const { id } = useParams();
   const { user } = useAuth();
-  const { notifyStatusChange, notifyCompletion } = useNotifications();
+  const { notifyStatusChange, notifyCompletion, notifyDiscussionComment, notifySolutionComment } = useNotifications();
   const navigate = useNavigate();
 
   const [problem, setProblem] = useState(null);
@@ -21,6 +21,9 @@ export default function ProblemDetails() {
   const [showSolutionComment, setShowSolutionComment] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [rightSidebarMinimized, setRightSidebarMinimized] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTo, setTransferTo] = useState('');
+  const [transferring, setTransferring] = useState(false);
 
   useEffect(() => {
     fetchProblemDetails();
@@ -49,6 +52,100 @@ export default function ProblemDetails() {
     const users = JSON.parse(localStorage.getItem('system_users') || '[]');
     const user = users.find(u => u.id === userId || u.name === userId);
     return user ? user.name : userId;
+  };
+
+  // ✅ Check if current user can transfer this problem
+  const canTransferProblem = () => {
+    if (!problem || !user) return false;
+    
+    // Admin and Team Leaders can always transfer
+    if (user.role === 'admin' || user.role === 'team_leader') {
+      return true;
+    }
+    
+    // Regular users cannot transfer problems they created
+    // They can only work on assigned problems
+    if (user.role === 'user' && problem.createdBy === user.name) {
+      return false;
+    }
+    
+    return false;
+  };
+
+  // ✅ Handle problem transfer
+  const handleTransferProblem = async () => {
+    if (!transferTo) {
+      toast.error('Please select a user to transfer to');
+      return;
+    }
+
+    // ✅ Prevent transferring to the problem creator
+    if (transferTo === problem.createdBy) {
+      toast.error('Cannot transfer problem to the person who created it');
+      return;
+    }
+
+    setTransferring(true);
+    try {
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+      
+      const targetUser = users.find(u => u.id === parseInt(transferTo) || u.name === transferTo);
+      if (!targetUser) {
+        toast.error('Selected user not found');
+        return;
+      }
+
+      const updatedProblems = problems.map(p => {
+        if (p.id === parseInt(id)) {
+          const transferRecord = {
+            from: problem.assignedTo || 'Unassigned',
+            to: targetUser.name,
+            by: user.name,
+            date: new Date().toISOString(),
+            reason: comment.trim() || 'No reason provided'
+          };
+
+          return {
+            ...p,
+            assignedTo: targetUser.name,
+            transferHistory: [...(p.transferHistory || []), transferRecord],
+            status: 'pending', // Reset status when transferred
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        return p;
+      });
+
+      localStorage.setItem('problems', JSON.stringify(updatedProblems));
+
+      // Send notification to the new assigned user
+      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const notification = {
+        id: Date.now(),
+        userId: targetUser.id,
+        userName: targetUser.name,
+        type: 'problem_assigned',
+        title: '🔀 Problem Transferred to You',
+        message: `Problem #${problem.id} has been transferred to you by ${user.name}`,
+        problemId: problem.id,
+        isRead: false,
+        createdAt: new Date().toISOString()
+      };
+      notifications.push(notification);
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      toast.success(`Problem transferred to ${targetUser.name} successfully!`);
+      setShowTransferModal(false);
+      setTransferTo('');
+      setComment('');
+      fetchProblemDetails();
+    } catch (error) {
+      toast.error('Failed to transfer problem');
+      console.error(error);
+    } finally {
+      setTransferring(false);
+    }
   };
 
   // Calculate duration between two dates
@@ -116,6 +213,16 @@ export default function ProblemDetails() {
               type: 'solution'
             };
             updatedProblem.comments = [...(p.comments || []), newComment];
+
+            // 🔥 SEND SOLUTION NOTIFICATION
+            if (notifySolutionComment) {
+              notifySolutionComment(
+                p.id,
+                user?.name,
+                comment.trim(),
+                updatedProblem
+              );
+            }
           }
 
           return updatedProblem;
@@ -254,10 +361,23 @@ export default function ProblemDetails() {
             }),
             type: 'general'
           };
-          return { 
+          
+          const updatedProblem = { 
             ...p, 
             comments: [...(p.comments || []), newComment] 
           };
+
+          // 🔥 SEND DISCUSSION NOTIFICATION
+          if (notifyDiscussionComment) {
+            notifyDiscussionComment(
+              p.id, 
+              user?.name, 
+              comment.trim(),
+              updatedProblem
+            );
+          }
+
+          return updatedProblem;
         }
         return p;
       });
@@ -350,6 +470,17 @@ export default function ProblemDetails() {
     ? calculateDuration(problem.createdAt, problem.resolvedAt)
     : null;
 
+  // Get active users for transfer (excluding problem creator)
+  const getAvailableUsersForTransfer = () => {
+    const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+    return users.filter(u => 
+      u.status === 'active' && 
+      u.name !== problem?.createdBy && // Exclude problem creator
+      u.name !== problem?.assignedTo && // Exclude current assignee
+      (u.role === 'user' || u.role === 'team_leader') // Only regular users and team leaders
+    );
+  };
+
   if (loading) {
     return (
       <div>
@@ -418,9 +549,10 @@ export default function ProblemDetails() {
               </h5>
             )}
             <ul className="nav flex-column">
+              {/* Dashboard Link - Conditional */}
               <li className="nav-item mb-2">
-                <a 
-                  href="/dashboard" 
+                <Link 
+                  to={user?.role === 'admin' || user?.role === 'team_leader' ? "/dashboard" : "/employee-dashboard"} 
                   className="nav-link text-white rounded d-flex align-items-center"
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
@@ -428,11 +560,13 @@ export default function ProblemDetails() {
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
-                </a>
+                </Link>
               </li>
+              
+              {/* Create Problem Link */}
               <li className="nav-item mb-2">
-                <a 
-                  href="/problem/create" 
+                <Link 
+                  to="/problem/create" 
                   className="nav-link text-white rounded d-flex align-items-center"
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
@@ -440,21 +574,29 @@ export default function ProblemDetails() {
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
-                </a>
+                </Link>
               </li>
+              
+              {/* All Problems Link - Conditional */}
               <li className="nav-item mb-2">
-                <a 
-                  href="/problems" 
+                <Link 
+                  to={user?.role === 'admin' || user?.role === 'team_leader' ? "/problems" : "/employee-dashboard"} 
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
-                  title="All Problems"
+                  title={user?.role === 'admin' || user?.role === 'team_leader' ? "All Problems" : "Employee Dashboard"}
                 >
                   <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-                </a>
+                  {!sidebarMinimized && (
+                    <span className="ms-2" style={{ fontSize: '0.9rem' }}>
+                      {user?.role === 'admin' || user?.role === 'team_leader' ? "All Problems" : "All Problems"}
+                    </span>
+                  )}
+                </Link>
               </li>
+              
+              {/* Reports Link */}
               <li className="nav-item mb-2">
-                <a 
-                  href="/reports" 
+                <Link 
+                  to="/reports" 
                   className="nav-link text-white rounded d-flex align-items-center"
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
@@ -462,12 +604,14 @@ export default function ProblemDetails() {
                 >
                   <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
-                </a>
+                </Link>
               </li>
+              
+              {/* Admin Panel Link - Only for Admin/Team Leader */}
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <li className="nav-item mb-2">
-                  <a 
-                    href="/admin" 
+                  <Link 
+                    to="/admin" 
                     className="nav-link text-white rounded d-flex align-items-center"
                     onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                     onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
@@ -475,7 +619,7 @@ export default function ProblemDetails() {
                   >
                     <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
-                </a>
+                  </Link>
                 </li>
               )}
             </ul>
@@ -499,11 +643,33 @@ export default function ProblemDetails() {
                     <h5 className="mb-0" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
                       Problem #{problem.id}
                     </h5>
-                    {canDelete() && (
-                      <button className="btn btn-danger btn-sm" onClick={handleDelete} style={{ fontSize: '0.85rem' }}>
-                        🗑 Delete
-                      </button>
-                    )}
+                    <div className="d-flex gap-2">
+                      {/* Transfer Button - Only show if user can transfer */}
+                      {canTransferProblem() && problem.status !== 'done' && (
+                        <button 
+                          className="btn btn-warning btn-sm"
+                          onClick={() => setShowTransferModal(true)}
+                          title="Transfer Problem"
+                        >
+                          <FaExchangeAlt className="me-1" />
+                          Transfer
+                        </button>
+                      )}
+                      
+                      {/* Transfer Restriction Notice for Problem Creator */}
+                      {user?.role === 'user' && problem.createdBy === user.name && (
+                        <span className="badge bg-secondary" title="You cannot transfer problems you created">
+                          <FaBan className="me-1" />
+                          No Transfer
+                        </span>
+                      )}
+                      
+                      {canDelete() && (
+                        <button className="btn btn-danger btn-sm" onClick={handleDelete}>
+                          🗑 Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="card-body" style={{ padding: '1.5rem' }}>
                     {/* Pending Approval Alert */}
@@ -683,14 +849,24 @@ export default function ProblemDetails() {
                       <div className="col-md-6">
                         <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
                           <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Created By</small>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#495057' }}>{problem.createdBy}</div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#495057' }}>
+                            {problem.createdBy}
+                            {problem.createdBy === user?.name && (
+                              <span className="badge bg-info ms-1" style={{ fontSize: '0.6rem' }}>YOU</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="col-md-6">
                         <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
                           <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned To</small>
                           {problem.assignedTo ? (
-                            <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>{getUserName(problem.assignedTo)}</span>
+                            <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                              {getUserName(problem.assignedTo)}
+                              {problem.assignedTo === user?.name && (
+                                <span className="badge bg-light text-dark ms-1" style={{ fontSize: '0.6rem' }}>YOU</span>
+                              )}
+                            </span>
                           ) : (
                             <span className="text-muted" style={{ fontSize: '0.85rem' }}>Not assigned yet</span>
                           )}
@@ -784,13 +960,6 @@ export default function ProblemDetails() {
                         <FaComments className="me-2" />
                         Activity & Discussion
                       </h5>
-                      {/* <button 
-                        className="btn btn-sm btn-outline-light"
-                        onClick={toggleRightSidebar}
-                        title="Minimize sidebar"
-                      >
-                        <FaChevronRight size={12} />
-                      </button> */}
                     </div>
                     <div className="card-body p-0">
                       {/* Resolution Duration */}
@@ -989,6 +1158,107 @@ export default function ProblemDetails() {
                 borderRadius: '10px'
               }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Problem Modal */}
+      {showTransferModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning text-dark">
+                <h5 className="modal-title">
+                  <FaExchangeAlt className="me-2" />
+                  Transfer Problem
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => {
+                    setShowTransferModal(false);
+                    setTransferTo('');
+                    setComment('');
+                  }}
+                  disabled={transferring}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  <strong>Transfer Rules:</strong>
+                  <ul className="mb-0 small">
+                    <li>You cannot transfer problems to the person who created it</li>
+                    <li>Only Admin and Team Leaders can transfer problems</li>
+                    <li>Problem status will be reset to "Pending" after transfer</li>
+                  </ul>
+                </div>
+                
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Transfer To:</label>
+                  <select
+                    className="form-control"
+                    value={transferTo}
+                    onChange={(e) => setTransferTo(e.target.value)}
+                    disabled={transferring}
+                  >
+                    <option value="">-- Select User --</option>
+                    {getAvailableUsersForTransfer().map(user => (
+                      <option key={user.id} value={user.name}>
+                        {user.name} ({user.role === 'team_leader' ? 'Team Leader' : 'User'}) - {user.department}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-muted">
+                    Available users for transfer (excluding problem creator)
+                  </small>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Transfer Reason (Optional):</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Explain why you are transferring this problem..."
+                    disabled={transferring}
+                  ></textarea>
+                </div>
+
+                <div className="d-flex gap-2 mt-4">
+                  <button 
+                    className="btn btn-warning flex-grow-1"
+                    onClick={handleTransferProblem}
+                    disabled={!transferTo || transferring}
+                  >
+                    {transferring ? (
+                      <>
+                        <div className="spinner-border spinner-border-sm me-2" role="status">
+                          <span className="visually-hidden">Transferring...</span>
+                        </div>
+                        Transferring...
+                      </>
+                    ) : (
+                      <>
+                        <FaExchangeAlt className="me-2" />
+                        Transfer Problem
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowTransferModal(false);
+                      setTransferTo('');
+                      setComment('');
+                    }}
+                    disabled={transferring}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

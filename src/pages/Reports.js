@@ -1,9 +1,12 @@
+// src/pages/Reports.js - Fixed Code
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
 import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaDownload, FaPrint, FaFilter, FaCalendarAlt, FaEnvelope, FaFilePdf } from 'react-icons/fa';
+
 export default function Reports() {
   const { user } = useAuth();
   const [problems, setProblems] = useState([]);
@@ -11,6 +14,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [users, setUsers] = useState([]); // ✅ Users state added
 
   // Filter states - SMS Log Style
   const [filters, setFilters] = useState({
@@ -22,6 +26,37 @@ export default function Reports() {
     startDate: '',
     endDate: ''
   });
+
+  // ✅ Load users from localStorage for name resolution
+  useEffect(() => {
+    const loadUsers = () => {
+      try {
+        const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
+        setUsers(storedUsers);
+        console.log('✅ Users loaded for name resolution:', storedUsers.length);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+      }
+    };
+
+    loadUsers();
+  }, []);
+
+  // ✅ Function to get user name by ID
+  const getUserNameById = (userId) => {
+    if (!userId) return 'Unassigned';
+    
+    const foundUser = users.find(u => u.id === userId || u.id == userId);
+    return foundUser ? foundUser.name : `User#${userId}`;
+  };
+
+  // ✅ Function to get user name by username/email (for createdBy field)
+  const getUserNameByUsername = (username) => {
+    if (!username) return 'Unknown';
+    
+    const foundUser = users.find(u => u.username === username || u.email === username);
+    return foundUser ? foundUser.name : username;
+  };
 
   // Helper functions for the report
   const calculateDuration = (createdAt) => {
@@ -60,8 +95,10 @@ export default function Reports() {
   };
 
   const getSolvingTeam = (problem) => {
+    // ✅ Use user name instead of ID
     if (problem.assignedTo) {
-      return `${problem.assignedTo}'s Team`;
+      const assignedUserName = getUserNameById(problem.assignedTo);
+      return `${assignedUserName}'s Team`;
     }
     
     if (problem.department === 'IT & Innovation') {
@@ -84,9 +121,12 @@ export default function Reports() {
     return teamLeaders[department] || 'Department Team Leader';
   };
 
-const downloadPDFReport = (problem) => {
-  // Create a simple text version that can be printed as PDF
-  const pdfContent = `
+  const downloadPDFReport = (problem) => {
+    // ✅ Use user names in PDF report
+    const assignedUserName = getUserNameById(problem.assignedTo);
+    const createdByName = getUserNameByUsername(problem.createdBy);
+    
+    const pdfContent = `
 PROBLEM RESOLUTION REPORT
 =========================
 
@@ -101,8 +141,8 @@ TICKET INFORMATION:
 
 TEAM INFORMATION:
 ────────────────
-• Reported By: ${problem.createdBy}
-• Assigned To: ${problem.assignedTo || 'Unassigned'}
+• Reported By: ${createdByName}
+• Assigned To: ${assignedUserName}
 • Solving Team: ${getSolvingTeam(problem)}
 • Team Leader: ${getTeamLeader(problem.department)}
 
@@ -120,65 +160,18 @@ ADDITIONAL INFORMATION:
 ──────────────────────
 Official Problem Management System
 This is an automatically generated report.
-  `.trim();
+    `.trim();
 
-  // Create and download text file (User can print as PDF)
-  const blob = new Blob([pdfContent], { type: 'text/plain' });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `problem-report-${String(problem.id).padStart(5, '0')}.txt`;
-  link.click();
-  window.URL.revokeObjectURL(url);
-  
-  toast.success('Report downloaded! Print it as PDF from your text editor.');
-};
-
- const downloadReport = (problem) => {
-  // Create a simple text version for PDF
-  const pdfContent = `
-PROBLEM RESOLUTION REPORT
-=========================
-
-TICKET INFORMATION:
-• Ticket Number: #${String(problem.id).padStart(5, '0')}
-• Department: ${problem.department}
-• Priority: ${problem.priority}
-• Status: ${problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
-
-TEAM INFORMATION:
-• Reported By: ${problem.createdBy}
-• Assigned To: ${problem.assignedTo || 'Unassigned'}
-• Solving Team: ${getSolvingTeam(problem)}
-• Team Leader: ${getTeamLeader(problem.department)}
-
-PROBLEM DESCRIPTION:
-${problem.statement || problem.description || 'No detailed description provided.'}
-
-TIMELINE:
-• Created Date: ${new Date(problem.createdAt).toLocaleDateString('en-BD')}
-• Created Time: ${new Date(problem.createdAt).toLocaleTimeString('en-BD')}
-• Problem Type: ${getProblemType(problem)}
-• Resolution Duration: ${calculateDuration(problem.createdAt)}
-
-ADDITIONAL INFORMATION:
-• Report Generated: ${new Date().toLocaleString('en-BD')}
-• Generated By: ${user?.name || 'System'}
-
----
-Official Problem Management System
-  `.trim();
-
-  const blob = new Blob([pdfContent], { type: 'text/plain' });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `problem-report-${String(problem.id).padStart(5, '0')}.txt`;
-  link.click();
-  window.URL.revokeObjectURL(url);
-  
-  toast.success('Report downloaded as text file!');
-};
+    const blob = new Blob([pdfContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `problem-report-${String(problem.id).padStart(5, '0')}.txt`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('Report downloaded! Print it as PDF from your text editor.');
+  };
 
   const getResolutionDate = (problem) => {
     if (problem.status === 'done' && problem.actionHistory) {
@@ -209,7 +202,7 @@ Official Problem Management System
         filteredProblems = storedProblems;
       } else {
         filteredProblems = storedProblems.filter(p => 
-          p.createdBy === user?.name || p.assignedTo === user?.name
+          p.createdBy === user?.name || p.assignedTo === user?.id
         );
       }
       
@@ -239,15 +232,17 @@ Official Problem Management System
     }
 
     if (filters.createdBy) {
-      filtered = filtered.filter(problem => 
-        problem.createdBy?.toLowerCase().includes(filters.createdBy.toLowerCase())
-      );
+      filtered = filtered.filter(problem => {
+        const createdByName = getUserNameByUsername(problem.createdBy);
+        return createdByName.toLowerCase().includes(filters.createdBy.toLowerCase());
+      });
     }
 
     if (filters.assignedTo) {
-      filtered = filtered.filter(problem => 
-        problem.assignedTo?.toLowerCase().includes(filters.assignedTo.toLowerCase())
-      );
+      filtered = filtered.filter(problem => {
+        const assignedUserName = getUserNameById(problem.assignedTo);
+        return assignedUserName.toLowerCase().includes(filters.assignedTo.toLowerCase());
+      });
     }
 
     if (filters.startDate) {
@@ -295,7 +290,7 @@ Official Problem Management System
     }, 500);
   };
 
-  // ✅ FIXED: CSV export function - শুধুমাত্র filtered problems export করবে
+  // ✅ FIXED: CSV export function - Now shows names instead of IDs
   const exportToCSV = () => {
     if (filteredProblems.length === 0) {
       toast.warning('No data to export');
@@ -303,13 +298,14 @@ Official Problem Management System
     }
 
     const headers = ['Problem ID', 'Department', 'Priority', 'Status', 'Created By', 'Assigned To', 'Created Date', 'Problem Statement'];
+    
     const csvData = filteredProblems.map(problem => [
       String(problem.id).padStart(5, '0'),
       problem.department,
       problem.priority,
       problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase(),
-      problem.createdBy,
-      problem.assignedTo || 'Unassigned',
+      getUserNameByUsername(problem.createdBy), // ✅ Show name instead of username
+      getUserNameById(problem.assignedTo), // ✅ Show name instead of ID
       new Date(problem.createdAt).toLocaleDateString(),
       problem.statement || problem.description || ''
     ]);
@@ -329,10 +325,10 @@ Official Problem Management System
     toast.success(`CSV exported successfully! (${filteredProblems.length} records)`);
   };
 
-  // Get unique values for dropdowns
+  // ✅ Get unique values for dropdowns - Now using names
   const departments = [...new Set(problems.map(p => p.department))].filter(Boolean);
-  const creators = [...new Set(problems.map(p => p.createdBy))].filter(Boolean);
-  const assignees = [...new Set(problems.map(p => p.assignedTo))].filter(Boolean);
+  const creators = [...new Set(problems.map(p => getUserNameByUsername(p.createdBy)))].filter(Boolean);
+  const assignees = [...new Set(problems.map(p => getUserNameById(p.assignedTo)))].filter(Boolean);
 
   const sidebarLinkStyle = {
     transition: 'all 0.2s ease'
@@ -624,41 +620,33 @@ Official Problem Management System
                           title="End Date"
                         />
                         <small className="text-muted">End</small>
-
-                        
                       </div>
-                      
                     </div>
-
-                    
                   </div>
 
                   <div className="col-md-12 col-lg-2 d-flex align-items-center mt-4">
-                      <button 
-                        className="btn btn-outline-secondary w-100"
-                        onClick={resetFilters}
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                          border: '1px solid rgba(108, 117, 125, 0.3)',
-                          color: '#6c757d',
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)';
-                          e.target.style.borderColor = 'rgba(108, 117, 125, 0.5)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                          e.target.style.borderColor = 'rgba(108, 117, 125, 0.3)';
-                        }}
-                      >
-                         Reset Filters
-                      </button>
-                    </div>
-
-                  {/* Action Buttons */}
-                  
+                    <button 
+                      className="btn btn-outline-secondary w-100"
+                      onClick={resetFilters}
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(108, 117, 125, 0.3)',
+                        color: '#6c757d',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)';
+                        e.target.style.borderColor = 'rgba(108, 117, 125, 0.5)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                        e.target.style.borderColor = 'rgba(108, 117, 125, 0.3)';
+                      }}
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -679,82 +667,84 @@ Official Problem Management System
                       </tr>
                     </thead>
                     <tbody>
-  {filteredProblems.length === 0 ? (
-    <tr>
-      <td colSpan="8" className="text-center py-5">
-        <div className="py-4">
-          <FaFileAlt size={48} className="text-muted mb-3" />
-          <p className="text-muted mb-3">No problems found matching your filters</p>
-          <button className="btn btn-primary me-2" onClick={resetFilters}>
-            Reset Filters
-          </button>
-          <Link to="/problem/create" className="btn btn-outline-primary">
-            <FaPlusCircle className="me-2" />
-            Create New Problem
-          </Link>
-        </div>
-      </td>
-    </tr>
-  ) : (
-    filteredProblems.map(problem => (
-      <tr key={problem.id} className="align-middle">
-        <td className="fw-bold">#{String(problem.id).padStart(5, '0')}</td>
-        <td>
-          <span className="fw-semibold">{problem.department}</span>
-        </td>
-        <td>
-          <span className={`badge ${problem.priority === 'High' ? 'bg-danger' : problem.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-success'}`}>
-            {problem.priority === 'High' ? '🔴 ' : problem.priority === 'Medium' ? '🟡 ' : '🟢 '}
-            {problem.priority}
-          </span>
-        </td>
-        <td>
-          <span className={`badge ${problem.status === 'pending' ? 'bg-warning text-dark' : problem.status === 'in_progress' ? 'bg-info' : problem.status === 'done' ? 'bg-success' : 'bg-secondary'}`}>
-            {problem.status === 'pending_approval' ? ' PENDING APPROVAL' : 
-             problem.status === 'pending' ? ' PENDING' :
-             problem.status === 'in_progress' ? 'IN PROGRESS' :
-             'SOLVED'}
-          </span>
-        </td>
-        <td>
-          <span className="fw-semibold">{problem.createdBy}</span>
-        </td>
-        <td>
-          {problem.assignedTo ? (
-            <span className="badge bg-info text-white">
-              {problem.assignedTo}
-            </span>
-          ) : (
-            <span className="badge bg-secondary">UNASSIGNED</span>
-          )}
-        </td>
-        <td>
-          <span className="text-nowrap">
-            {new Date(problem.createdAt).toLocaleDateString('en-BD')}
-          </span>
-        </td>
-        <td style={{ textAlign: 'center' }}>
-          <div className="btn-group btn-group-sm" role="group">
-            <button 
-              className="btn btn-outline-primary btn-sm"
-              onClick={() => generateReport(problem)}
-              title="Print Report"
-            >
-              <FaPrint />
-            </button>
-            <button 
-              className="btn btn-outline-success btn-sm"
-              onClick={() => downloadPDFReport(problem)}
-              title="Download PDF"
-            >
-              <FaFilePdf />
-            </button>
-          </div>
-        </td>
-      </tr>
-    ))
-  )}
-</tbody>
+                      {filteredProblems.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="text-center py-5">
+                            <div className="py-4">
+                              <FaFileAlt size={48} className="text-muted mb-3" />
+                              <p className="text-muted mb-3">No problems found matching your filters</p>
+                              <button className="btn btn-primary me-2" onClick={resetFilters}>
+                                Reset Filters
+                              </button>
+                              <Link to="/problem/create" className="btn btn-outline-primary">
+                                <FaPlusCircle className="me-2" />
+                                Create New Problem
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredProblems.map(problem => (
+                          <tr key={problem.id} className="align-middle">
+                            <td className="fw-bold">#{String(problem.id).padStart(5, '0')}</td>
+                            <td>
+                              <span className="fw-semibold">{problem.department}</span>
+                            </td>
+                            <td>
+                              <span className={`badge ${problem.priority === 'High' ? 'bg-danger' : problem.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-success'}`}>
+                                {problem.priority === 'High' ? '🔴 ' : problem.priority === 'Medium' ? '🟡 ' : '🟢 '}
+                                {problem.priority}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`badge ${problem.status === 'pending' ? 'bg-warning text-dark' : problem.status === 'in_progress' ? 'bg-info' : problem.status === 'done' ? 'bg-success' : 'bg-secondary'}`}>
+                                {problem.status === 'pending_approval' ? ' PENDING APPROVAL' : 
+                                problem.status === 'pending' ? ' PENDING' :
+                                problem.status === 'in_progress' ? 'IN PROGRESS' :
+                                'SOLVED'}
+                              </span>
+                            </td>
+                            <td>
+                              {/* ✅ Show user name instead of username */}
+                              <span className="fw-semibold">{getUserNameByUsername(problem.createdBy)}</span>
+                            </td>
+                            <td>
+                              {/* ✅ Show user name instead of ID */}
+                              {problem.assignedTo ? (
+                                <span className="badge bg-info text-white">
+                                  {getUserNameById(problem.assignedTo)}
+                                </span>
+                              ) : (
+                                <span className="badge bg-secondary">UNASSIGNED</span>
+                              )}
+                            </td>
+                            <td>
+                              <span className="text-nowrap">
+                                {new Date(problem.createdAt).toLocaleDateString('en-BD')}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div className="btn-group btn-group-sm" role="group">
+                                <button 
+                                  className="btn btn-outline-primary btn-sm"
+                                  onClick={() => generateReport(problem)}
+                                  title="Print Report"
+                                >
+                                  <FaPrint />
+                                </button>
+                                <button 
+                                  className="btn btn-outline-success btn-sm"
+                                  onClick={() => downloadPDFReport(problem)}
+                                  title="Download PDF"
+                                >
+                                  <FaFilePdf />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
                   </table>
                 </div>
               </div>
@@ -764,7 +754,7 @@ Official Problem Management System
       </div>
 
       {/* Printable Report Section */}
-     {selectedProblem && (
+      {selectedProblem && (
         <div className="print-only" style={{ display: 'none' }}>
           <div style={{ 
             maxWidth: '190mm',
@@ -909,12 +899,14 @@ Official Problem Management System
                     <tbody>
                       <tr>
                         <td style={{ width: '40%', fontWeight: 'bold', padding: '2px 0' }}>Reported By:</td>
-                        <td>{selectedProblem.createdBy}</td>
+                        {/* ✅ Show name in printable report */}
+                        <td>{getUserNameByUsername(selectedProblem.createdBy)}</td>
                       </tr>
                       <tr>
                         <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Assigned To:</td>
+                        {/* ✅ Show name in printable report */}
                         <td>
-                          {selectedProblem.assignedTo || 'Unassigned'}
+                          {getUserNameById(selectedProblem.assignedTo) || 'Unassigned'}
                         </td>
                       </tr>
                       <tr>

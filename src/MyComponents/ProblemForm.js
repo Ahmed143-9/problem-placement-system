@@ -1,10 +1,10 @@
-// ProblemForm.js - COMPLETE FIXED CODE WITH MANUAL ASSIGNMENT
+// ProblemForm.js - COMPLETE FIXED CODE WITH CREATOR PROTECTION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaUserPlus } from 'react-icons/fa';
+import { FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaUserPlus, FaBan } from 'react-icons/fa';
 
 const SERVICES = [
   'Bulk SMS -> WinText',
@@ -45,13 +45,16 @@ export default function ProblemForm() {
     loadTeamMembers();
   }, []);
 
-  // Load team members for manual assignment
+  // Load team members for manual assignment (EXCLUDING CURRENT USER)
   const loadTeamMembers = () => {
     try {
       const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const activeUsers = systemUsers.filter(u => u.status === 'active');
+      // 🔥 CURRENT USER কে বাদ দিয়ে শুধুমাত্র অন্যান্য active users
+      const activeUsers = systemUsers.filter(u => 
+        u.status === 'active' && u.id !== user?.id
+      );
       setTeamMembers(activeUsers);
-      console.log('👥 Team members loaded:', activeUsers.length);
+      console.log('👥 Team members loaded (excluding self):', activeUsers.length);
     } catch (error) {
       console.error('Failed to load team members:', error);
     }
@@ -125,10 +128,11 @@ export default function ProblemForm() {
     }));
   };
 
-  // 🔥 FIXED: Auto Assignment to First Face with PROPER LOGIC
+  // 🔥 FIXED: Auto Assignment to First Face with CREATOR PROTECTION
   const getAutoAssignedUser = (department) => {
     try {
       console.log('🔄 Checking First Face assignments for department:', department);
+      console.log('👤 Current user (problem creator):', user?.name);
       
       const firstFaceAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
       const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
@@ -142,35 +146,43 @@ export default function ProblemForm() {
 
       let assignedUser = null;
 
-      // 1. Check for department-specific first face
-      const deptFirstFace = activeAssignments.find(ff => ff.department === department);
-      console.log('Department First Face:', deptFirstFace);
+      // 1. Check for department-specific first face (EXCLUDING PROBLEM CREATOR)
+      const deptFirstFace = activeAssignments.find(ff => 
+        ff.department === department && ff.userId != user?.id // 🔥 Creator কে বাদ
+      );
+      console.log('Department First Face (excluding creator):', deptFirstFace);
 
-      // 2. Check for global first face (all departments)
-      const globalFirstFace = activeAssignments.find(ff => ff.department === 'all');
-      console.log('Global First Face:', globalFirstFace);
+      // 2. Check for global first face (EXCLUDING PROBLEM CREATOR)
+      const globalFirstFace = activeAssignments.find(ff => 
+        ff.department === 'all' && ff.userId != user?.id // 🔥 Creator কে বাদ
+      );
+      console.log('Global First Face (excluding creator):', globalFirstFace);
 
       // Priority: Department > Global
       if (deptFirstFace) {
         const userDetails = systemUsers.find(u => u.id == deptFirstFace.userId);
-        assignedUser = {
-          userId: deptFirstFace.userId,
-          userName: userDetails ? userDetails.name : deptFirstFace.userName,
-          userEmail: userDetails ? userDetails.email : '',
-          type: 'FIRST_FACE_DEPARTMENT'
-        };
-        console.log('✅ Assigned to Department First Face:', assignedUser);
+        if (userDetails && userDetails.id !== user?.id) { // 🔥 Double check
+          assignedUser = {
+            userId: deptFirstFace.userId,
+            userName: userDetails ? userDetails.name : deptFirstFace.userName,
+            userEmail: userDetails ? userDetails.email : '',
+            type: 'FIRST_FACE_DEPARTMENT'
+          };
+          console.log('✅ Assigned to Department First Face:', assignedUser);
+        }
       } else if (globalFirstFace) {
         const userDetails = systemUsers.find(u => u.id == globalFirstFace.userId);
-        assignedUser = {
-          userId: globalFirstFace.userId,
-          userName: userDetails ? userDetails.name : globalFirstFace.userName,
-          userEmail: userDetails ? userDetails.email : '',
-          type: 'FIRST_FACE_GLOBAL'
-        };
-        console.log('✅ Assigned to Global First Face:', assignedUser);
+        if (userDetails && userDetails.id !== user?.id) { // 🔥 Double check
+          assignedUser = {
+            userId: globalFirstFace.userId,
+            userName: userDetails ? userDetails.name : globalFirstFace.userName,
+            userEmail: userDetails ? userDetails.email : '',
+            type: 'FIRST_FACE_GLOBAL'
+          };
+          console.log('✅ Assigned to Global First Face:', assignedUser);
+        }
       } else {
-        console.log('❌ No First Face found for assignment');
+        console.log('❌ No First Face found for assignment (excluding problem creator)');
       }
 
       return assignedUser;
@@ -181,13 +193,15 @@ export default function ProblemForm() {
     }
   };
 
-  // 🔥 FIXED: Manual Assignment Logic
+  // 🔥 FIXED: Manual Assignment Logic with CREATOR PROTECTION
   const getManualAssignedUser = () => {
     if (!formData.assignedTo) return null;
 
     try {
       const selectedUser = teamMembers.find(user => user.id == formData.assignedTo);
-      if (selectedUser) {
+      
+      // 🔥 DOUBLE CHECK: Ensure we're not assigning to problem creator
+      if (selectedUser && selectedUser.id !== user?.id) {
         return {
           userId: selectedUser.id,
           userName: selectedUser.name,
@@ -195,6 +209,8 @@ export default function ProblemForm() {
           type: 'MANUAL_ASSIGNMENT'
         };
       }
+      
+      console.warn('⚠️ Attempted to assign problem to creator - prevented');
       return null;
     } catch (error) {
       console.error('Error in manual assignment:', error);
@@ -234,7 +250,7 @@ export default function ProblemForm() {
     }
   };
 
-  // 🔥 FIXED: Handle Submit with BOTH Auto and Manual Assignment
+  // 🔥 FIXED: Handle Submit with CREATOR PROTECTION
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -248,16 +264,24 @@ export default function ProblemForm() {
       }
 
       console.log('🔄 Starting problem creation...');
+      console.log('👤 Problem creator:', user?.name);
 
-      // 🔥 ASSIGNMENT LOGIC: Manual > Auto
+      // 🔥 ASSIGNMENT LOGIC: Manual > Auto (WITH CREATOR PROTECTION)
       let assignedUser = null;
       let assignmentType = 'NOT_ASSIGNED';
 
       // 1. Check for manual assignment first
       if (formData.assignedTo) {
         assignedUser = getManualAssignedUser();
-        assignmentType = 'MANUAL_ASSIGNMENT';
-        console.log('🔧 Manual assignment:', assignedUser);
+        if (assignedUser) {
+          assignmentType = 'MANUAL_ASSIGNMENT';
+          console.log('🔧 Manual assignment:', assignedUser);
+        } else {
+          console.warn('⚠️ Manual assignment failed - possibly assigning to creator');
+          toast.warning('Cannot assign problem to yourself. Please select another team member.');
+          setLoading(false);
+          return;
+        }
       }
 
       // 2. If no manual assignment, check for First Face auto assignment
@@ -265,6 +289,14 @@ export default function ProblemForm() {
         assignedUser = getAutoAssignedUser(formData.department);
         assignmentType = assignedUser ? assignedUser.type : 'NOT_ASSIGNED';
         console.log('🤖 Auto assignment:', assignedUser);
+      }
+
+      // 🔥 FINAL CHECK: Ensure we're not assigning to problem creator
+      if (assignedUser && assignedUser.userId === user?.id) {
+        console.error('🚨 CRITICAL: Attempted to assign problem to creator - BLOCKED');
+        assignedUser = null;
+        assignmentType = 'NOT_ASSIGNED';
+        toast.warning('Problem cannot be assigned to the creator. Please select another team member.');
       }
 
       // Extract only image URLs
@@ -288,7 +320,7 @@ export default function ProblemForm() {
         createdBy: user?.name || 'Unknown User',
         createdById: user?.id,
         
-        // 🔥 CRITICAL: Assignment fields - MUST BE SET
+        // 🔥 CRITICAL: Assignment fields - MUST BE SET (WITH CREATOR PROTECTION)
         assignedTo: assignedUser ? assignedUser.userId : null,
         assignedToName: assignedUser ? assignedUser.userName : null,
         assignedToEmail: assignedUser ? assignedUser.userEmail : null,
@@ -324,8 +356,8 @@ export default function ProblemForm() {
       console.log('💾 Problem saved to localStorage');
       console.log('Total problems now:', problems.length);
 
-      // Send notification if assigned
-      if (assignedUser) {
+      // Send notification if assigned (AND NOT TO CREATOR)
+      if (assignedUser && assignedUser.userId !== user?.id) {
         sendProblemAssignmentNotification(newProblem, assignedUser, assignmentType);
       }
 
@@ -337,7 +369,7 @@ export default function ProblemForm() {
           toast.success(`✅ Problem submitted and auto-assigned to ${assignedUser.userName}`);
         }
       } else {
-        toast.success('Problem submitted successfully! Please assign manually.');
+        toast.success('✅ Problem submitted successfully! Will be assigned manually.');
       }
       
       // Reset form
@@ -503,6 +535,12 @@ export default function ProblemForm() {
                       </h4>
                       <small className="opacity-75">Please provide detailed information about the issue</small>
                     </div>
+                    {/* <div className="d-flex align-items-center">
+                      <span className="badge bg-warning me-2">
+                        <FaBan className="me-1" />
+                        Self-Assignment Blocked
+                      </span>
+                    </div> */}
                   </div>
                 </div>
                 <div className="card-body p-4">
@@ -581,7 +619,7 @@ export default function ProblemForm() {
                       </div>
                     </div>
 
-                    {/* 🔥 MANUAL ASSIGNMENT SECTION */}
+                    {/* 🔥 MANUAL ASSIGNMENT SECTION WITH CREATOR PROTECTION */}
                     <div className="mt-3">
                       <div className="d-flex justify-content-between align-items-center mb-2">
                         <label className="form-label fw-semibold mb-0">
@@ -598,26 +636,35 @@ export default function ProblemForm() {
                       </div>
                       
                       {showManualAssignment && (
-                        <select
-                          className="form-control"
-                          name="assignedTo"
-                          value={formData.assignedTo}
-                          onChange={handleChange}
-                        >
-                          <option value="">-- Select Team Member --</option>
-                          {teamMembers.map(member => (
-                            <option key={member.id} value={member.id}>
-                              {member.name} ({member.department}) - {member.role}
-                            </option>
-                          ))}
-                        </select>
+                        <div>
+                          <select
+                            className="form-control"
+                            name="assignedTo"
+                            value={formData.assignedTo}
+                            onChange={handleChange}
+                          >
+                            <option value="">-- Select Team Member --</option>
+                            {teamMembers.map(member => (
+                              <option key={member.id} value={member.id}>
+                                {member.name} ({member.department}) - {member.role}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="alert alert-info mt-2 py-2">
+                            <small>
+                              <FaBan className="me-1" />
+                              <strong>Note:</strong> You cannot assign problems to yourself. 
+                              The system will automatically exclude you from assignment.
+                            </small>
+                          </div>
+                        </div>
                       )}
-                      <small className="text-muted">
+                      {/* <small className="text-muted">
                         {showManualAssignment 
                           ? 'Manual assignment will override First Face auto-assignment' 
-                          : 'Leave empty for First Face auto-assignment'
+                          : 'Leave empty for First Face auto-assignment (excluding yourself)'
                         }
-                      </small>
+                      </small> */}
                     </div>
 
                     {/* Problem Statement */}
@@ -677,6 +724,18 @@ export default function ProblemForm() {
                         </div>
                       )}
                     </div>
+
+                    {/* Security Notice */}
+                    {/* <div className="alert alert-warning mt-3">
+                      <h6 className="mb-2">
+                        <FaBan className="me-2" />
+                        Assignment Security
+                      </h6>
+                      <p className="mb-0 small">
+                        For security and efficiency reasons, problems cannot be assigned to the person who created them. 
+                        This ensures proper workflow and prevents self-assignment conflicts.
+                      </p>
+                    </div> */}
 
                     {/* Submit Buttons */}
                     <div className="d-flex gap-2 mt-4 pt-3 border-top">

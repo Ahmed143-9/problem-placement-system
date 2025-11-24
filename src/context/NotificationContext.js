@@ -115,9 +115,179 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Notification helpers
+  // Get problem details by ID
+  const getProblemDetails = (problemId) => {
+    try {
+      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
+      return problems.find(p => p.id === problemId);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  // 🔥 NEW: Get all users who should be notified about discussion
+  const getDiscussionParticipants = (problemId) => {
+    try {
+      const problem = getProblemDetails(problemId);
+      if (!problem) return [];
+
+      const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+      const participants = new Set();
+
+      // 1. Problem Creator
+      if (problem.createdBy) {
+        participants.add(problem.createdBy);
+      }
+
+      // 2. Currently Assigned User
+      if (problem.assignedToName) {
+        participants.add(problem.assignedToName);
+      }
+
+      // 3. All users who commented on this problem
+      if (problem.comments && problem.comments.length > 0) {
+        problem.comments.forEach(comment => {
+          if (comment.author) {
+            participants.add(comment.author);
+          }
+        });
+      }
+
+      // 4. Admin and Team Leaders (if configured to receive all notifications)
+      const adminAndLeaders = users.filter(u => 
+        u.role === 'admin' || u.role === 'team_leader'
+      ).map(u => u.name);
+      
+      adminAndLeaders.forEach(admin => participants.add(admin));
+
+      // Convert to array and remove current comment author (if provided)
+      return Array.from(participants);
+    } catch (error) {
+      console.error('Error getting discussion participants:', error);
+      return [];
+    }
+  };
+
+  // 🔥 NEW: Notify about new discussion comment
+  const notifyDiscussionComment = (problemId, commentAuthor, commentText, problemDetails = null) => {
+    try {
+      console.log('🔔 Sending discussion notifications for problem:', problemId);
+      
+      const problem = problemDetails || getProblemDetails(problemId);
+      if (!problem) {
+        console.error('Problem not found for notification:', problemId);
+        return;
+      }
+
+      // Get all participants who should be notified (excluding the comment author)
+      const participants = getDiscussionParticipants(problemId).filter(
+        participant => participant !== commentAuthor
+      );
+
+      console.log('👥 Discussion participants to notify:', participants);
+
+      // Send notification to each participant
+      participants.forEach(participant => {
+        const userId = getUserIdByUsername(participant);
+        
+        if (userId) {
+          addNotification({
+            type: 'discussion_comment',
+            title: '💬 New Discussion Message',
+            message: `${commentAuthor} commented on Problem #${problemId}: "${commentText.substring(0, 50)}${commentText.length > 50 ? '...' : ''}"`,
+            problemId,
+            targetUsername: participant,
+            userId: userId,
+            commentAuthor: commentAuthor,
+            commentText: commentText,
+            problemTitle: problem.statement?.substring(0, 30) || `Problem #${problemId}`,
+            icon: '💬',
+            color: 'info',
+            isDiscussion: true
+          });
+        }
+      });
+
+      // Also notify Admin and Team Leaders (as backup)
+      addNotification({
+        type: 'discussion_comment',
+        title: '💬 New Discussion Activity',
+        message: `${commentAuthor} commented on Problem #${problemId}`,
+        problemId,
+        forAdminOrLeader: true,
+        commentAuthor: commentAuthor,
+        commentText: commentText,
+        icon: '💬',
+        color: 'info',
+        isDiscussion: true
+      });
+
+      console.log(`✅ Discussion notifications sent to ${participants.length} participants`);
+      
+    } catch (error) {
+      console.error('❌ Failed to send discussion notifications:', error);
+    }
+  };
+
+  // 🔥 NEW: Notify about solution comment (special type)
+  const notifySolutionComment = (problemId, solvedBy, solutionText, problemDetails = null) => {
+    try {
+      const problem = problemDetails || getProblemDetails(problemId);
+      if (!problem) return;
+
+      // Get problem creator and assigned user
+      const participants = new Set();
+      
+      if (problem.createdBy && problem.createdBy !== solvedBy) {
+        participants.add(problem.createdBy);
+      }
+      
+      if (problem.assignedToName && problem.assignedToName !== solvedBy) {
+        participants.add(problem.assignedToName);
+      }
+
+      // Notify participants
+      participants.forEach(participant => {
+        const userId = getUserIdByUsername(participant);
+        
+        if (userId) {
+          addNotification({
+            type: 'solution_comment',
+            title: '✅ Solution Provided',
+            message: `${solvedBy} provided a solution for Problem #${problemId}`,
+            problemId,
+            targetUsername: participant,
+            userId: userId,
+            solvedBy: solvedBy,
+            solutionText: solutionText,
+            icon: '✅',
+            color: 'success',
+            isSolution: true
+          });
+        }
+      });
+
+      // Notify Admin and Team Leaders for approval
+      addNotification({
+        type: 'solution_comment',
+        title: '✅ Solution Ready for Review',
+        message: `${solvedBy} submitted a solution for Problem #${problemId}`,
+        problemId,
+        forAdminOrLeader: true,
+        solvedBy: solvedBy,
+        solutionText: solutionText,
+        icon: '✅',
+        color: 'success',
+        isSolution: true
+      });
+
+    } catch (error) {
+      console.error('Failed to send solution notification:', error);
+    }
+  };
+
+  // Existing notification helpers
   const notifyNewProblem = (problemId, createdBy, department) => {
-    // Only notify Admin and Team Leaders
     addNotification({
       type: 'new_problem',
       title: 'New Problem Raised',
@@ -130,7 +300,6 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const notifyAssignment = (problemId, assignedToUsername, assignedBy) => {
-    // Only notify the specific person assigned
     const userId = getUserIdByUsername(assignedToUsername);
     
     addNotification({
@@ -146,7 +315,6 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const notifyStatusChange = (problemId, newStatus, changedBy, assignedToUsername) => {
-    // Notify the assigned person
     if (assignedToUsername) {
       const userId = getUserIdByUsername(assignedToUsername);
       
@@ -164,7 +332,6 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const notifyTransfer = (problemId, fromUsername, toUsername, transferredBy) => {
-    // Notify the new assignee
     const toUserId = getUserIdByUsername(toUsername);
     
     addNotification({
@@ -178,7 +345,6 @@ export const NotificationProvider = ({ children }) => {
       color: 'warning'
     });
 
-    // Notify admin and team leaders
     addNotification({
       type: 'transfer',
       title: 'Problem Transferred',
@@ -191,7 +357,6 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const notifyCompletion = (problemId, completedBy) => {
-    // Only notify Admin and Team Leaders for completion
     addNotification({
       type: 'completion',
       title: 'Problem Completed',
@@ -218,7 +383,11 @@ export const NotificationProvider = ({ children }) => {
         notifyAssignment,
         notifyStatusChange,
         notifyTransfer,
-        notifyCompletion
+        notifyCompletion,
+        // 🔥 NEW: Discussion notification functions
+        notifyDiscussionComment,
+        notifySolutionComment,
+        getDiscussionParticipants
       }}
     >
       {children}
