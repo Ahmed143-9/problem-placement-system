@@ -24,14 +24,14 @@ export const AuthProvider = ({ children }) => {
     name: 'System Super Admin',
     email: 'superadmin@system.com', 
     username: 'superadmin',
-    role: 'super_admin', // 🔥 Correct role
+    role: 'super_admin',
     department: 'System Administration',
     status: 'active',
     designation: 'Super Administrator',
     isHidden: true
   };
 
-  // Auto login on app load
+  // Auto login on app load - FIXED VERSION
   useEffect(() => {
     const checkAuthStatus = () => {
       try {
@@ -39,15 +39,23 @@ export const AuthProvider = ({ children }) => {
         const savedUser = localStorage.getItem('current_user');
         const isSuperAdmin = localStorage.getItem('is_super_admin') === 'true';
         
+        console.log('🔄 Auto-login check:', { 
+          hasToken: !!token, 
+          hasUser: !!savedUser, 
+          isSuperAdmin 
+        });
+
         if (token && savedUser) {
           try {
             let userData = JSON.parse(savedUser);
             
-            // 🔥 If it's super admin, use the SUPER_ADMIN object
+            // 🔥 FIX: Properly handle super admin auto-login
             if (isSuperAdmin) {
+              console.log('🔥 Super Admin auto-login detected');
               userData = {
                 ...SUPER_ADMIN,
-                loginTime: userData.loginTime || new Date().toISOString()
+                loginTime: userData.loginTime || new Date().toISOString(),
+                isSuperAdmin: true
               };
             }
             
@@ -55,14 +63,20 @@ export const AuthProvider = ({ children }) => {
             setIsAuthenticated(true);
             console.log('✅ Auto-login successful:', userData.name, 'Role:', userData.role);
           } catch (error) {
-            console.error('❌ Auto-login failed:', error);
+            console.error('❌ Auto-login failed - parsing error:', error);
             localStorage.removeItem('token');
             localStorage.removeItem('current_user');
             localStorage.removeItem('is_super_admin');
           }
+        } else {
+          console.log('🔐 No saved login found');
+          setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('❌ Auth check failed:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('current_user');
+        localStorage.removeItem('is_super_admin');
       } finally {
         setLoading(false);
       }
@@ -74,6 +88,8 @@ export const AuthProvider = ({ children }) => {
   // 🔥 FIXED LOGIN FUNCTION
   const login = async (username, password) => {
     try {
+      console.log('🔐 Login attempt for:', username);
+
       // 🔥 SUPER ADMIN EMERGENCY LOGIN - FIXED
       if (username === 'superadmin@system.com' && password === 'SuperAdmin123!@#') {
         console.log('🔥 SUPER ADMIN LOGIN DETECTED');
@@ -87,11 +103,12 @@ export const AuthProvider = ({ children }) => {
         // 🔥 Save proper data to localStorage
         localStorage.setItem('token', 'super_admin_emergency_token_' + Date.now());
         localStorage.setItem('current_user', JSON.stringify(superAdminUser));
-        localStorage.setItem('is_super_admin', 'true');
+        localStorage.setItem('is_super_admin', 'true'); // 🔥 CRITICAL: Set this flag
         
         setUser(superAdminUser);
         setIsAuthenticated(true);
         
+        console.log('✅ Super Admin login successful');
         return { 
           success: true, 
           isSuperAdmin: true,
@@ -128,12 +145,13 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error };
       }
     } catch (error) {
-      console.error('Login network error:', error);
+      console.error('❌ Login network error:', error);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };
 
   const logout = () => {
+    console.log('🚪 Logging out...');
     localStorage.removeItem('token');
     localStorage.removeItem('current_user');
     localStorage.removeItem('is_super_admin');
@@ -141,9 +159,15 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  // Check if current user is Super Admin
+  // Check if current user is Super Admin - FIXED
   const isSuperAdmin = () => {
-    return user?.role === 'super_admin' || localStorage.getItem('is_super_admin') === 'true';
+    const isSuper = user?.role === 'super_admin' || localStorage.getItem('is_super_admin') === 'true';
+    console.log('🛡️ Super Admin Check:', { 
+      userRole: user?.role, 
+      localStorageFlag: localStorage.getItem('is_super_admin'),
+      result: isSuper 
+    });
+    return isSuper;
   };
 
   // Check if user has admin privileges (either admin or super_admin)

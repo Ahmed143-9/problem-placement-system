@@ -942,13 +942,13 @@ const canChangeStatus = () => {
     <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Update Status</h6>
     
     {/* Debug Info - Remove in production */}
-    {process.env.NODE_ENV === 'development' && (
+    {/* {process.env.NODE_ENV === 'development' && (
       <div className="alert alert-info py-2 mb-2" style={{ fontSize: '0.7rem' }}>
         <strong>Debug:</strong> User: {user?.name}, Role: {user?.role}, 
         Assigned: {problem.assignedTo}, Can Change: {canChangeStatus().toString()}
       </div>
     )}
-    
+     */}
     <div className="btn-group btn-group-sm" role="group">
       <button
         className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
