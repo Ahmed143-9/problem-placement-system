@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
     name: 'System Super Admin',
     email: 'superadmin@system.com', 
     username: 'superadmin',
-    role: 'super_admin',
+    role: 'admin',
     department: 'System Administration',
     status: 'active',
     designation: 'Super Administrator',
