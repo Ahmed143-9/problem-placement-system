@@ -1,4 +1,4 @@
-// src/context/AuthContext.js - COMPLETE FIXED VERSION WITH SUPER ADMIN
+// src/context/AuthContext.js - COMPLETE FIXED VERSION
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -18,16 +18,17 @@ export const AuthProvider = ({ children }) => {
   
   const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
-  // 🔥 SUPER ADMIN CREDENTIALS (Change this password in production!)
+  // 🔥 SUPER ADMIN CREDENTIALS
   const SUPER_ADMIN = {
-    id: 0,
+    id: 999999,
     name: 'System Super Admin',
     email: 'superadmin@system.com', 
     username: 'superadmin',
-    role: 'super_admin',
-    department: 'System Administration', // 🔥 Change this
+    role: 'super_admin', // 🔥 Correct role
+    department: 'System Administration',
     status: 'active',
-    designation: 'Super Administrator' // 🔥 Add designation
+    designation: 'Super Administrator',
+    isHidden: true
   };
 
   // Auto login on app load
@@ -36,17 +37,28 @@ export const AuthProvider = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         const savedUser = localStorage.getItem('current_user');
+        const isSuperAdmin = localStorage.getItem('is_super_admin') === 'true';
         
         if (token && savedUser) {
           try {
-            const userData = JSON.parse(savedUser);
+            let userData = JSON.parse(savedUser);
+            
+            // 🔥 If it's super admin, use the SUPER_ADMIN object
+            if (isSuperAdmin) {
+              userData = {
+                ...SUPER_ADMIN,
+                loginTime: userData.loginTime || new Date().toISOString()
+              };
+            }
+            
             setUser(userData);
             setIsAuthenticated(true);
-            console.log('✅ Auto-login successful:', userData.name);
+            console.log('✅ Auto-login successful:', userData.name, 'Role:', userData.role);
           } catch (error) {
             console.error('❌ Auto-login failed:', error);
             localStorage.removeItem('token');
             localStorage.removeItem('current_user');
+            localStorage.removeItem('is_super_admin');
           }
         }
       } catch (error) {
@@ -58,10 +70,11 @@ export const AuthProvider = ({ children }) => {
 
     checkAuthStatus();
   }, []);
-  
+
+  // 🔥 FIXED LOGIN FUNCTION
   const login = async (username, password) => {
     try {
-      // 🔥 SUPER ADMIN EMERGENCY LOGIN
+      // 🔥 SUPER ADMIN EMERGENCY LOGIN - FIXED
       if (username === 'superadmin@system.com' && password === 'SuperAdmin123!@#') {
         console.log('🔥 SUPER ADMIN LOGIN DETECTED');
         
@@ -71,6 +84,7 @@ export const AuthProvider = ({ children }) => {
           isSuperAdmin: true
         };
         
+        // 🔥 Save proper data to localStorage
         localStorage.setItem('token', 'super_admin_emergency_token_' + Date.now());
         localStorage.setItem('current_user', JSON.stringify(superAdminUser));
         localStorage.setItem('is_super_admin', 'true');
@@ -137,6 +151,11 @@ export const AuthProvider = ({ children }) => {
     return user?.role === 'admin' || isSuperAdmin();
   };
 
+  // Check if user should be hidden from user lists
+  const isHiddenUser = (user) => {
+    return user?.isHidden === true || user?.role === 'super_admin';
+  };
+
   // Super admin can perform any action
   const canPerformAction = (action, targetUser = null) => {
     if (isSuperAdmin()) return true;
@@ -171,7 +190,8 @@ export const AuthProvider = ({ children }) => {
     API_BASE_URL,
     isSuperAdmin: isSuperAdmin(),
     isAdminUser: isAdminUser(),
-    canPerformAction
+    canPerformAction,
+    isHiddenUser
   };
 
   return (

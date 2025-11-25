@@ -1,14 +1,13 @@
-// src/pages/AdminPanel.js - Complete Fixed Code
-
+// src/pages/AdminPanel.js - COMPLETE CODE WITH SUPER ADMIN (FIXED)
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaRobot, FaTasks, FaArrowRight, FaUserCheck, FaLayerGroup, FaUserTie, FaSpinner, FaInfoCircle, FaSync, FaBell } from 'react-icons/fa';
+import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaRobot, FaTasks, FaArrowRight, FaUserCheck, FaLayerGroup, FaUserTie, FaSpinner, FaInfoCircle, FaSync, FaBell, FaShieldAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
 export default function AdminPanelUserManagement() {
-  const { user, API_BASE_URL } = useAuth();
+  const { user, API_BASE_URL, isSuperAdmin, isHiddenUser } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [problems, setProblems] = useState([]);
@@ -42,7 +41,7 @@ export default function AdminPanelUserManagement() {
     status: 'active'
   });
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || isSuperAdmin;
 
   useEffect(() => {
     loadUsers();
@@ -51,7 +50,7 @@ export default function AdminPanelUserManagement() {
     loadActiveUsers();
   }, [API_BASE_URL]);
 
-  // Load Users with Loading State
+  // Load Users with Hidden User Filtering
   const loadUsers = async () => {
     setLoadingUsers(true);
     try {
@@ -73,8 +72,10 @@ export default function AdminPanelUserManagement() {
       const data = await response.json();
 
       if (data.success) {
-        setUsers(data.users);
-        console.log('✅ Users loaded successfully:', data.users.length);
+        // FILTER OUT HIDDEN USERS (Super Admin)
+        const filteredUsers = data.users.filter(user => !isHiddenUser(user));
+        setUsers(filteredUsers);
+        console.log('✅ Users loaded successfully (filtered):', filteredUsers.length);
         
         // Save users to localStorage for name resolution
         localStorage.setItem('system_users', JSON.stringify(data.users));
@@ -151,7 +152,7 @@ export default function AdminPanelUserManagement() {
     }
   };
 
-  // Load Active Users with Loading State
+  // Load Active Users with Hidden User Filtering
   const loadActiveUsers = async () => {
     setLoadingActiveUsers(true);
     try {
@@ -184,23 +185,25 @@ export default function AdminPanelUserManagement() {
       console.log('🟢 Active Users Data:', data);
 
       if (data.success) {
-        setActiveUsers(data.activeUsers || []);
-        console.log('✅ Active users loaded:', data.activeUsers?.length || 0);
+        // FILTER OUT HIDDEN USERS (Super Admin)
+        const filteredActiveUsers = (data.activeUsers || []).filter(user => !isHiddenUser(user));
+        setActiveUsers(filteredActiveUsers);
+        console.log('✅ Active users loaded (filtered):', filteredActiveUsers.length);
       } else {
         console.error('🔴 Active Users API Error:', data.error);
         // Fallback to all users if active users endpoint fails
         const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-        const activeUsers = allUsers.filter(u => u.status === 'active');
+        const activeUsers = allUsers.filter(u => u.status === 'active' && !isHiddenUser(u));
         setActiveUsers(activeUsers);
-        console.log('📋 Using fallback active users:', activeUsers.length);
+        console.log('📋 Using fallback active users (filtered):', activeUsers.length);
       }
     } catch (error) {
       console.error('🔴 Failed to load active users:', error);
       // Fallback to localStorage users
       const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const activeUsers = allUsers.filter(u => u.status === 'active');
+      const activeUsers = allUsers.filter(u => u.status === 'active' && !isHiddenUser(u));
       setActiveUsers(activeUsers);
-      console.log('📋 Using localStorage active users:', activeUsers.length);
+      console.log('📋 Using localStorage active users (filtered):', activeUsers.length);
     } finally {
       setLoadingActiveUsers(false);
     }
@@ -375,87 +378,87 @@ export default function AdminPanelUserManagement() {
 
   // Handle Save User with Notification
   const handleSaveUser = async () => {
-  if (!isAdmin) return toast.error('Only Admin can add or edit users!');
-  if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
+    if (!isAdmin) return toast.error('Only Admin can add or edit users!');
+    if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
 
-  // 🔥 Password validation শুধু new user এর জন্য
-  if (!editingUser) {
-    if (!formData.password) return toast.error('Password is required for new user');
-    if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
-  }
-
-  // 🔥 Edit mode এ password blank হলে remove করুন request থেকে
-  const submitData = { ...formData };
-  if (editingUser && !submitData.password) {
-    delete submitData.password; // 🔥 Password field remove করুন যদি blank থাকে
-  }
-
-  try {
-    const token = localStorage.getItem('token');
-    const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
-    const method = editingUser ? 'PUT' : 'POST';
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    // Password validation শুধু new user এর জন্য
+    if (!editingUser) {
+      if (!formData.password) return toast.error('Password is required for new user');
+      if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
     }
 
-    const response = await fetch(url, {
-      method: method,
-      headers: headers,
-      body: JSON.stringify(submitData), // 🔥 Updated data use করুন
-    });
+    // Edit mode এ password blank হলে remove করুন request থেকে
+    const submitData = { ...formData };
+    if (editingUser && !submitData.password) {
+      delete submitData.password; // Password field remove করুন যদি blank থাকে
+    }
 
-    const responseText = await response.text();
-    console.log('🟡 RAW RESPONSE:', responseText);
-
-    let data;
     try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('🔴 JSON PARSE ERROR:', parseError);
-      throw new Error('Server returned invalid JSON');
-    }
+      const token = localStorage.getItem('token');
+      const url = editingUser ? `${API_BASE_URL}/users/${editingUser.id}` : `${API_BASE_URL}/users`;
+      const method = editingUser ? 'PUT' : 'POST';
 
-    console.log('🟢 PARSED RESPONSE:', data);
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
 
-    if (data.success) {
-      // Send notification for user creation/update
-      if (editingUser) {
-        sendUserUpdateNotification(editingUser, formData);
-        toast.success('User updated successfully!');
-      } else {
-        sendUserCreationNotification(formData);
-        toast.success('User created successfully!');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      setFormData({
-        name: '',
-        username: '',
-        email: '',
-        password: '',
-        role: 'user',
-        department: '',
-        status: 'active'
+      const response = await fetch(url, {
+        method: method,
+        headers: headers,
+        body: JSON.stringify(submitData), // Updated data use করুন
       });
-      setShowAddModal(false);
-      setEditingUser(null);
-      setShowPassword(false); // 🔥 Reset password visibility
-      loadUsers();
-      
-    } else {
-      console.error('🔴 BACKEND ERROR:', data);
-      toast.error(data.error || 'Failed to save user');
+
+      const responseText = await response.text();
+      console.log('🟡 RAW RESPONSE:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('🔴 JSON PARSE ERROR:', parseError);
+        throw new Error('Server returned invalid JSON');
+      }
+
+      console.log('🟢 PARSED RESPONSE:', data);
+
+      if (data.success) {
+        // Send notification for user creation/update
+        if (editingUser) {
+          sendUserUpdateNotification(editingUser, formData);
+          toast.success('User updated successfully!');
+        } else {
+          sendUserCreationNotification(formData);
+          toast.success('User created successfully!');
+        }
+
+        setFormData({
+          name: '',
+          username: '',
+          email: '',
+          password: '',
+          role: 'user',
+          department: '',
+          status: 'active'
+        });
+        setShowAddModal(false);
+        setEditingUser(null);
+        setShowPassword(false); // Reset password visibility
+        loadUsers();
+        
+      } else {
+        console.error('🔴 BACKEND ERROR:', data);
+        toast.error(data.error || 'Failed to save user');
+      }
+    } catch (error) {
+      console.error('🔴 SAVE USER ERROR:', error);
+      toast.error(error.message || 'Failed to save user');
     }
-  } catch (error) {
-    console.error('🔴 SAVE USER ERROR:', error);
-    toast.error(error.message || 'Failed to save user');
-  }
-};
+  };
 
   // Send Notification for User Creation
   const sendUserCreationNotification = (userData) => {
@@ -512,23 +515,23 @@ export default function AdminPanelUserManagement() {
 
   // Handle Edit User
   const handleEditUser = userId => {
-  if (!isAdmin) return toast.error('Only Admin can edit users!');
-  const userToEdit = users.find(u => u.id === userId);
-  if (userToEdit) {
-    setEditingUser(userToEdit);
-    setFormData({
-      name: userToEdit.name,
-      username: userToEdit.username,
-      email: userToEdit.email,
-      password: '', // 🔥 Password blank রাখুন (security reason)
-      role: userToEdit.role,
-      department: userToEdit.department,
-      status: userToEdit.status
-    });
-    setShowAddModal(true);
-    setShowPassword(false); // 🔥 Reset password visibility
-  }
-};
+    if (!isAdmin) return toast.error('Only Admin can edit users!');
+    const userToEdit = users.find(u => u.id === userId);
+    if (userToEdit) {
+      setEditingUser(userToEdit);
+      setFormData({
+        name: userToEdit.name,
+        username: userToEdit.username,
+        email: userToEdit.email,
+        password: '', // Password blank রাখুন (security reason)
+        role: userToEdit.role,
+        department: userToEdit.department,
+        status: userToEdit.status
+      });
+      setShowAddModal(true);
+      setShowPassword(false); // Reset password visibility
+    }
+  };
 
   // Handle Delete User with Notification
   const handleDeleteUser = async userId => {
@@ -809,7 +812,7 @@ export default function AdminPanelUserManagement() {
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
-              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+              {(user?.role === 'admin' || isSuperAdmin) && (
                 <li className="nav-item mb-2">
                   <Link 
                     to="/admin" 
@@ -842,6 +845,12 @@ export default function AdminPanelUserManagement() {
                   <h4 className="mb-1 fw-semibold text-truncate">
                     <FaUsers className="me-2" /> 
                     User Management Panel
+                    {isSuperAdmin && (
+                        <span className="badge bg-warning text-dark ms-2">
+                          <FaShieldAlt className="me-1" />
+                          Super Admin
+                        </span>
+                      )}
                   </h4>
                   <small className="opacity-75">
                     {isAdmin ? 'Add and manage Team Leaders and Users' : 'View team members (Read-only access)'}

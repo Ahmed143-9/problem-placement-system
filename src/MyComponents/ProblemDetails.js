@@ -394,13 +394,38 @@ export default function ProblemDetails() {
     }
   };
 
-  const canChangeStatus = () => {
-    return (
-      user?.role === 'admin' ||
-      user?.role === 'team_leader' ||
-      problem?.assignedTo === user?.name
-    );
-  };
+const canChangeStatus = () => {
+  if (!problem || !user) return false;
+  
+  console.log('Checking status change permissions:', {
+    user: user?.name,
+    role: user?.role,
+    assignedTo: problem?.assignedTo,
+    assignedToName: problem?.assignedToName,
+    createdBy: problem?.createdBy,
+    status: problem?.status
+  });
+
+  // Admin and Team Leaders can always change status
+  if (user.role === 'admin' || user.role === 'team_leader') {
+    console.log('User is admin/team leader - can change status');
+    return true;
+  }
+  
+  // Regular users can change status only if they are assigned to the problem
+  // Check both assignedTo (ID) and assignedToName (Name) fields
+  if (user.role === 'user') {
+    const isAssigned = 
+      problem.assignedTo === user.name || 
+      problem.assignedToName === user.name ||
+      (problem.assignedTo && problem.assignedTo.toString() === user.id?.toString());
+    
+    console.log('Regular user can change status:', isAssigned);
+    return isAssigned;
+  }
+  
+  return false;
+};
 
   const canApprove = () => {
     return user?.role === 'admin' || user?.role === 'team_leader';
@@ -846,33 +871,33 @@ export default function ProblemDetails() {
 
                     {/* Created By / Assigned To */}
                     <div className="row g-3 mb-4">
-                      <div className="col-md-6">
-                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
-                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Created By</small>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#495057' }}>
-                            {problem.createdBy}
-                            {problem.createdBy === user?.name && (
-                              <span className="badge bg-info ms-1" style={{ fontSize: '0.6rem' }}>YOU</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
-                          <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned To</small>
-                          {problem.assignedTo ? (
-                            <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
-                              {getUserName(problem.assignedTo)}
-                              {problem.assignedTo === user?.name && (
-                                <span className="badge bg-light text-dark ms-1" style={{ fontSize: '0.6rem' }}>YOU</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-muted" style={{ fontSize: '0.85rem' }}>Not assigned yet</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+  <div className="col-md-6">
+    <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+      <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Created By</small>
+      <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#495057' }}>
+        {problem.createdBy}
+        {problem.createdBy === user?.name && (
+          <span className="badge bg-info ms-1" style={{ fontSize: '0.6rem' }}>YOU</span>
+        )}
+      </div>
+    </div>
+  </div>
+  <div className="col-md-6">
+    <div className="p-3 bg-light rounded-3" style={{ border: '1px solid #e9ecef' }}>
+      <small className="text-muted d-block mb-1" style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Assigned To</small>
+      {problem.assignedTo || problem.assignedToName ? (
+        <span className="badge bg-info" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+          {problem.assignedToName || getUserName(problem.assignedTo)}
+          {(problem.assignedTo === user?.name || problem.assignedToName === user?.name) && (
+            <span className="badge bg-light text-dark ms-1" style={{ fontSize: '0.6rem' }}>YOU</span>
+          )}
+        </span>
+      ) : (
+        <span className="text-muted" style={{ fontSize: '0.85rem' }}>Not assigned yet</span>
+      )}
+    </div>
+  </div>
+</div>
 
                     {/* Approval/Rejection Section */}
                     {problem.status === 'pending_approval' && canApprove() && (
@@ -900,7 +925,7 @@ export default function ProblemDetails() {
                     {/* Completed Status */}
                     {problem.status === 'done' && (
                       <div className="alert alert-success mb-4" style={{ borderRadius: '8px', fontSize: '0.9rem' }}>
-                        <h6 className="alert-heading mb-2" style={{ fontSize: '1rem', fontWeight: '600' }}>✅ Problem Completed</h6>
+                        <h6 className="alert-heading mb-2" style={{ fontSize: '1rem', fontWeight: '600' }}>Problem Completed</h6>
                         <p className="mb-0" style={{ fontSize: '0.85rem' }}>This problem has been successfully resolved and marked as done.</p>
                         {problem.approvedBy && (
                           <small className="text-muted d-block mt-2" style={{ fontSize: '0.75rem' }}>
@@ -911,36 +936,60 @@ export default function ProblemDetails() {
                     )}
 
                     {/* Status Change Buttons */}
-                    {canChangeStatus() && problem.status !== 'pending_approval' && problem.status !== 'done' && !showSolutionComment && (
-                      <div className="mb-4">
-                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Update Status</h6>
-                        <div className="btn-group btn-group-sm" role="group">
-                          <button
-                            className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
-                            onClick={() => handleStatusChange('pending')}
-                            disabled={problem.status === 'pending'}
-                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
-                          >
-                            Pending
-                          </button>
-                          <button
-                            className={`btn ${problem.status === 'in_progress' ? 'btn-info' : 'btn-outline-info'}`}
-                            onClick={() => handleStatusChange('in_progress')}
-                            disabled={problem.status === 'in_progress'}
-                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
-                          >
-                            In Progress
-                          </button>
-                          <button
-                            className="btn btn-outline-success"
-                            onClick={() => handleStatusChange('done')}
-                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
-                          >
-                            ✓ {canApprove() ? 'Mark Solved' : 'Submit'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    {/* Status Change Buttons */}
+                        {canChangeStatus() && problem.status !== 'done' && !showSolutionComment && (
+  <div className="mb-4">
+    <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: '600' }}>Update Status</h6>
+    
+    {/* Debug Info - Remove in production */}
+    {process.env.NODE_ENV === 'development' && (
+      <div className="alert alert-info py-2 mb-2" style={{ fontSize: '0.7rem' }}>
+        <strong>Debug:</strong> User: {user?.name}, Role: {user?.role}, 
+        Assigned: {problem.assignedTo}, Can Change: {canChangeStatus().toString()}
+      </div>
+    )}
+    
+    <div className="btn-group btn-group-sm" role="group">
+      <button
+        className={`btn ${problem.status === 'pending' ? 'btn-warning' : 'btn-outline-warning'}`}
+        onClick={() => handleStatusChange('pending')}
+        disabled={problem.status === 'pending' || problem.status === 'pending_approval'}
+        style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
+      >
+        Pending
+      </button>
+      <button
+        className={`btn ${problem.status === 'in_progress' ? 'btn-info' : 'btn-outline-info'}`}
+        onClick={() => handleStatusChange('in_progress')}
+        disabled={problem.status === 'in_progress' || problem.status === 'pending_approval'}
+        style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
+      >
+        In Progress
+      </button>
+      <button
+        className={`btn ${problem.status === 'pending_approval' ? 'btn-secondary' : 'btn-outline-success'}`}
+        onClick={() => handleStatusChange('done')}
+        disabled={problem.status === 'pending_approval'}
+        style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}
+      >
+        {problem.status === 'pending_approval' ? (
+          <>⏳ Waiting Approval</>
+        ) : (
+          <>✓ {canApprove() ? 'Mark Solved' : 'Submit for Approval'}</>
+        )}
+      </button>
+    </div>
+    
+    {/* Show waiting message when in pending_approval */}
+    {problem.status === 'pending_approval' && (
+      <div className="mt-2">
+        <small className="text-warning">
+          ⏳ This problem is waiting for admin/team leader approval
+        </small>
+      </div>
+    )}
+  </div>
+)}
                   </div>
                 </div>
               </div>

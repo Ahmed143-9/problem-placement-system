@@ -222,7 +222,7 @@ export const NotificationProvider = ({ children }) => {
         isDiscussion: true
       });
 
-      console.log(`✅ Discussion notifications sent to ${participants.length} participants`);
+      console.log(`Discussion notifications sent to ${participants.length} participants`);
       
     } catch (error) {
       console.error('❌ Failed to send discussion notifications:', error);
@@ -253,7 +253,7 @@ export const NotificationProvider = ({ children }) => {
         if (userId) {
           addNotification({
             type: 'solution_comment',
-            title: '✅ Solution Provided',
+            title: 'Solution Provided',
             message: `${solvedBy} provided a solution for Problem #${problemId}`,
             problemId,
             targetUsername: participant,
@@ -270,7 +270,7 @@ export const NotificationProvider = ({ children }) => {
       // Notify Admin and Team Leaders for approval
       addNotification({
         type: 'solution_comment',
-        title: '✅ Solution Ready for Review',
+        title: 'Solution Ready for Review',
         message: `${solvedBy} submitted a solution for Problem #${problemId}`,
         problemId,
         forAdminOrLeader: true,
