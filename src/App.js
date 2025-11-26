@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"; // useEffect import করুন
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -20,6 +20,7 @@ import AdminRoute from "./components/AdminRoute";
 import ProblemCreate from "./pages/ProblemCreate";
 import FirstFaceAssignment from "./components/FirstFaceAssignment";
 import { migrateExistingProblems } from './utils/migration';
+import DomainStatus from './pages/DomainStatus';
 
 function App() {
   useEffect(() => {
@@ -114,6 +115,16 @@ function App() {
                 <AdminRoute>
                   <FirstFaceAssignment />
                 </AdminRoute>
+              }
+            />
+
+            {/* Domain Status Route - শুধুমাত্র Admin এবং Team Leader এর জন্য */}
+            <Route
+              path="/domain-status"
+              element={
+                <ProtectedRoute>
+                  <DomainStatus />
+                </ProtectedRoute>
               }
             />
 

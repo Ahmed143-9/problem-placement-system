@@ -125,7 +125,7 @@ export default function ProblemList() {
 
           if (response.ok) {
             const data = await response.json();
-            console.log('✅ API response data:', data);
+            console.log('API response data:', data);
             
             // Handle different response structures
             let apiProblems = [];
@@ -137,7 +137,7 @@ export default function ProblemList() {
               apiProblems = data;
             }
 
-            console.log(`✅ Extracted ${apiProblems.length} problems from API response`);
+            console.log(`Extracted ${apiProblems.length} problems from API response`);
 
             if (apiProblems.length > 0) {
               // Transform data to match frontend structure
@@ -155,7 +155,7 @@ export default function ProblemList() {
 
               setProblems(transformedProblems);
               localStorage.setItem('problems', JSON.stringify(transformedProblems));
-              console.log(`✅ Loaded ${transformedProblems.length} problems from server`);
+              console.log(`Loaded ${transformedProblems.length} problems from server`);
               return;
             }
           }
@@ -211,7 +211,7 @@ export default function ProblemList() {
                 u.username !== 'Admin' && u.status === 'active'
               );
               setTeamMembers(members);
-              console.log(`✅ Loaded ${members.length} team members from API`);
+              console.log(`Loaded ${members.length} team members from API`);
               return;
             }
           }
@@ -232,13 +232,13 @@ export default function ProblemList() {
         ];
         localStorage.setItem('system_users', JSON.stringify(sampleMembers));
         setTeamMembers(sampleMembers);
-        console.log('✅ Created sample team members');
+        console.log('Created sample team members');
       } else {
         const members = storedUsers.filter(u => 
           u.username !== 'Admin' && u.status === 'active'
         );
         setTeamMembers(members);
-        console.log(`✅ Loaded ${members.length} team members from localStorage`);
+        console.log(`Loaded ${members.length} team members from localStorage`);
       }
     } catch (error) {
       console.error('Failed to fetch team members:', error);
@@ -317,7 +317,7 @@ const handleAssignSubmit = async () => {
     setProblems(updatedProblems);
     localStorage.setItem('problems', JSON.stringify(updatedProblems));
     
-    console.log('✅ Assignment saved to localStorage');
+    console.log('Assignment saved to localStorage');
     
     toast.success(
       isTransfer 
@@ -357,7 +357,7 @@ const handleAssignSubmit = async () => {
             });
 
             if (response.ok) {
-              console.log(`✅ Problem #${problemId} deleted from API`);
+              console.log(`Problem #${problemId} deleted from API`);
             }
           } catch (apiError) {
             console.warn('API delete failed, data deleted locally:', apiError);
@@ -574,7 +574,7 @@ const handleAssignSubmit = async () => {
                     title="Admin Panel"
                   >
                     <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                   </Link>
                 </li>
               )}
@@ -837,7 +837,7 @@ const handleAssignSubmit = async () => {
                               )}
 
                               {/* Delete Button */}
-                              {user?.role === 'admin' && (
+                              {/* {user?.role === 'admin' && (
                                 <button
                                   className="btn btn-sm btn-outline-danger"
                                   onClick={() => handleDelete(problem.id)}
@@ -846,7 +846,7 @@ const handleAssignSubmit = async () => {
                                 >
                                   <i className="bi bi-trash-fill" style={{ fontSize: '1rem' }}></i>
                                 </button>
-                              )}
+                              )} */}
                             </div>
                           </td>
                         </tr>

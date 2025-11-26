@@ -472,7 +472,7 @@ This is an automatically generated report.
                       title="Admin Panel"
                     >
                       <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                     </Link>
                   </li>
                 )}

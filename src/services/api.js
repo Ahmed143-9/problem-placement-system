@@ -1,7 +1,7 @@
 // src/services/api.js ফাইল তৈরি করুন (যদি আগে না থাকে)
 import axios from "axios";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = "https://ticketapi.wineds.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,

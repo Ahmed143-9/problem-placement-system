@@ -31,7 +31,7 @@ export default function FirstFaceAssignment() {
       setAssignments(result.data);
       // Also save to localStorage for auto-assignment logic
       localStorage.setItem('firstFace_assignments', JSON.stringify(result.data));
-      console.log('✅ Assignments loaded:', result.data);
+      console.log('Assignments loaded:', result.data);
     } catch (error) {
       console.error('❌ Error loading assignments:', error);
       // Fallback to localStorage

@@ -309,7 +309,7 @@ export default function AdminPanelUserManagement() {
       console.log('🔔 First Face assignment notification sent:', notification);
       
       // Show toast notification
-      toast.info(`📨 Notification sent to ${assignment.userName}`);
+      toast.info(`Notification sent to ${assignment.userName}`);
     } catch (error) {
       console.error('❌ Failed to send notification:', error);
     }
@@ -367,12 +367,12 @@ export default function AdminPanelUserManagement() {
       notifications.push(notification);
       localStorage.setItem('notifications', JSON.stringify(notifications));
 
-      console.log('🔔 First Face removal notification sent:', notification);
+      console.log('First Face removal notification sent:', notification);
       
       // Show toast notification
-      toast.info(`📨 Removal notification sent to ${assignment.userName}`);
+      toast.info(`Removal notification sent to ${assignment.userName}`);
     } catch (error) {
-      console.error('❌ Failed to send removal notification:', error);
+      console.error('Failed to send removal notification:', error);
     }
   };
 
@@ -480,9 +480,9 @@ export default function AdminPanelUserManagement() {
       notifications.push(notification);
       localStorage.setItem('notifications', JSON.stringify(notifications));
 
-      console.log('🔔 User creation notification sent:', notification);
+      console.log('User creation notification sent:', notification);
     } catch (error) {
-      console.error('❌ Failed to send user creation notification:', error);
+      console.error('Failed to send user creation notification:', error);
     }
   };
 
@@ -496,7 +496,7 @@ export default function AdminPanelUserManagement() {
         userId: oldUser.id,
         userName: oldUser.name,
         type: 'user_updated',
-        title: '✏️ User Updated',
+        title: 'User Updated',
         message: `User "${oldUser.name}" profile has been updated`,
         isRead: false,
         createdAt: new Date().toISOString(),
@@ -507,9 +507,9 @@ export default function AdminPanelUserManagement() {
       notifications.push(notification);
       localStorage.setItem('notifications', JSON.stringify(notifications));
 
-      console.log('🔔 User update notification sent:', notification);
+      console.log('User update notification sent:', notification);
     } catch (error) {
-      console.error('❌ Failed to send user update notification:', error);
+      console.error('Failed to send user update notification:', error);
     }
   };
 
@@ -594,9 +594,9 @@ export default function AdminPanelUserManagement() {
       notifications.push(notification);
       localStorage.setItem('notifications', JSON.stringify(notifications));
 
-      console.log('🔔 User deletion notification sent:', notification);
+      console.log('User deletion notification sent:', notification);
     } catch (error) {
-      console.error('❌ Failed to send user deletion notification:', error);
+      console.error('Failed to send user deletion notification:', error);
     }
   };
 

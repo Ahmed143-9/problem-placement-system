@@ -4,7 +4,21 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
-import { FaTasks, FaClipboardList, FaCheckCircle, FaSpinner, FaPlusCircle, FaUsersCog, FaHome, FaExclamationTriangle, FaFileAlt, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { 
+  FaTasks, 
+  FaClipboardList, 
+  FaCheckCircle, 
+  FaSpinner, 
+  FaPlusCircle, 
+  FaUsersCog, 
+  FaHome, 
+  FaExclamationTriangle, 
+  FaFileAlt, 
+  FaChartLine, 
+  FaChevronLeft, 
+  FaChevronRight,
+  FaGlobe // Domain Status এর জন্য আইকন যোগ করুন
+} from 'react-icons/fa';
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
@@ -109,12 +123,12 @@ export default function EmployeeDashboard() {
               zIndex: 1000,
               cursor: 'pointer',
             }}
->
-        {sidebarMinimized 
-          ? <FaChevronRight size={14} color="#333" /> 
-          : <FaChevronLeft size={14} color="#333" />
-        }
-      </button>
+          >
+            {sidebarMinimized 
+              ? <FaChevronRight size={14} color="#333" /> 
+              : <FaChevronLeft size={14} color="#333" />
+            }
+          </button>
 
           <div className="p-3">
             {!sidebarMinimized && (
@@ -174,19 +188,35 @@ export default function EmployeeDashboard() {
                 </Link>
               </li>
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
-                <li className="nav-item mb-2">
-                  <Link 
-                    to="/admin" 
-                    className="nav-link text-white rounded d-flex align-items-center"
-                    style={sidebarLinkStyle}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    title="Admin Panel"
-                  >
-                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
-                  </Link>
-                </li>
+                <>
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/admin" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      style={sidebarLinkStyle}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      title="Admin Panel"
+                    >
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+                    </Link>
+                  </li>
+                  {/* Domain Status অপশন শুধুমাত্র Admin এবং Team Leader এর জন্য */}
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/domain-status" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      style={sidebarLinkStyle}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      title="Domain Status"
+                    >
+                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+                    </Link>
+                  </li>
+                </>
               )}
             </ul>
           </div>

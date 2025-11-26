@@ -689,11 +689,11 @@ const canChangeStatus = () => {
                         </span>
                       )}
                       
-                      {canDelete() && (
+                      {/* {canDelete() && (
                         <button className="btn btn-danger btn-sm" onClick={handleDelete}>
                           🗑 Delete
                         </button>
-                      )}
+                      )} */}
                     </div>
                   </div>
                   <div className="card-body" style={{ padding: '1.5rem' }}>

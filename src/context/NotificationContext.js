@@ -125,7 +125,7 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // 🔥 NEW: Get all users who should be notified about discussion
+  // Get all users who should be notified about discussion
   const getDiscussionParticipants = (problemId) => {
     try {
       const problem = getProblemDetails(problemId);
@@ -168,7 +168,123 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // 🔥 NEW: Notify about new discussion comment
+  // ==================== DOMAIN STATUS NOTIFICATIONS ====================
+
+  // Notify when domain status changes (UP/DOWN)
+  const notifyDomainStatusChange = (domain, fromStatus, toStatus) => {
+    const priority = toStatus === 'DOWN' ? 'HIGH' : 'INFO';
+    const icon = toStatus === 'UP' ? '🟢' : '🔴';
+    const color = toStatus === 'UP' ? 'success' : 'danger';
+    
+    addNotification({
+      type: 'domain_status_change',
+      title: `${icon} Domain Status Changed`,
+      message: `${domain.replace('https://', '')} changed from ${fromStatus} to ${toStatus}`,
+      domain: domain,
+      fromStatus: fromStatus,
+      toStatus: toStatus,
+      priority: priority,
+      forAdminOrLeader: true,
+      icon: icon,
+      color: color,
+      timestamp: new Date().toISOString(),
+      isDomainNotification: true
+    });
+
+    console.log(`🔔 Domain Status Change: ${domain} - ${fromStatus} → ${toStatus}`);
+  };
+
+  // Notify when new domain is added to monitoring
+  const notifyNewDomain = (domain, isUp) => {
+    const status = isUp ? 'UP' : 'DOWN';
+    const icon = isUp ? '🟢' : '🔴';
+    
+    addNotification({
+      type: 'new_domain',
+      title: '🌐 New Domain Added',
+      message: `${domain.replace('https://', '')} is now being monitored (Status: ${status})`,
+      domain: domain,
+      isUp: isUp,
+      forAdminOrLeader: true,
+      icon: '🌐',
+      color: 'info',
+      timestamp: new Date().toISOString(),
+      isDomainNotification: true
+    });
+  };
+
+  // Notify when critical domain is down
+  const notifyCriticalDomain = (domain) => {
+    addNotification({
+      type: 'critical_domain',
+      title: '🚨 Critical Domain Alert',
+      message: `${domain.replace('https://', '')} is DOWN and requires immediate attention`,
+      domain: domain,
+      priority: 'URGENT',
+      forAdminOrLeader: true,
+      icon: '🚨',
+      color: 'danger',
+      timestamp: new Date().toISOString(),
+      isDomainNotification: true
+    });
+  };
+
+  // Manual domain check notification
+  const notifyManualDomainCheck = (domain, isUp) => {
+    addNotification({
+      type: 'manual_domain_check',
+      title: '🔍 Manual Domain Check',
+      message: `${domain.replace('https://', '')} is currently ${isUp ? 'UP' : 'DOWN'}`,
+      domain: domain,
+      isUp: isUp,
+      forAdminOrLeader: true,
+      icon: '🔍',
+      color: isUp ? 'success' : 'warning',
+      timestamp: new Date().toISOString(),
+      isDomainNotification: true
+    });
+  };
+
+  // Notify when multiple domains are down
+  const notifyMultipleDomainsDown = (downDomains) => {
+    if (downDomains.length === 0) return;
+
+    addNotification({
+      type: 'multiple_domains_down',
+      title: '⚠️ Multiple Domains Down',
+      message: `${downDomains.length} domain(s) are currently DOWN: ${downDomains.map(d => d.replace('https://', '')).join(', ')}`,
+      domains: downDomains,
+      count: downDomains.length,
+      priority: 'HIGH',
+      forAdminOrLeader: true,
+      icon: '⚠️',
+      color: 'danger',
+      timestamp: new Date().toISOString(),
+      isDomainNotification: true
+    });
+  };
+
+  // Notify when domain uptime is low
+  const notifyLowUptime = (uptimePercentage, totalDomains, downDomains) => {
+    addNotification({
+      type: 'low_uptime',
+      title: '📉 Low Uptime Alert',
+      message: `Domain uptime is ${uptimePercentage}% (${downDomains} out of ${totalDomains} domains are down)`,
+      uptimePercentage: uptimePercentage,
+      totalDomains: totalDomains,
+      downDomains: downDomains,
+      priority: 'MEDIUM',
+      forAdminOrLeader: true,
+      icon: '📉',
+      color: 'warning',
+      timestamp: new Date().toISOString(),
+      isDomainNotification: true
+    });
+  };
+
+  // ==================== PROBLEM MANAGEMENT NOTIFICATIONS ====================
+
+  // Notify about new discussion comment
   const notifyDiscussionComment = (problemId, commentAuthor, commentText, problemDetails = null) => {
     try {
       console.log('🔔 Sending discussion notifications for problem:', problemId);
@@ -229,7 +345,7 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // 🔥 NEW: Notify about solution comment (special type)
+  // Notify about solution comment (special type)
   const notifySolutionComment = (problemId, solvedBy, solutionText, problemDetails = null) => {
     try {
       const problem = problemDetails || getProblemDetails(problemId);
@@ -253,7 +369,7 @@ export const NotificationProvider = ({ children }) => {
         if (userId) {
           addNotification({
             type: 'solution_comment',
-            title: 'Solution Provided',
+            title: '✅ Solution Provided',
             message: `${solvedBy} provided a solution for Problem #${problemId}`,
             problemId,
             targetUsername: participant,
@@ -270,7 +386,7 @@ export const NotificationProvider = ({ children }) => {
       // Notify Admin and Team Leaders for approval
       addNotification({
         type: 'solution_comment',
-        title: 'Solution Ready for Review',
+        title: '✅ Solution Ready for Review',
         message: `${solvedBy} submitted a solution for Problem #${problemId}`,
         problemId,
         forAdminOrLeader: true,
@@ -290,7 +406,7 @@ export const NotificationProvider = ({ children }) => {
   const notifyNewProblem = (problemId, createdBy, department) => {
     addNotification({
       type: 'new_problem',
-      title: 'New Problem Raised',
+      title: '🆕 New Problem Raised',
       message: `${createdBy} raised a new problem (#${problemId}) in ${department} department`,
       problemId,
       forAdminOrLeader: true,
@@ -304,7 +420,7 @@ export const NotificationProvider = ({ children }) => {
     
     addNotification({
       type: 'assignment',
-      title: 'Problem Assigned',
+      title: '📌 Problem Assigned',
       message: `You have been assigned problem #${problemId} by ${assignedBy}`,
       problemId,
       targetUsername: assignedToUsername,
@@ -320,7 +436,7 @@ export const NotificationProvider = ({ children }) => {
       
       addNotification({
         type: 'status_change',
-        title: 'Status Updated',
+        title: '🔄 Status Updated',
         message: `Problem #${problemId} status changed to ${newStatus.replace('_', ' ').toUpperCase()} by ${changedBy}`,
         problemId,
         targetUsername: assignedToUsername,
@@ -336,7 +452,7 @@ export const NotificationProvider = ({ children }) => {
     
     addNotification({
       type: 'transfer',
-      title: 'Problem Transferred to You',
+      title: '⇄ Problem Transferred to You',
       message: `Problem #${problemId} has been transferred to you from ${fromUsername} by ${transferredBy}`,
       problemId,
       targetUsername: toUsername,
@@ -347,7 +463,7 @@ export const NotificationProvider = ({ children }) => {
 
     addNotification({
       type: 'transfer',
-      title: 'Problem Transferred',
+      title: '⇄ Problem Transferred',
       message: `Problem #${problemId} transferred from ${fromUsername} to ${toUsername}`,
       problemId,
       forAdminOrLeader: true,
@@ -359,7 +475,7 @@ export const NotificationProvider = ({ children }) => {
   const notifyCompletion = (problemId, completedBy) => {
     addNotification({
       type: 'completion',
-      title: 'Problem Completed',
+      title: '✅ Problem Completed',
       message: `Problem #${problemId} has been marked as completed by ${completedBy}`,
       problemId,
       forAdminOrLeader: true,
@@ -368,9 +484,55 @@ export const NotificationProvider = ({ children }) => {
     });
   };
 
+  // ==================== SYSTEM NOTIFICATIONS ====================
+
+  // System maintenance notification
+  const notifySystemMaintenance = (message, duration) => {
+    addNotification({
+      type: 'system_maintenance',
+      title: '🔧 System Maintenance',
+      message: message,
+      duration: duration,
+      forAdminOrLeader: false, // All users see this
+      icon: '🔧',
+      color: 'info',
+      isSystemNotification: true
+    });
+  };
+
+  // System error notification
+  const notifySystemError = (errorMessage, component) => {
+    addNotification({
+      type: 'system_error',
+      title: '❌ System Error',
+      message: `${component}: ${errorMessage}`,
+      component: component,
+      forAdminOrLeader: true,
+      icon: '❌',
+      color: 'danger',
+      isSystemNotification: true
+    });
+  };
+
+  // Backup completed notification
+  const notifyBackupCompleted = (backupType, size) => {
+    addNotification({
+      type: 'backup_completed',
+      title: '💾 Backup Completed',
+      message: `${backupType} backup completed successfully (${size})`,
+      backupType: backupType,
+      size: size,
+      forAdminOrLeader: true,
+      icon: '💾',
+      color: 'success',
+      isSystemNotification: true
+    });
+  };
+
   return (
     <NotificationContext.Provider
       value={{
+        // Core notification functions
         notifications,
         unreadCount,
         addNotification,
@@ -378,16 +540,33 @@ export const NotificationProvider = ({ children }) => {
         markAllAsRead,
         clearNotifications,
         loadNotifications,
+
         // Helper functions
+        getUserIdByUsername,
+        getProblemDetails,
+        getDiscussionParticipants,
+
+        // 🔥 DOMAIN STATUS NOTIFICATIONS
+        notifyDomainStatusChange,
+        notifyNewDomain,
+        notifyCriticalDomain,
+        notifyManualDomainCheck,
+        notifyMultipleDomainsDown,
+        notifyLowUptime,
+
+        // 🔥 PROBLEM MANAGEMENT NOTIFICATIONS
         notifyNewProblem,
         notifyAssignment,
         notifyStatusChange,
         notifyTransfer,
         notifyCompletion,
-        // 🔥 NEW: Discussion notification functions
         notifyDiscussionComment,
         notifySolutionComment,
-        getDiscussionParticipants
+
+        // 🔥 SYSTEM NOTIFICATIONS
+        notifySystemMaintenance,
+        notifySystemError,
+        notifyBackupCompleted
       }}
     >
       {children}
