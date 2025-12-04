@@ -381,10 +381,16 @@ export default function AdminPanelUserManagement() {
     if (!isAdmin) return toast.error('Only Admin can add or edit users!');
     if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
 
-    // Password validation শুধু new user এর জন্য
-    if (!editingUser) {
-      if (!formData.password) return toast.error('Password is required for new user');
-      if (!validatePassword(formData.password)) return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char');
+    // Password validation - BOTH new user AND edit mode যদি password provide করা হয়
+    if (formData.password) {
+      // যদি password দেওয়া থাকে (edit বা new উভয় ক্ষেত্রেই), validation চেক করব
+      if (!validatePassword(formData.password)) {
+        return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char (@$!%*?&.)');
+      }
+    } 
+    // New user এর জন্য password required
+    else if (!editingUser) {
+      return toast.error('Password is required for new user');
     }
 
     // Edit mode এ password blank হলে remove করুন request থেকে
@@ -410,7 +416,7 @@ export default function AdminPanelUserManagement() {
       const response = await fetch(url, {
         method: method,
         headers: headers,
-        body: JSON.stringify(submitData), // Updated data use করুন
+        body: JSON.stringify(submitData),
       });
 
       const responseText = await response.text();
@@ -677,10 +683,34 @@ export default function AdminPanelUserManagement() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // ✅ validatePassword function - এখানে রাখো (handleInputChange এর পরে)
   const validatePassword = (password) => {
-    const re = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    return re.test(password);
-  };
+  console.log('🔍 Frontend validating password:', password);
+  
+  // Step-by-step validation
+  if (!password || password.length < 8) {
+    console.log('❌ Password too short or empty');
+    return false;
+  }
+  
+  if (!/[A-Z]/.test(password)) {
+    console.log('❌ No uppercase letter found');
+    return false;
+  }
+  
+  if (!/\d/.test(password)) {
+    console.log('❌ No number found');
+    return false;
+  }
+  
+  if (!/[@$!%*?&.]/.test(password)) {
+    console.log('❌ No special character found');
+    return false;
+  }
+  
+  console.log('✅ Frontend password validation passed');
+  return true;
+};
 
   const getRoleBadge = role => {
     const badges = { 
@@ -821,7 +851,7 @@ export default function AdminPanelUserManagement() {
                     title="Admin Panel"
                   >
                     <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                   </Link>
                 </li>
               )}
@@ -1411,7 +1441,8 @@ export default function AdminPanelUserManagement() {
                             <li>At least 8 characters</li>
                             <li>1 uppercase letter</li>
                             <li>1 number</li>
-                            <li>1 special character (@$!%*?&)</li>
+                            <li>1 special character (@$!%*?&.)</li>
+                            <li className="text-success">Dot (.) is allowed!</li>
                           </ul>
                         </div>
                       )}
