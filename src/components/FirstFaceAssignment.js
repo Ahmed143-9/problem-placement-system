@@ -158,16 +158,21 @@ export default function FirstFaceAssignment() {
                   <div className="col-md-4">
                     <label className="form-label">Department</label>
                     <select 
-                      className="form-select"
-                      value={newAssignment.department}
-                      onChange={(e) => setNewAssignment({...newAssignment, department: e.target.value})}
-                    >
-                      <option value="">Select Department</option>
-                      <option value="IT & Innovation">IT & Innovation</option>
-                      <option value="Business">Business</option>
-                      <option value="Accounts">Accounts</option>
-                      <option value="all">All Departments</option>
-                    </select>
+                        className="form-select"
+                        value={newAssignment.department}
+                        onChange={(e) => setNewAssignment({...newAssignment, department: e.target.value})}
+                      >
+                        <option value="">Select Department</option>
+                        <option value="Enterprise Business Solutions">Enterprise Business Solutions</option>
+                        <option value="Board Management">Board Management</option>
+                        <option value="Support Stuff">Support Stuff</option>
+                        <option value="Administration and Human Resources">Administration and Human Resources</option>
+                        <option value="Finance and Accounts">Finance and Accounts</option>
+                        <option value="Business Dev and Operations">Business Dev and Operations</option>
+                        <option value="Implementation and Support">Implementation and Support</option>
+                        <option value="Technical and Networking Department">Technical and Networking Department</option>
+                        <option value="all">All Departments</option>
+                      </select>
                   </div>
                   
                   <div className="col-md-4">
@@ -247,18 +252,18 @@ export default function FirstFaceAssignment() {
                         {assignments.map((assignment) => (
                           <tr key={assignment.id}>
                             <td>
-                              <strong>
-                                {assignment.department === 'all' 
-                                  ? 'All Departments' 
-                                  : assignment.department
-                                }
-                              </strong>
-                              {assignment.department === 'all' && (
-                                <div>
-                                  <small className="text-warning">(Fallback for all departments)</small>
-                                </div>
-                              )}
-                            </td>
+                                <strong>
+                                  {assignment.department === 'all' 
+                                    ? 'All Departments' 
+                                    : assignment.department
+                                  }
+                                </strong>
+                                {assignment.department === 'all' && (
+                                  <div>
+                                    <small className="text-warning">(Fallback for all departments)</small>
+                                  </div>
+                                )}
+                              </td>
                             <td>
                               <span className="badge bg-info fs-6">
                                 {assignment.userName}
