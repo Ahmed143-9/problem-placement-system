@@ -559,9 +559,14 @@ export default function ProblemForm() {
                           required
                         >
                           <option value="">Select Department</option>
-                          <option value="IT & Innovation">IT & Innovation</option>
-                          <option value="Business">Business</option>
-                          <option value="Accounts">Accounts</option>
+                          <option value="Enterprise Business Solutions">Enterprise Business Solutions</option>
+                          <option value="Board Management">Board Management</option>
+                          <option value="Support Stuff">Support Stuff</option>
+                          <option value="Administration and Human Resources">Administration and Human Resources</option>
+                          <option value="Finance and Accounts">Finance and Accounts</option>
+                          <option value="Business Dev and Operations">Business Dev and Operations</option>
+                          <option value="Implementation and Support">Implementation and Support</option>
+                          <option value="Technical and Networking Department">Technical and Networking Department</option>
                         </select>
                       </div>
 
