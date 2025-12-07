@@ -10,7 +10,7 @@ import './ProblemList.css';
 export default function ProblemList() {
   const { user, isAuthenticated } = useAuth();
   const { notifyAssignment, notifyTransfer } = useNotifications();
-  const API_BASE_URL = 'http://localhost:8000/api';
+  const API_BASE_URL = 'https://ticketapi.wineds.com/api'; // Match AuthContext
   const navigate = useNavigate();
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,36 +65,90 @@ export default function ProblemList() {
     const sampleProblems = [
       {
         id: 1,
-        department: 'Tech',
+        department: 'Technical and Networking Department',
+        service: 'Server Maintenance',
         priority: 'High',
         status: 'pending',
-        createdBy: user?.name || 'Admin',
-        assignedTo: '',
         statement: 'Server downtime affecting user login functionality',
-        createdAt: new Date().toISOString()
+        client: 'Internal IT',
+        createdBy: user?.name || 'Admin User',
+        createdById: user?.id || 1,
+        assignedTo: null,
+        assignedToName: null,
+        assignedToEmail: null,
+        createdAt: new Date().toISOString(),
+        comments: [],
+        transferHistory: [],
+        actionHistory: [{
+          action: 'Problem Created',
+          by: user?.name || 'Admin User',
+          timestamp: new Date().toISOString(),
+          comment: 'Initial problem report'
+        }]
       },
       {
         id: 2,
-        department: 'Business',
+        department: 'Enterprise Business Solutions',
+        service: 'Customer Portal',
         priority: 'Medium',
         status: 'in_progress',
-        createdBy: user?.name || 'Admin',
-        assignedTo: 'John Doe',
         statement: 'Update pricing page with new product features',
-        createdAt: new Date().toISOString()
+        client: 'ABC Corporation',
+        createdBy: user?.name || 'Admin User',
+        createdById: user?.id || 1,
+        assignedTo: 2, // John Doe's ID
+        assignedToName: 'John Doe',
+        assignedToEmail: 'john.doe@example.com',
+        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        comments: [],
+        transferHistory: [],
+        actionHistory: [{
+          action: 'Problem Created',
+          by: user?.name || 'Admin User',
+          timestamp: new Date(Date.now() - 86400000).toISOString(),
+          comment: 'Initial problem report'
+        }, {
+          action: 'Assigned',
+          by: user?.name || 'Admin User',
+          timestamp: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+          comment: 'Assigned to John Doe'
+        }]
       },
       {
         id: 3,
-        department: 'Accounts',
+        department: 'Finance and Accounts',
+        service: 'Billing System',
         priority: 'Low',
         status: 'done',
-        createdBy: user?.name || 'Admin',
-        assignedTo: 'Jane Smith',
         statement: 'Fix calculation error in monthly reports',
-        createdAt: new Date().toISOString()
+        client: 'Finance Department',
+        createdBy: user?.name || 'Admin User',
+        createdById: user?.id || 1,
+        assignedTo: 3, // Jane Smith's ID
+        assignedToName: 'Jane Smith',
+        assignedToEmail: 'jane.smith@example.com',
+        createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+        comments: [],
+        transferHistory: [],
+        actionHistory: [{
+          action: 'Problem Created',
+          by: user?.name || 'Admin User',
+          timestamp: new Date(Date.now() - 172800000).toISOString(),
+          comment: 'Initial problem report'
+        }, {
+          action: 'Assigned',
+          by: user?.name || 'Admin User',
+          timestamp: new Date(Date.now() - 129600000).toISOString(), // 36 hours ago
+          comment: 'Assigned to Jane Smith'
+        }, {
+          action: 'Resolved',
+          by: 'Jane Smith',
+          timestamp: new Date(Date.now() - 86400000).toISOString(), // 24 hours ago
+          comment: 'Issue fixed and tested'
+        }]
       }
     ];
-    
+  
     setProblems(sampleProblems);
     localStorage.setItem('problems', JSON.stringify(sampleProblems));
     toast.info('Created sample problems to get you started!');
@@ -126,7 +180,7 @@ export default function ProblemList() {
           if (response.ok) {
             const data = await response.json();
             console.log('API response data:', data);
-            
+          
             // Handle different response structures
             let apiProblems = [];
             if (data.success && Array.isArray(data.problems)) {
@@ -137,30 +191,42 @@ export default function ProblemList() {
               apiProblems = data;
             }
 
-            console.log(`Extracted ${apiProblems.length} problems from API response`);
+            console.log(`📊 Extracted ${apiProblems.length} problems from API response`);
 
             if (apiProblems.length > 0) {
               // Transform data to match frontend structure
-              const transformedProblems = apiProblems.map(problem => ({
-                id: problem.id,
-                department: problem.department,
-                priority: problem.priority,
-                status: problem.status,
-                statement: problem.statement,
-                createdBy: problem.created_by || problem.createdBy,
-                assignedTo: problem.assigned_to || problem.assignedTo,
-                transferHistory: problem.transfer_history || problem.transferHistory,
-                createdAt: problem.created_at || problem.createdAt
-              }));
+              const transformedProblems = apiProblems.map(problem => {
+                // Get assignee information if available
+                const assignee = problem.assignee;
+                
+                return {
+                  id: problem.id,
+                  department: problem.department,
+                  service: problem.service || '',
+                  priority: problem.priority,
+                  status: problem.status,
+                  statement: problem.statement,
+                  client: problem.client || '',
+                  createdBy: problem.creator?.name || problem.created_by || problem.createdBy || 'Unknown',
+                  createdById: problem.creator?.id || problem.created_by_id || problem.createdById,
+                  assignedTo: assignee?.id || problem.assigned_to || problem.assignedTo,
+                  assignedToName: assignee?.name || problem.assigned_to_name || problem.assignedToName,
+                  assignedToEmail: assignee?.email || problem.assigned_to_email || problem.assignedToEmail,
+                  transferHistory: problem.transfer_history || problem.transferHistory || [],
+                  actionHistory: problem.action_history || problem.actionHistory || [],
+                  comments: problem.comments || [],
+                  createdAt: problem.created_at || problem.createdAt
+                };
+              });
 
               setProblems(transformedProblems);
               localStorage.setItem('problems', JSON.stringify(transformedProblems));
-              console.log(`Loaded ${transformedProblems.length} problems from server`);
+              console.log(`✅ Loaded ${transformedProblems.length} problems from server`);
               return;
             }
           }
         } catch (apiError) {
-          console.warn('API call failed, using localStorage:', apiError);
+          console.warn('⚠️ API call failed, using localStorage:', apiError);
         }
       }
 
@@ -192,11 +258,13 @@ export default function ProblemList() {
   // Fixed: Fetch team members from API
   const fetchTeamMembers = async () => {
     try {
+      console.log('🔄 Fetching team members...');
       const token = localStorage.getItem('token');
       
       // Try API first
       if (token) {
         try {
+          console.log('🌐 Attempting API call to:', `${API_BASE_URL}/users`);
           const response = await fetch(`${API_BASE_URL}/users`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -204,14 +272,18 @@ export default function ProblemList() {
             },
           });
 
+          console.log('📡 API Response status:', response.status);
+
           if (response.ok) {
             const data = await response.json();
+            console.log('API response data:', data);
+          
             if (data.success) {
               const members = data.users.filter(u => 
-                u.username !== 'Admin' && u.status === 'active'
+                u.email !== 'admin@example.com' && u.status === 'active'
               );
               setTeamMembers(members);
-              console.log(`Loaded ${members.length} team members from API`);
+              console.log(`✅ Loaded ${members.length} team members from API`);
               return;
             }
           }
@@ -222,26 +294,27 @@ export default function ProblemList() {
 
       // Fallback to localStorage
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      
+      console.log('📁 Stored users from localStorage:', storedUsers);
+
       if (storedUsers.length === 0) {
         // Create sample team members
         const sampleMembers = [
-          { id: 1, name: 'John Doe', role: 'team_leader', department: 'Tech', status: 'active', username: 'john' },
-          { id: 2, name: 'Jane Smith', role: 'user', department: 'Business', status: 'active', username: 'jane' },
-          { id: 3, name: 'Mike Johnson', role: 'user', department: 'Accounts', status: 'active', username: 'mike' }
+          { id: 1, name: 'John Doe', role: 'team_leader', department: 'Technical and Networking Department', status: 'active', username: 'john', email: 'john.doe@example.com' },
+          { id: 2, name: 'Jane Smith', role: 'user', department: 'Enterprise Business Solutions', status: 'active', username: 'jane', email: 'jane.smith@example.com' },
+          { id: 3, name: 'Mike Johnson', role: 'user', department: 'Finance and Accounts', status: 'active', username: 'mike', email: 'mike.johnson@example.com' }
         ];
         localStorage.setItem('system_users', JSON.stringify(sampleMembers));
         setTeamMembers(sampleMembers);
-        console.log('Created sample team members');
+        console.log('📝 Created sample team members');
       } else {
         const members = storedUsers.filter(u => 
-          u.username !== 'Admin' && u.status === 'active'
+          u.email !== 'admin@example.com' && u.status === 'active'
         );
         setTeamMembers(members);
-        console.log(`Loaded ${members.length} team members from localStorage`);
+        console.log(`📁 Loaded ${members.length} team members from localStorage`);
       }
     } catch (error) {
-      console.error('Failed to fetch team members:', error);
+      console.error('❌ Failed to fetch team members:', error);
       setTeamMembers([]);
     }
   };
@@ -399,10 +472,26 @@ const handleAssignSubmit = async () => {
   };
 
   const canAssign = () => {
+    console.log('🔍 canAssign check:', {
+      userRole: user?.role,
+      result: user?.role === 'admin' || user?.role === 'team_leader'
+    });
     return user?.role === 'admin' || user?.role === 'team_leader';
   };
 
   const canTransfer = (problem) => {
+    console.log('🔍 canTransfer check:', {
+      problemStatus: problem.status,
+      userRole: user?.role,
+      userName: user?.name,
+      assignedTo: problem.assignedTo,
+      assignedToName: problem.assignedToName,
+      result: problem.status !== 'done' && 
+             problem.status !== 'pending_approval' &&
+             (user?.role === 'admin' || 
+              user?.role === 'team_leader' || 
+              user?.name === problem.assignedTo)
+    });
     return problem.status !== 'done' && 
            problem.status !== 'pending_approval' &&
            (user?.role === 'admin' || 
@@ -454,6 +543,49 @@ const handleAssignSubmit = async () => {
 
   const sidebarLinkStyle = {
     transition: 'all 0.2s ease'
+  };
+
+  // Debug function to check problems and user data
+  const debugProblemsData = () => {
+    console.log('=== DEBUG PROBLEMS DATA ===');
+    console.log('User:', user);
+    console.log('User Role:', user?.role);
+    console.log('Is Admin/Team Leader:', user?.role === 'admin' || user?.role === 'team_leader');
+    console.log('Problems Count:', problems.length);
+    console.log('Current Problems Count:', currentProblems.length);
+    
+    if (currentProblems.length > 0) {
+      console.log('First Problem:', currentProblems[0]);
+      console.log('Can Assign First Problem:', canAssign());
+      console.log('Can Transfer First Problem:', canTransfer(currentProblems[0]));
+      
+      // Check each action button condition
+      const firstProblem = currentProblems[0];
+      console.log('Assign Button Conditions:', {
+        canAssign: canAssign(),
+        statusNotDone: firstProblem.status !== 'done',
+        notAssigned: !firstProblem.assignedTo,
+        showAssign: canAssign() && firstProblem.status !== 'done' && !firstProblem.assignedTo
+      });
+      
+      console.log('Reassign Button Conditions:', {
+        canAssign: canAssign(),
+        statusNotDone: firstProblem.status !== 'done',
+        isAssigned: !!firstProblem.assignedTo,
+        showReassign: canAssign() && firstProblem.status !== 'done' && !!firstProblem.assignedTo
+      });
+      
+      console.log('Transfer Button Conditions:', {
+        canTransfer: canTransfer(firstProblem),
+        showTransfer: canTransfer(firstProblem)
+      });
+    }
+    
+    console.log('Team Members Count:', teamMembers.length);
+    console.log('Team Members:', teamMembers);
+    
+    // Force a re-render by updating state
+    setProblems([...problems]);
   };
 
   if (loading) {
@@ -623,6 +755,14 @@ const handleAssignSubmit = async () => {
                   >
                     <i className="bi bi-arrow-clockwise"></i>
                   </button>
+                  {/* Debug button - remove in production */}
+                  <button 
+                    className="btn btn-outline-danger btn-sm"
+                    onClick={debugProblemsData}
+                    title="Debug Data"
+                  >
+                    <i className="bi bi-bug"></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -688,9 +828,14 @@ const handleAssignSubmit = async () => {
                     onChange={(e) => setFilterDepartment(e.target.value)}
                   >
                     <option value="all">All Depts</option>
-                    <option value="Tech">Tech</option>
-                    <option value="Business">Business</option>
-                    <option value="Accounts">Accounts</option>
+                    <option value="Enterprise Business Solutions">Enterprise Business Solutions</option>
+                    <option value="Board Management">Board Management</option>
+                    <option value="Support Stuff">Support Stuff</option>
+                    <option value="Administration and Human Resources">Administration and Human Resources</option>
+                    <option value="Finance and Accounts">Finance and Accounts</option>
+                    <option value="Business Dev and Operations">Business Dev and Operations</option>
+                    <option value="Implementation and Support">Implementation and Support</option>
+                    <option value="Technical and Networking Department">Technical and Networking Department</option>
                   </select>
                 </div>
                 <div className="col-md-2 col-sm-6">
@@ -835,18 +980,6 @@ const handleAssignSubmit = async () => {
                                   <i className="bi bi-arrow-left-right" style={{ fontSize: '1rem' }}></i>
                                 </button>
                               )}
-
-                              {/* Delete Button */}
-                              {/* {user?.role === 'admin' && (
-                                <button
-                                  className="btn btn-sm btn-outline-danger"
-                                  onClick={() => handleDelete(problem.id)}
-                                  title="Delete Problem"
-                                  style={{ padding: '6px 10px' }}
-                                >
-                                  <i className="bi bi-trash-fill" style={{ fontSize: '1rem' }}></i>
-                                </button>
-                              )} */}
                             </div>
                           </td>
                         </tr>

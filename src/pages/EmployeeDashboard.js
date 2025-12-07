@@ -101,15 +101,15 @@ export default function EmployeeDashboard() {
   const fetchTeamMembers = useCallback(() => {
     try {
       const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      // Filter out current user and inactive users
+      // Filter to only include active users (don't exclude current user for transfer)
       const members = storedUsers.filter(u => 
-        u.id !== user?.id && u.status === 'active'
+        u.email !== 'admin@example.com' && u.status === 'active'
       );
       setTeamMembers(members);
     } catch (error) {
       console.error('Failed to fetch team members:', error);
     }
-  }, [user?.id]);
+  }, []);
 
   useEffect(() => {
     fetchUserProblems();
@@ -133,27 +133,33 @@ export default function EmployeeDashboard() {
   };
 
   const handleTransferSubmit = () => {
-    if (!transferTo.trim()) {
+    if (!transferTo) {
       toast.error('Please select a team member to transfer to');
       return;
     }
 
     try {
       const allProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      
+      // Find the user being transferred to by ID
+      const transferToUser = teamMembers.find(member => member.id === parseInt(transferTo));
+      
+      if (!transferToUser) {
+        toast.error('Selected team member not found');
+        return;
+      }
+      
       const updatedProblems = allProblems.map(p => {
         if (p.id === selectedProblem.id) {
-          // Find the user being transferred to
-          const transferToUser = teamMembers.find(member => member.name === transferTo);
-          
           return {
             ...p,
-            assignedTo: transferToUser ? transferToUser.id : transferTo, // Keep name if user not found
-            assignedToName: transferTo,
+            assignedTo: transferToUser.id,
+            assignedToName: transferToUser.name,
             transferHistory: [
               ...(p.transferHistory || []),
               {
                 from: user?.name,
-                to: transferTo,
+                to: transferToUser.name,
                 date: new Date().toISOString(),
                 by: user?.name,
                 type: 'transfer'
@@ -165,7 +171,7 @@ export default function EmployeeDashboard() {
                 action: 'Transferred',
                 by: user?.name,
                 timestamp: new Date().toISOString(),
-                comment: `Transferred from ${user?.name} to ${transferTo}`
+                comment: `Transferred from ${user?.name} to ${transferToUser.name}`
               }
             ]
           };
@@ -176,13 +182,13 @@ export default function EmployeeDashboard() {
       localStorage.setItem('problems', JSON.stringify(updatedProblems));
       
       // Send notification to the new assignee
-      sendTransferNotification(selectedProblem, transferTo);
+      sendTransferNotification(selectedProblem, transferToUser.name);
       
       setShowTransferModal(false);
       setTransferTo('');
       setSelectedProblem(null);
       fetchUserProblems();
-      toast.success(`Work transferred to ${transferTo} successfully!`);
+      toast.success(`Work transferred to ${transferToUser.name} successfully!`);
     } catch (error) {
       console.error('Failed to transfer work:', error);
       toast.error('Failed to transfer work. Please try again.');
@@ -190,15 +196,16 @@ export default function EmployeeDashboard() {
   };
 
   // Send transfer notification
-  const sendTransferNotification = (problem, newAssignee) => {
+  const sendTransferNotification = (problem, newAssigneeName) => {
     try {
       const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const newAssigneeUser = teamMembers.find(member => member.name === newAssignee);
+      // Find user by name since that's what we're passing
+      const newAssigneeUser = teamMembers.find(member => member.name === newAssigneeName);
       
       const notification = {
         id: Date.now(),
         userId: newAssigneeUser ? newAssigneeUser.id : null,
-        userName: newAssignee,
+        userName: newAssigneeName,
         type: 'problem_transferred',
         title: '🔄 Work Transferred to You',
         message: `Problem #${problem.id} has been transferred to you by ${user?.name}`,
@@ -212,7 +219,7 @@ export default function EmployeeDashboard() {
       notifications.push(notification);
       localStorage.setItem('notifications', JSON.stringify(notifications));
 
-      console.log('🔔 Transfer notification sent to:', newAssignee);
+      console.log('🔔 Transfer notification sent to:', newAssigneeName);
     } catch (error) {
       console.error('Failed to send transfer notification:', error);
     }
@@ -623,7 +630,7 @@ export default function EmployeeDashboard() {
                     >
                       <option value="">-- Select Team Member --</option>
                       {teamMembers.map(member => (
-                        <option key={member.id} value={member.name}>
+                        <option key={member.id} value={member.id}>
                           {member.name} ({member.role === 'team_leader' ? 'Team Leader' : 'User'}) - {member.department}
                         </option>
                       ))}

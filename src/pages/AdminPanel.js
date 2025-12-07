@@ -19,7 +19,7 @@ export default function AdminPanelUserManagement() {
   const [selectedEmail, setSelectedEmail] = useState('');
   const [showFirstFaceModal, setShowFirstFaceModal] = useState(false);
   const [selectedFirstFace, setSelectedFirstFace] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [firstFaceStats, setFirstFaceStats] = useState({ assigned: 0, total: 0 });
   const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
@@ -40,6 +40,15 @@ export default function AdminPanelUserManagement() {
     department: '',
     status: 'active'
   });
+
+  // Handle input changes for form fields
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const isAdmin = user?.role === 'admin' || isSuperAdmin;
 
@@ -255,12 +264,21 @@ export default function AdminPanelUserManagement() {
       const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
       console.log('📋 Existing assignments:', existingAssignments);
       
-      // Deactivate previous assignments for same department
-      const updatedAssignments = existingAssignments.map(assignment => 
-        assignment.department === selectedDepartment 
-          ? { ...assignment, isActive: false }
-          : assignment
-      );
+      // Deactivate previous assignments for same department or all departments
+      const updatedAssignments = existingAssignments.map(assignment => {
+        // If assigning for all departments, deactivate all existing assignments
+        if (selectedDepartment === 'all') {
+          return { ...assignment, isActive: false };
+        }
+        // Otherwise, only deactivate assignments for the same department
+        else if (assignment.department === selectedDepartment) {
+          return { ...assignment, isActive: false };
+        }
+        // Keep other assignments as they are
+        else {
+          return assignment;
+        }
+      });
 
       // Add new assignment
       updatedAssignments.push(newAssignment);
@@ -274,7 +292,7 @@ export default function AdminPanelUserManagement() {
       toast.success(`✅ ${selectedUser.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
       setShowFirstFaceModal(false);
       setSelectedFirstFace('');
-      setSelectedDepartment('all');
+      setSelectedDepartment('');
       
       // Reload assignments to show in UI
       await loadFirstFaceAssignments();
@@ -381,9 +399,9 @@ export default function AdminPanelUserManagement() {
     if (!isAdmin) return toast.error('Only Admin can add or edit users!');
     if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
 
-    // Password validation - BOTH new user AND edit mode যদি password provide করা হয়
+    // Password validation - BOTH new user AND edit mode যদি password provide করা হয়
     if (formData.password) {
-      // যদি password দেওয়া থাকে (edit বা new উভয় ক্ষেত্রেই), validation চেক করব
+      // যদি password দেওয়া থাকে (edit বা new উভয় ক্ষেত্রেই), validation চেক করব
       if (!validatePassword(formData.password)) {
         return toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char (@$!%*?&.)');
       }
@@ -392,7 +410,27 @@ export default function AdminPanelUserManagement() {
     else if (!editingUser) {
       return toast.error('Password is required for new user');
     }
-
+  
+    // Log the data being sent
+    console.log('📤 Sending user data to backend:', formData);
+  
+    // Check if department is valid
+    const validDepartments = [
+      'Enterprise Business Solutions',
+      'Board Management',
+      'Support Stuff',
+      'Administration and Human Resources',
+      'Finance and Accounts',
+      'Business Dev and Operations',
+      'Implementation and Support',
+      'Technical and Networking Department'
+    ];
+  
+    if (formData.department && !validDepartments.includes(formData.department)) {
+      console.warn('⚠️ Invalid department selected:', formData.department);
+      console.log('📋 Valid departments:', validDepartments);
+    }
+    
     // Edit mode এ password blank হলে remove করুন request থেকে
     const submitData = { ...formData };
     if (editingUser && !submitData.password) {
@@ -412,12 +450,20 @@ export default function AdminPanelUserManagement() {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
+      
+      console.log('📡 Sending request to:', url);
+      console.log('📥 Request method:', method);
+      console.log('📨 Request headers:', headers);
+      console.log('📦 Request body:', JSON.stringify(submitData));
 
       const response = await fetch(url, {
         method: method,
         headers: headers,
         body: JSON.stringify(submitData),
       });
+      
+      console.log('📊 Response status:', response.status);
+      console.log('📊 Response headers:', response.headers);
 
       const responseText = await response.text();
       console.log('🟡 RAW RESPONSE:', responseText);
@@ -678,15 +724,19 @@ export default function AdminPanelUserManagement() {
     setSidebarMinimized(!sidebarMinimized);
   };
 
-  const handleInputChange = e => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
   // ✅ validatePassword function - এখানে রাখো (handleInputChange এর পরে)
   const validatePassword = (password) => {
   console.log('🔍 Frontend validating password:', password);
-  
+  console.log('🔍 Password details:', {
+    length: password.length,
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSpecial: /[@$!%*?&.]/.test(password),
+    uppercaseCheck: password.match(/[A-Z]/),
+    numberCheck: password.match(/\d/),
+    specialCheck: password.match(/[@$!%*?&.]/)
+  });
+
   // Step-by-step validation
   if (!password || password.length < 8) {
     console.log('❌ Password too short or empty');
@@ -733,9 +783,14 @@ export default function AdminPanelUserManagement() {
     
     const byDepartment = {
       all: unassigned.length,
-      'IT & Innovation': unassigned.filter(p => p.department === 'IT & Innovation').length,
-      'Business': unassigned.filter(p => p.department === 'Business').length,
-      'Accounts': unassigned.filter(p => p.department === 'Accounts').length
+      'Enterprise Business Solutions': unassigned.filter(p => p.department === 'Enterprise Business Solutions').length,
+      'Board Management': unassigned.filter(p => p.department === 'Board Management').length,
+      'Support Stuff': unassigned.filter(p => p.department === 'Support Stuff').length,
+      'Administration and Human Resources': unassigned.filter(p => p.department === 'Administration and Human Resources').length,
+      'Finance and Accounts': unassigned.filter(p => p.department === 'Finance and Accounts').length,
+      'Business Dev and Operations': unassigned.filter(p => p.department === 'Business Dev and Operations').length,
+      'Implementation and Support': unassigned.filter(p => p.department === 'Implementation and Support').length,
+      'Technical and Networking Department': unassigned.filter(p => p.department === 'Technical and Networking Department').length
     };
     
     return byDepartment;
@@ -1205,7 +1260,7 @@ export default function AdminPanelUserManagement() {
                   onClick={() => {
                     setShowFirstFaceModal(false);
                     setSelectedFirstFace('');
-                    setSelectedDepartment('all');
+                    setSelectedDepartment('');
                   }}
                   disabled={savingFirstFace}
                 ></button>
@@ -1260,15 +1315,23 @@ export default function AdminPanelUserManagement() {
                     onChange={(e) => setSelectedDepartment(e.target.value)}
                     disabled={savingFirstFace}
                   >
+                    <option value="">Select Department</option>
                     <option value="all">All Departments</option>
-                    <option value="IT & Innovation">IT & Innovation Department</option>
-                    <option value="Business">Business Department</option>
-                    <option value="Accounts">Accounts Department</option>
+                    <option value="Enterprise Business Solutions">Enterprise Business Solutions</option>
+                    <option value="Board Management">Board Management</option>
+                    <option value="Support Stuff">Support Stuff</option>
+                    <option value="Administration and Human Resources">Administration and Human Resources</option>
+                    <option value="Finance and Accounts">Finance and Accounts</option>
+                    <option value="Business Dev and Operations">Business Dev and Operations</option>
+                    <option value="Implementation and Support">Implementation and Support</option>
+                    <option value="Technical and Networking Department">Technical and Networking Department</option>
                   </select>
                   <small className="text-muted">
-                    {selectedDepartment === 'all' 
-                      ? 'Will receive ALL new problems from ANY department' 
-                      : `Will receive only ${selectedDepartment} department problems`
+                    {!selectedDepartment 
+                      ? 'Please select a department' 
+                      : selectedDepartment === 'all'
+                        ? 'Will receive problems from ALL departments'
+                        : `Will receive only ${selectedDepartment} department problems`
                     }
                   </small>
                 </div>
@@ -1296,7 +1359,7 @@ export default function AdminPanelUserManagement() {
                     onClick={() => {
                       setShowFirstFaceModal(false);
                       setSelectedFirstFace('');
-                      setSelectedDepartment('all');
+                      setSelectedDepartment('');
                     }}
                     disabled={savingFirstFace}
                   >
