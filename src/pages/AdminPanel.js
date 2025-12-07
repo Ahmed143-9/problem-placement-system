@@ -399,6 +399,29 @@ export default function AdminPanelUserManagement() {
     if (!isAdmin) return toast.error('Only Admin can add or edit users!');
     if (!formData.name || !formData.username || !formData.email) return toast.error('Fill all required fields');
 
+    // Log form data before validation
+    console.log('📥 Form data before validation:', formData);
+  
+    // Log department value specifically with detailed inspection
+    console.log('🔍 Department inspection:', {
+      value: formData.department,
+      type: typeof formData.department,
+      length: formData.department.length,
+      charCodes: formData.department.split('').map((char, index) => ({ index, char, code: char.charCodeAt(0) })),
+      trimmed: formData.department.trim(),
+      hasWhitespace: /\s/.test(formData.department),
+      hasControlChars: /[\x00-\x1F\x7F]/.test(formData.department)
+    });
+  
+    // Log password value specifically
+    console.log('🔍 Password inspection:', {
+      value: formData.password,
+      type: typeof formData.password,
+      length: formData.password.length,
+      hasDot: formData.password.includes('.'),
+      hasAt: formData.password.includes('@')
+    });
+
     // Password validation - BOTH new user AND edit mode যদি password provide করা হয়
     if (formData.password) {
       // যদি password দেওয়া থাকে (edit বা new উভয় ক্ষেত্রেই), validation চেক করব
@@ -429,6 +452,11 @@ export default function AdminPanelUserManagement() {
     if (formData.department && !validDepartments.includes(formData.department)) {
       console.warn('⚠️ Invalid department selected:', formData.department);
       console.log('📋 Valid departments:', validDepartments);
+      console.log('🔄 Comparing with valid departments:');
+      validDepartments.forEach((dept, index) => {
+        console.log(`  ${index + 1}. "${formData.department}" === "${dept}" ? ${formData.department === dept}`);
+        console.log(`     Trimmed: "${formData.department.trim()}" === "${dept.trim()}" ? ${formData.department.trim() === dept.trim()}`);
+      });
     }
     
     // Edit mode এ password blank হলে remove করুন request থেকে
@@ -454,7 +482,7 @@ export default function AdminPanelUserManagement() {
       console.log('📡 Sending request to:', url);
       console.log('📥 Request method:', method);
       console.log('📨 Request headers:', headers);
-      console.log('📦 Request body:', JSON.stringify(submitData));
+      console.log('📦 Request body:', JSON.stringify(submitData, null, 2));
 
       const response = await fetch(url, {
         method: method,
@@ -464,7 +492,7 @@ export default function AdminPanelUserManagement() {
       
       console.log('📊 Response status:', response.status);
       console.log('📊 Response headers:', response.headers);
-
+      
       const responseText = await response.text();
       console.log('🟡 RAW RESPONSE:', responseText);
 
@@ -504,6 +532,13 @@ export default function AdminPanelUserManagement() {
         
       } else {
         console.error('🔴 BACKEND ERROR:', data);
+        // Log specific validation errors
+        if (data.errors) {
+          console.log('📋 Validation errors:', data.errors);
+          Object.keys(data.errors).forEach(field => {
+            console.log(`  ${field}:`, data.errors[field]);
+          });
+        }
         toast.error(data.error || 'Failed to save user');
       }
     } catch (error) {
