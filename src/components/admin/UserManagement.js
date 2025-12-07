@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaUserPlus } from 'react-icons/fa';
 import { userAPI } from '../../utils/api';
 
 export default function UserManagement() {
@@ -8,7 +8,8 @@ export default function UserManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState({});
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -28,6 +29,7 @@ export default function UserManagement() {
     try {
       const result = await userAPI.getUsers();
       setUsers(result.users);
+      console.log('Users loaded:', result.users); // Debug log to see user data structure
     } catch (error) {
       toast.error('Failed to load users');
     }
@@ -44,11 +46,21 @@ export default function UserManagement() {
 
     setLoading(true);
     try {
+      // For editing, if password field is unchanged (same as what was loaded), don't send it
+      const submitData = { ...formData };
+      
       if (editingUser) {
-        await userAPI.updateUser(editingUser.id, formData);
+        // If password field is empty or matches what was originally loaded, don't update password
+        if (!submitData.password) {
+          delete submitData.password;
+        }
+      }
+
+      if (editingUser) {
+        await userAPI.updateUser(editingUser.id, submitData);
         toast.success('User updated successfully!');
       } else {
-        await userAPI.createUser(formData);
+        await userAPI.createUser(submitData);
         toast.success('User created successfully!');
       }
 
@@ -59,6 +71,25 @@ export default function UserManagement() {
       toast.error(error.message || 'Failed to save user');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // New function to reset user password
+  const handleResetPassword = async (userId, userName) => {
+    const newPassword = prompt(`Enter new password for ${userName}:`);
+    if (!newPassword) return;
+    
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      await userAPI.resetUserPassword(userId, newPassword);
+      toast.success(`Password reset successfully for ${userName}!`);
+      loadUsers();
+    } catch (error) {
+      toast.error(error.message || 'Failed to reset password');
     }
   };
 
@@ -95,10 +126,16 @@ export default function UserManagement() {
       status: 'active'
     });
     setEditingUser(null);
+    // Reset password visibility when closing modal
+    setShowPassword({});
+    setPasswordVisible(false);
   };
 
-  const openEditModal = (user) => {
+  const openEditModal = async (user) => {
     setEditingUser(user);
+    
+    // For editing, initially set password to empty
+    // But fetch the actual password for admin visibility
     setFormData({
       name: user.name,
       username: user.username,
@@ -108,12 +145,38 @@ export default function UserManagement() {
       department: user.department,
       status: user.status
     });
+    
     setShowModal(true);
+  };
+
+  // Function to reveal the user's password for admin
+  const revealUserPassword = async () => {
+    if (!editingUser) return;
+    
+    try {
+      const result = await userAPI.getUserPassword(editingUser.id);
+      if (result.success) {
+        setFormData(prev => ({
+          ...prev,
+          password: result.password
+        }));
+        setPasswordVisible(true);
+      }
+    } catch (error) {
+      toast.error('Failed to retrieve password');
+    }
   };
 
   const openAddModal = () => {
     resetForm();
     setShowModal(true);
+  };
+
+  const togglePasswordVisibility = (fieldId) => {
+    setShowPassword(prev => ({
+      ...prev,
+      [fieldId]: !prev[fieldId]
+    }));
   };
 
   const getRoleBadge = (role) => {
@@ -180,6 +243,13 @@ export default function UserManagement() {
                       onClick={() => handleToggleStatus(user.id)}
                     >
                       {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      className="btn btn-outline-info"
+                      onClick={() => handleResetPassword(user.id, user.name)}
+                      title="Reset Password"
+                    >
+                      <FaKey />
                     </button>
                     <button
                       className="btn btn-outline-danger"
@@ -252,24 +322,46 @@ export default function UserManagement() {
 
                   <div className="col-12">
                     <label className="form-label">
-                      Password {!editingUser && '*'}
+                      {editingUser ? 'Password (Visible to Admins)' : 'Password'} {!editingUser && '*'}
                       {editingUser && <small className="text-muted"> (Leave blank to keep current)</small>}
                     </label>
                     <div className="input-group">
                       <input
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword.password ? 'text' : 'password'}
                         className="form-control"
+                        placeholder={editingUser ? "Current password or enter new one" : "Enter password"}
                         value={formData.password}
                         onChange={(e) => setFormData({...formData, password: e.target.value})}
                       />
                       <button
                         className="btn btn-outline-secondary"
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
+                        onClick={() => togglePasswordVisibility('password')}
                       >
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                        {showPassword.password ? <FaEyeSlash /> : <FaEye />}
                       </button>
                     </div>
+                    
+                    {/* Button to reveal password for admins */}
+                    {editingUser && !passwordVisible && (
+                      <div className="mt-2">
+                        <button 
+                          type="button" 
+                          className="btn btn-sm btn-outline-info"
+                          onClick={revealUserPassword}
+                        >
+                          Reveal Current Password
+                        </button>
+                      </div>
+                    )}
+                    
+                    {editingUser && (
+                      <div className="mt-2">
+                        <small className="text-muted">
+                          Note: As an admin, you can see the current password. Leave blank to keep it unchanged.
+                        </small>
+                      </div>
+                    )}
                   </div>
 
                   <div className="col-md-6">
@@ -304,7 +396,7 @@ export default function UserManagement() {
                     </select>
                   </div>
 
-                  <div className="col-12">
+                  <div className="col-md-6">
                     <label className="form-label">Status</label>
                     <select
                       className="form-select"

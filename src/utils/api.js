@@ -75,6 +75,13 @@ export const userAPI = {
   deleteUser: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
   toggleUserStatus: (id) => apiRequest(`/users/${id}/toggle-status`, { method: 'PATCH' }),
   getActiveUsers: () => apiRequest('/active-users'),
+  // Add reset password method
+  resetUserPassword: (id, newPassword) => apiRequest(`/users/${id}/reset-password`, { 
+    method: 'POST', 
+    body: { password: newPassword } 
+  }),
+  // Add method to get user password for admin users
+  getUserPassword: (id) => apiRequest(`/users/${id}/password`)
 };
 
 export const problemAPI = {

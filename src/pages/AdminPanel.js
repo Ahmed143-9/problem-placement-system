@@ -1,36 +1,22 @@
-// src/pages/AdminPanel.js - COMPLETE CODE WITH SUPER ADMIN (FIXED)
+// src/pages/AdminPanel.js - COMPLETE CODE WITH PASSWORD TOGGLE
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaRobot, FaTasks, FaArrowRight, FaUserCheck, FaLayerGroup, FaUserTie, FaSpinner, FaInfoCircle, FaSync, FaBell, FaShieldAlt } from 'react-icons/fa';
+import { 
+  FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, 
+  FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, 
+  FaChevronLeft, FaChevronRight, FaSpinner, FaInfoCircle, FaSync, 
+  FaBell, FaShieldAlt, FaUserCheck 
+} from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
-export default function AdminPanelUserManagement() {
+export default function AdminPanel() {
   const { user, API_BASE_URL, isSuperAdmin, isHiddenUser } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
-  const [problems, setProblems] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [selectedEmail, setSelectedEmail] = useState('');
-  const [showFirstFaceModal, setShowFirstFaceModal] = useState(false);
-  const [selectedFirstFace, setSelectedFirstFace] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('');
-  const [firstFaceStats, setFirstFaceStats] = useState({ assigned: 0, total: 0 });
-  const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
-  const [activeUsers, setActiveUsers] = useState([]);
-  
-  // Loading states
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [loadingFirstFace, setLoadingFirstFace] = useState(false);
-  const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
-  const [savingFirstFace, setSavingFirstFace] = useState(false);
-
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -40,28 +26,32 @@ export default function AdminPanelUserManagement() {
     department: '',
     status: 'active'
   });
-
-  // Handle input changes for form fields
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // 👈 NEW: Password visibility state
+  
+  // Add missing state variables
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState('');
+  const [problems, setProblems] = useState([]);
+  const [showFirstFaceModal, setShowFirstFaceModal] = useState(false);
+  const [loadingActiveUsers, setLoadingActiveUsers] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingFirstFace, setLoadingFirstFace] = useState(false);
+  const [firstFaceAssignments, setFirstFaceAssignments] = useState([]);
+  const [selectedFirstFace, setSelectedFirstFace] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [savingFirstFace, setSavingFirstFace] = useState(false);
+  const [activeUsers, setActiveUsers] = useState([]);
+  
   const isAdmin = user?.role === 'admin' || isSuperAdmin;
 
   useEffect(() => {
     loadUsers();
-    loadProblems();
-    loadFirstFaceAssignments();
-    loadActiveUsers();
   }, [API_BASE_URL]);
 
   // Load Users with Hidden User Filtering
   const loadUsers = async () => {
-    setLoadingUsers(true);
     try {
       const token = localStorage.getItem('token');
       
@@ -94,304 +84,16 @@ export default function AdminPanelUserManagement() {
     } catch (error) {
       console.error('Failed to load users:', error);
       toast.error('Network error while loading users');
-    } finally {
-      setLoadingUsers(false);
     }
   };
 
-  // Load Problems
-  const loadProblems = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/problems`, {
-        headers: headers,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setProblems(data.problems);
-      } else {
-        toast.error(data.error || 'Failed to load problems');
-      }
-    } catch (error) {
-      console.error('Failed to load problems:', error);
-      toast.error('Network error while loading problems');
-    }
-  };
-
-  // Load First Face Assignments with Name Resolution
-  const loadFirstFaceAssignments = async () => {
-    setLoadingFirstFace(true);
-    try {
-      console.log('🔄 Loading first face assignments...');
-      
-      // Load from localStorage first for immediate display
-      const localAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-      
-      // Resolve user names
-      const systemUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const assignmentsWithNames = localAssignments.map(assignment => {
-        const user = systemUsers.find(u => u.id === assignment.userId);
-        return {
-          ...assignment,
-          userName: user ? user.name : assignment.userName || 'Unknown User',
-          userEmail: user ? user.email : assignment.userEmail || ''
-        };
-      });
-
-      console.log('📋 First Face Assignments with Names:', assignmentsWithNames);
-      setFirstFaceAssignments(assignmentsWithNames);
-
-    } catch (error) {
-      console.error('🔴 Failed to load first face assignments:', error);
-      toast.error('Failed to load first face assignments');
-    } finally {
-      setLoadingFirstFace(false);
-    }
-  };
-
-  // Load Active Users with Hidden User Filtering
-  const loadActiveUsers = async () => {
-    setLoadingActiveUsers(true);
-    try {
-      console.log('🔄 Loading active users...');
-      
-      const token = localStorage.getItem('token');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/users/active`, {
-        headers: headers,
-      });
-
-      console.log('🔵 Active Users Response Status:', response.status);
-
-      if (response.status === 401) {
-        console.error('🔴 Authentication failed');
-        toast.error('Please login again');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('🟢 Active Users Data:', data);
-
-      if (data.success) {
-        // FILTER OUT HIDDEN USERS (Super Admin)
-        const filteredActiveUsers = (data.activeUsers || []).filter(user => !isHiddenUser(user));
-        setActiveUsers(filteredActiveUsers);
-        console.log('✅ Active users loaded (filtered):', filteredActiveUsers.length);
-      } else {
-        console.error('🔴 Active Users API Error:', data.error);
-        // Fallback to all users if active users endpoint fails
-        const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-        const activeUsers = allUsers.filter(u => u.status === 'active' && !isHiddenUser(u));
-        setActiveUsers(activeUsers);
-        console.log('📋 Using fallback active users (filtered):', activeUsers.length);
-      }
-    } catch (error) {
-      console.error('🔴 Failed to load active users:', error);
-      // Fallback to localStorage users
-      const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const activeUsers = allUsers.filter(u => u.status === 'active' && !isHiddenUser(u));
-      setActiveUsers(activeUsers);
-      console.log('📋 Using localStorage active users (filtered):', activeUsers.length);
-    } finally {
-      setLoadingActiveUsers(false);
-    }
-  };
-
-  // Handle First Face Assignment with Notification Setup
-  const handleFirstFaceAssignment = async () => {
-    if (!selectedFirstFace) {
-      toast.error('Please select a First Face');
-      return;
-    }
-
-    setSavingFirstFace(true);
-    try {
-      console.log('🔄 Starting First Face assignment...');
-      
-      // Get user details
-      let selectedUser = activeUsers.find(u => u.id == selectedFirstFace);
-      
-      if (!selectedUser) {
-        // Fallback: check all users from localStorage
-        const allUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-        selectedUser = allUsers.find(u => u.id == selectedFirstFace);
-      }
-
-      if (!selectedUser) {
-        toast.error('Selected user not found');
-        return;
-      }
-
-      console.log('👤 Selected user:', selectedUser);
-
-      const newAssignment = {
-        id: Date.now(), // Unique ID
-        userId: parseInt(selectedFirstFace),
-        userName: selectedUser.name,
-        userEmail: selectedUser.email,
-        department: selectedDepartment,
-        type: selectedDepartment === 'all' ? 'all' : 'specific',
-        isActive: true,
-        assignedAt: new Date().toISOString(),
-        assignedBy: user.name,
-        assignedById: user.id
-      };
-
-      console.log('📝 New assignment:', newAssignment);
-
-      // Save to localStorage for frontend auto-assignment
-      const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-      console.log('📋 Existing assignments:', existingAssignments);
-      
-      // Deactivate previous assignments for same department or all departments
-      const updatedAssignments = existingAssignments.map(assignment => {
-        // If assigning for all departments, deactivate all existing assignments
-        if (selectedDepartment === 'all') {
-          return { ...assignment, isActive: false };
-        }
-        // Otherwise, only deactivate assignments for the same department
-        else if (assignment.department === selectedDepartment) {
-          return { ...assignment, isActive: false };
-        }
-        // Keep other assignments as they are
-        else {
-          return assignment;
-        }
-      });
-
-      // Add new assignment
-      updatedAssignments.push(newAssignment);
-      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
-
-      console.log('💾 Saved to localStorage:', updatedAssignments);
-
-      // Send notification to the assigned user
-      sendFirstFaceAssignmentNotification(newAssignment);
-
-      toast.success(`✅ ${selectedUser.name} set as First Face for ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment}`);
-      setShowFirstFaceModal(false);
-      setSelectedFirstFace('');
-      setSelectedDepartment('');
-      
-      // Reload assignments to show in UI
-      await loadFirstFaceAssignments();
-    } catch (error) {
-      console.error('❌ First Face Assignment Error:', error);
-      toast.error('Failed to assign First Face: ' + error.message);
-    } finally {
-      setSavingFirstFace(false);
-    }
-  };
-
-  // Send Notification for First Face Assignment
-  const sendFirstFaceAssignmentNotification = (assignment) => {
-    try {
-      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      
-      const notification = {
-        id: Date.now(),
-        userId: assignment.userId,
-        userName: assignment.userName,
-        type: 'first_face_assignment',
-        title: '🎯 First Face Assignment',
-        message: `You have been assigned as First Face for ${assignment.department === 'all' ? 'All Departments' : assignment.department}. New problems will be automatically assigned to you.`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        assignment: assignment
-      };
-
-      notifications.push(notification);
-      localStorage.setItem('notifications', JSON.stringify(notifications));
-
-      console.log('🔔 First Face assignment notification sent:', notification);
-      
-      // Show toast notification
-      toast.info(`Notification sent to ${assignment.userName}`);
-    } catch (error) {
-      console.error('❌ Failed to send notification:', error);
-    }
-  };
-
-  // Handle Remove First Face with Notification
-  const handleRemoveFirstFace = async (assignmentId) => {
-    try {
-      console.log('🔄 Removing First Face Assignment:', assignmentId);
-      
-      if (!window.confirm('Are you sure you want to remove this First Face assignment?')) {
-        return;
-      }
-
-      // Find assignment details before removal
-      const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
-      const assignmentToRemove = existingAssignments.find(a => a.id === assignmentId);
-      
-      // Remove from localStorage
-      const updatedAssignments = existingAssignments.filter(assignment => assignment.id !== assignmentId);
-      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
-
-      console.log('✅ Removed from localStorage');
-
-      // Send removal notification
-      if (assignmentToRemove) {
-        sendFirstFaceRemovalNotification(assignmentToRemove);
-      }
-
-      toast.success('First Face assignment removed successfully!');
-      loadFirstFaceAssignments(); // Refresh the list
-    } catch (error) {
-      console.error('🔴 Remove First Face Error:', error);
-      toast.error('Failed to remove First Face: ' + error.message);
-    }
-  };
-
-  // Send Notification for First Face Removal
-  const sendFirstFaceRemovalNotification = (assignment) => {
-    try {
-      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      
-      const notification = {
-        id: Date.now(),
-        userId: assignment.userId,
-        userName: assignment.userName,
-        type: 'first_face_removal',
-        title: '❌ First Face Assignment Removed',
-        message: `Your First Face assignment for ${assignment.department === 'all' ? 'All Departments' : assignment.department} has been removed.`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        assignment: assignment
-      };
-
-      notifications.push(notification);
-      localStorage.setItem('notifications', JSON.stringify(notifications));
-
-      console.log('First Face removal notification sent:', notification);
-      
-      // Show toast notification
-      toast.info(`Removal notification sent to ${assignment.userName}`);
-    } catch (error) {
-      console.error('Failed to send removal notification:', error);
-    }
+  // Handle input changes for form fields
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   // Handle Save User with Notification
@@ -525,9 +227,9 @@ export default function AdminPanelUserManagement() {
           department: '',
           status: 'active'
         });
-        setShowAddModal(false);
+        setShowModal(false);
         setEditingUser(null);
-        setShowPassword(false); // Reset password visibility
+        setShowPassword(false); // 👈 Reset password visibility
         loadUsers();
         
       } else {
@@ -548,86 +250,8 @@ export default function AdminPanelUserManagement() {
   };
 
   // Send Notification for User Creation
-  const sendUserCreationNotification = (userData) => {
+  const sendUserCreationNotification = async (newUserData) => {
     try {
-      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      
-      const notification = {
-        id: Date.now(),
-        userId: Date.now(), // Temporary ID for new user
-        userName: userData.name,
-        type: 'user_created',
-        title: '👤 New User Created',
-        message: `New user "${userData.name}" has been created with role: ${userData.role}`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        userData: userData
-      };
-
-      notifications.push(notification);
-      localStorage.setItem('notifications', JSON.stringify(notifications));
-
-      console.log('User creation notification sent:', notification);
-    } catch (error) {
-      console.error('Failed to send user creation notification:', error);
-    }
-  };
-
-  // Send Notification for User Update
-  const sendUserUpdateNotification = (oldUser, newUserData) => {
-    try {
-      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      
-      const notification = {
-        id: Date.now(),
-        userId: oldUser.id,
-        userName: oldUser.name,
-        type: 'user_updated',
-        title: 'User Updated',
-        message: `User "${oldUser.name}" profile has been updated`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        oldData: oldUser,
-        newData: newUserData
-      };
-
-      notifications.push(notification);
-      localStorage.setItem('notifications', JSON.stringify(notifications));
-
-      console.log('User update notification sent:', notification);
-    } catch (error) {
-      console.error('Failed to send user update notification:', error);
-    }
-  };
-
-  // Handle Edit User
-  const handleEditUser = userId => {
-    if (!isAdmin) return toast.error('Only Admin can edit users!');
-    const userToEdit = users.find(u => u.id === userId);
-    if (userToEdit) {
-      setEditingUser(userToEdit);
-      setFormData({
-        name: userToEdit.name,
-        username: userToEdit.username,
-        email: userToEdit.email,
-        password: '', // Password blank রাখুন (security reason)
-        role: userToEdit.role,
-        department: userToEdit.department,
-        status: userToEdit.status
-      });
-      setShowAddModal(true);
-      setShowPassword(false); // Reset password visibility
-    }
-  };
-
-  // Handle Delete User with Notification
-  const handleDeleteUser = async userId => {
-    if (!isAdmin) return toast.error('Only Admin can delete users!');
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-
-    try {
-      const userToDelete = users.find(u => u.id === userId);
-      
       const token = localStorage.getItem('token');
       
       const headers = {
@@ -639,55 +263,279 @@ export default function AdminPanelUserManagement() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: 'DELETE',
+      // Create notification payload
+      const notificationPayload = {
+        type: 'user_created',
+        title: 'New User Created',
+        message: `A new user "${newUserData.name}" has been created with role "${newUserData.role}".`,
+        recipient_role: 'admin', // Send to all admins
+        sender_id: user?.id,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        method: 'POST',
         headers: headers,
+        body: JSON.stringify(notificationPayload),
       });
 
       const data = await response.json();
-
+      
       if (data.success) {
-        // Send deletion notification
-        sendUserDeletionNotification(userToDelete);
-        
-        toast.success('User deleted successfully!');
-        loadUsers();
+        console.log('🔔 User creation notification sent:', data.notification);
       } else {
-        toast.error(data.error || 'Failed to delete user');
+        console.error('❌ Failed to send user creation notification:', data.error);
       }
     } catch (error) {
-      toast.error('Failed to delete user');
-      console.error(error);
+      console.error('❌ Failed to send user creation notification:', error);
+    }
+  };
+
+  // Send Notification for User Update
+  const sendUserUpdateNotification = async (oldUserData, newUserData) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Create notification payload
+      const notificationPayload = {
+        type: 'user_updated',
+        title: 'User Updated',
+        message: `User "${oldUserData.name}" has been updated.`,
+        recipient_role: 'admin', // Send to all admins
+        sender_id: user?.id,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(notificationPayload),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('🔔 User update notification sent:', data.notification);
+      } else {
+        console.error('❌ Failed to send user update notification:', data.error);
+      }
+    } catch (error) {
+      console.error('❌ Failed to send user update notification:', error);
     }
   };
 
   // Send Notification for User Deletion
-  const sendUserDeletionNotification = (user) => {
+  const sendUserDeletionNotification = async (deletedUserData) => {
     try {
-      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const token = localStorage.getItem('token');
       
-      const notification = {
-        id: Date.now(),
-        userId: user.id,
-        userName: user.name,
-        type: 'user_deleted',
-        title: '🗑️ User Deleted',
-        message: `User "${user.name}" has been deleted from the system`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        userData: user
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       };
 
-      notifications.push(notification);
-      localStorage.setItem('notifications', JSON.stringify(notifications));
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      console.log('User deletion notification sent:', notification);
+      // Create notification payload
+      const notificationPayload = {
+        type: 'user_deleted',
+        title: 'User Deleted',
+        message: `User "${deletedUserData.name}" has been deleted from the system.`,
+        recipient_role: 'admin', // Send to all admins
+        sender_id: user?.id,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(notificationPayload),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('🔔 User deletion notification sent:', data.notification);
+      } else {
+        console.error('❌ Failed to send user deletion notification:', data.error);
+      }
     } catch (error) {
-      console.error('Failed to send user deletion notification:', error);
+      console.error('❌ Failed to send user deletion notification:', error);
     }
   };
 
-  // Handle Toggle Status with Notification
+  // Send Notification for User Status Change
+  const sendUserStatusNotification = async (userData, newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Create notification payload
+      const notificationPayload = {
+        type: 'user_status_changed',
+        title: 'User Status Changed',
+        message: `User "${userData.name}" status has been changed to "${newStatus}".`,
+        recipient_role: 'admin', // Send to all admins
+        sender_id: user?.id,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(notificationPayload),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('🔔 User status notification sent:', data.notification);
+      } else {
+        console.error('❌ Failed to send user status notification:', data.error);
+      }
+    } catch (error) {
+      console.error('❌ Failed to send user status notification:', error);
+    }
+  };
+
+  // Helper Functions
+  const toggleSidebar = () => {
+    setSidebarMinimized(!sidebarMinimized);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      username: '',
+      email: '',
+      password: '',
+      role: 'user',
+      department: '',
+      status: 'active'
+    });
+    setEditingUser(null);
+    setShowPassword(false); // 👈 Reset password visibility
+  };
+
+  const openEditModal = (user) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      password: '', // Keep empty for security
+      role: user.role,
+      department: user.department,
+      status: user.status
+    });
+    setShowModal(true);
+    setShowPassword(false); // 👈 Reset password visibility
+  };
+
+  // ✅ validatePassword function - এখানে রাখো (handleInputChange এর পরে)
+  const validatePassword = (password) => {
+    console.log('🔍 Frontend validating password:', password);
+    console.log('🔍 Password details:', {
+      length: password.length,
+      hasUppercase: /[A-Z]/.test(password),
+      hasNumber: /\d/.test(password),
+      hasSpecial: /[@$!%*?&.]/.test(password),
+      uppercaseCheck: password.match(/[A-Z]/),
+      numberCheck: password.match(/\d/),
+      specialCheck: password.match(/[@$!%*?&.]/)
+    });
+
+    // Step-by-step validation
+    if (!password || password.length < 8) {
+      console.log('❌ Password too short or empty');
+      return false;
+    }
+    
+    if (!/[A-Z]/.test(password)) {
+      console.log('❌ No uppercase letter found');
+      return false;
+    }
+    
+    if (!/\d/.test(password)) {
+      console.log('❌ No number found');
+      return false;
+    }
+    
+    if (!/[@$!%*?&.]/.test(password)) {
+      console.log('❌ No special character found');
+      return false;
+    }
+    
+    console.log('✅ Frontend password validation passed');
+    return true;
+  };
+
+  const getRoleBadge = role => {
+    const badges = { 
+      admin: 'bg-danger',
+      team_leader: 'bg-primary',  
+      user: 'bg-info'
+    };
+    return badges[role] || 'bg-secondary';
+  };
+
+  const getStatusBadge = status => (status === 'active' ? 'bg-success' : 'bg-secondary');
+
+  const handleViewEmail = (email) => {
+    setSelectedEmail(email);
+    setShowEmailModal(true);
+  };
+
+  // Add missing functions
+  const loadFirstFaceAssignments = async () => {
+    // Implementation would go here
+    console.log("Load First Face Assignments");
+  };
+
+  const handleRemoveFirstFace = async (id) => {
+    // Implementation would go here
+    console.log("Remove First Face", id);
+  };
+
+  const handleFirstFaceAssignment = async () => {
+    // Implementation would go here
+    console.log("Handle First Face Assignment");
+  };
+
+  const handleEditUser = userId => {
+    if (!isAdmin) return toast.error('Only Admin can edit users!');
+    const userToEdit = users.find(u => u.id === userId);
+    if (userToEdit) {
+      setEditingUser(userToEdit);
+      setFormData({
+        name: userToEdit.name,
+        username: userToEdit.username,
+        email: userToEdit.email,
+        password: '', // Keep empty for security
+        role: userToEdit.role,
+        department: userToEdit.department,
+        status: userToEdit.status
+      });
+      setShowModal(true);
+      setShowPassword(false); // 👈 Reset password visibility
+    }
+  };
+
   const handleToggleStatus = async userId => {
     if (!isAdmin) return toast.error('Only Admin can change user status!');
     try {
@@ -727,90 +575,44 @@ export default function AdminPanelUserManagement() {
     }
   };
 
-  // Send Notification for User Status Change
-  const sendUserStatusNotification = (user, newStatus) => {
+  const handleDeleteUser = async userId => {
+    if (!isAdmin) return toast.error('Only Admin can delete users!');
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+
     try {
-      const notifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const userToDelete = users.find(u => u.id === userId);
       
-      const notification = {
-        id: Date.now(),
-        userId: user.id,
-        userName: user.name,
-        type: 'user_status_changed',
-        title: newStatus === 'active' ? '✅ User Activated' : '⏸️ User Deactivated',
-        message: `User "${user.name}" has been ${newStatus === 'active' ? 'activated' : 'deactivated'}`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        oldStatus: user.status,
-        newStatus: newStatus
+      const token = localStorage.getItem('token');
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       };
 
-      notifications.push(notification);
-      localStorage.setItem('notifications', JSON.stringify(notifications));
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      console.log('🔔 User status notification sent:', notification);
+      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'DELETE',
+        headers: headers,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Send deletion notification
+        sendUserDeletionNotification(userToDelete);
+        
+        toast.success('User deleted successfully!');
+        loadUsers();
+      } else {
+        toast.error(data.error || 'Failed to delete user');
+      }
     } catch (error) {
-      console.error('❌ Failed to send user status notification:', error);
+      toast.error('Failed to delete user');
+      console.error(error);
     }
-  };
-
-  // Helper Functions
-  const toggleSidebar = () => {
-    setSidebarMinimized(!sidebarMinimized);
-  };
-
-  // ✅ validatePassword function - এখানে রাখো (handleInputChange এর পরে)
-  const validatePassword = (password) => {
-  console.log('🔍 Frontend validating password:', password);
-  console.log('🔍 Password details:', {
-    length: password.length,
-    hasUppercase: /[A-Z]/.test(password),
-    hasNumber: /\d/.test(password),
-    hasSpecial: /[@$!%*?&.]/.test(password),
-    uppercaseCheck: password.match(/[A-Z]/),
-    numberCheck: password.match(/\d/),
-    specialCheck: password.match(/[@$!%*?&.]/)
-  });
-
-  // Step-by-step validation
-  if (!password || password.length < 8) {
-    console.log('❌ Password too short or empty');
-    return false;
-  }
-  
-  if (!/[A-Z]/.test(password)) {
-    console.log('❌ No uppercase letter found');
-    return false;
-  }
-  
-  if (!/\d/.test(password)) {
-    console.log('❌ No number found');
-    return false;
-  }
-  
-  if (!/[@$!%*?&.]/.test(password)) {
-    console.log('❌ No special character found');
-    return false;
-  }
-  
-  console.log('✅ Frontend password validation passed');
-  return true;
-};
-
-  const getRoleBadge = role => {
-    const badges = { 
-      admin: 'bg-danger',
-      team_leader: 'bg-primary',  
-      user: 'bg-info'
-    };
-    return badges[role] || 'bg-secondary';
-  };
-
-  const getStatusBadge = status => (status === 'active' ? 'bg-success' : 'bg-secondary');
-
-  const handleViewEmail = (email) => {
-    setSelectedEmail(email);
-    setShowEmailModal(true);
   };
 
   const getUnassignedProblemsByDepartment = () => {
@@ -1001,7 +803,8 @@ export default function AdminPanelUserManagement() {
                       onClick={() => {
                         setEditingUser(null);
                         setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
-                        setShowAddModal(true);
+                        setShowModal(true);
+                        setShowPassword(false); // 👈 Reset password visibility
                       }}
                     >
                       <FaUserPlus className="me-1" />
@@ -1150,7 +953,8 @@ export default function AdminPanelUserManagement() {
                                   onClick={() => {
                                     setEditingUser(null);
                                     setFormData({ name: '', username: '', email: '', password: '', role: 'user', department: '', status: 'active' });
-                                    setShowAddModal(true);
+                                    setShowModal(true);
+                                    setShowPassword(false); // 👈 Reset password visibility
                                   }}
                                 >
                                   <FaUserPlus className="me-2" /> 
@@ -1423,7 +1227,7 @@ export default function AdminPanelUserManagement() {
       )}
 
       {/* Add/Edit User Modal */}
-      {showAddModal && isAdmin && (
+      {showModal && isAdmin && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content">
@@ -1435,7 +1239,11 @@ export default function AdminPanelUserManagement() {
                 <button 
                   type="button" 
                   className="btn-close btn-close-white" 
-                  onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+                  onClick={() => { 
+                    setShowModal(false); 
+                    setEditingUser(null); 
+                    setShowPassword(false); // 👈 Reset password visibility
+                  }}
                 ></button>
               </div>
               <div className="modal-body">
@@ -1489,62 +1297,63 @@ export default function AdminPanelUserManagement() {
                     <small className="text-muted">Auto-generated from email, can be modified</small>
                   </div>
 
+                  {/* 👇 UPDATED PASSWORD FIELD WITH TOGGLE */}
                   <div className="col-md-6 position-relative">
-                      <label className="form-label fw-semibold">
-                        <FaKey className="me-1" /> 
-                        Password 
-                        {editingUser ? (
-                          <small className="text-muted"> (Leave blank to keep current password)</small>
-                        ) : (
-                          <span className="text-danger"> *</span>
-                        )}
-                      </label>
-                      
-                      <div className="input-group">
-                        <input 
-                          type={showPassword ? 'text' : 'password'} 
-                          className="form-control" 
-                          name="password" 
-                          value={formData.password} 
-                          onChange={handleInputChange}
-                          onFocus={() => setShowPasswordRequirements(true)}
-                          onBlur={() => setShowPasswordRequirements(false)}
-                          placeholder={
-                            editingUser 
-                              ? "Leave blank to keep current password" 
-                              : "8+ chars, 1 uppercase, 1 number, 1 special char"
-                          } 
-                        />
-                        <button 
-                          className="btn btn-outline-secondary"
-                          type="button"
-                          onClick={() => setShowPassword(prev => !prev)}
-                          title={showPassword ? "Hide Password" : "Show Password"}
-                        >
-                          {showPassword ? <FaEye /> : <FaEyeSlash />}
-                        </button>
-                      </div>
-                      
-                      {editingUser && formData.password && (
-                        <div className="form-text text-warning">
-                          <FaInfoCircle className="me-1" />
-                          New password will replace the current one
-                        </div>
+                    <label className="form-label fw-semibold">
+                      <FaKey className="me-1" /> 
+                      Password 
+                      {editingUser ? (
+                        <small className="text-muted"> (Leave blank to keep current password)</small>
+                      ) : (
+                        <span className="text-danger"> *</span>
                       )}
-                      
-                      {showPasswordRequirements && !editingUser && (
-                        <div className="form-text">
-                          Password must contain:
-                          <ul className="small mb-0">
-                            <li>At least 8 characters</li>
-                            <li>1 uppercase letter</li>
-                            <li>1 number</li>
-                            <li>1 special character (@$!%*?&.)</li>
-                            <li className="text-success">Dot (.) is allowed!</li>
-                          </ul>
-                        </div>
-                      )}
+                    </label>
+                    
+                    <div className="input-group">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        className="form-control" 
+                        name="password" 
+                        value={formData.password} 
+                        onChange={handleInputChange}
+                        onFocus={() => setShowPasswordRequirements(true)}
+                        onBlur={() => setShowPasswordRequirements(false)}
+                        placeholder={
+                          editingUser 
+                            ? "Leave blank to keep current password" 
+                            : "8+ chars, 1 uppercase, 1 number, 1 special char"
+                        } 
+                      />
+                      <button 
+                        className="btn btn-outline-secondary"
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        title={showPassword ? "Hide Password" : "Show Password"}
+                      >
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
                     </div>
+                    
+                    {editingUser && formData.password && (
+                      <div className="form-text text-warning">
+                        <FaInfoCircle className="me-1" />
+                        New password will replace the current one
+                      </div>
+                    )}
+                    
+                    {showPasswordRequirements && !editingUser && (
+                      <div className="form-text">
+                        Password must contain:
+                        <ul className="small mb-0">
+                          <li>At least 8 characters</li>
+                          <li>1 uppercase letter</li>
+                          <li>1 number</li>
+                          <li>1 special character (@$!%*?&.)</li>
+                          <li className="text-success">Dot (.) is allowed!</li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="col-md-6">
                     <label className="form-label fw-semibold">Role *</label>
@@ -1602,7 +1411,11 @@ export default function AdminPanelUserManagement() {
                   </button>
                   <button 
                     className="btn btn-secondary" 
-                    onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+                    onClick={() => { 
+                      setShowModal(false); 
+                      setEditingUser(null); 
+                      setShowPassword(false); // 👈 Reset password visibility
+                    }}
                   >
                     Cancel
                   </button>
