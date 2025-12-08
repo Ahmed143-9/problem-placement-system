@@ -48,7 +48,20 @@ export default function AdminPanel() {
 
   useEffect(() => {
     loadUsers();
+    loadFirstFaceAssignmentsFromStorage(); // Load First Face assignments when component mounts
   }, [API_BASE_URL]);
+
+  // Load First Face assignments from localStorage
+  const loadFirstFaceAssignmentsFromStorage = () => {
+    try {
+      const assignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      setFirstFaceAssignments(assignments);
+      console.log('✅ First Face assignments loaded from localStorage:', assignments.length);
+    } catch (error) {
+      console.error('❌ Error loading First Face assignments:', error);
+      toast.error('Failed to load First Face assignments');
+    }
+  };
 
   // Load Users with Hidden User Filtering
   const loadUsers = async () => {
@@ -75,6 +88,10 @@ export default function AdminPanel() {
         const filteredUsers = data.users.filter(user => !isHiddenUser(user));
         setUsers(filteredUsers);
         console.log('✅ Users loaded successfully (filtered):', filteredUsers.length);
+        
+        // Also set active users for First Face assignment
+        const activeUsersList = filteredUsers.filter(u => u.status === 'active');
+        setActiveUsers(activeUsersList);
         
         // Save users to localStorage for name resolution
         localStorage.setItem('system_users', JSON.stringify(data.users));
@@ -503,18 +520,106 @@ export default function AdminPanel() {
 
   // Add missing functions
   const loadFirstFaceAssignments = async () => {
-    // Implementation would go here
-    console.log("Load First Face Assignments");
+    setLoadingFirstFace(true);
+    try {
+      loadFirstFaceAssignmentsFromStorage();
+      // Add a small delay to show the loading spinner
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error('❌ Error loading First Face assignments:', error);
+      toast.error('Failed to load First Face assignments');
+    } finally {
+      setLoadingFirstFace(false);
+    }
   };
 
   const handleRemoveFirstFace = async (id) => {
-    // Implementation would go here
-    console.log("Remove First Face", id);
+    try {
+      // Get existing assignments from localStorage
+      const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      
+      // Filter out the assignment to remove
+      const updatedAssignments = existingAssignments.filter(assignment => assignment.id !== id);
+      
+      // Save to localStorage
+      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+      
+      // Update state
+      setFirstFaceAssignments(updatedAssignments);
+      
+      toast.success('First Face assignment removed!');
+    } catch (error) {
+      console.error('❌ Error removing First Face assignment:', error);
+      toast.error(error.message || 'Failed to remove First Face assignment');
+    }
   };
 
   const handleFirstFaceAssignment = async () => {
-    // Implementation would go here
-    console.log("Handle First Face Assignment");
+    if (!selectedFirstFace || !selectedDepartment) {
+      toast.error('Please select both a user and a department');
+      return;
+    }
+
+    setSavingFirstFace(true);
+    try {
+      // Find the selected user
+      const userToAssign = users.find(u => u.id === selectedFirstFace);
+      if (!userToAssign) {
+        throw new Error('Selected user not found');
+      }
+
+      // Create assignment object
+      const newAssignment = {
+        id: Date.now(), // Simple ID generation
+        userId: selectedFirstFace,
+        userName: userToAssign.name,
+        department: selectedDepartment,
+        type: selectedDepartment === 'all' ? 'all' : 'specific',
+        assignedAt: new Date().toISOString(),
+        assignedBy: user?.name || 'System',
+        isActive: true
+      };
+
+      // Get existing assignments from localStorage
+      const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+      
+      // Add new assignment
+      const updatedAssignments = [...existingAssignments, newAssignment];
+      
+      // Save to localStorage
+      localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+      
+      // Update state
+      setFirstFaceAssignments(updatedAssignments);
+      
+      // Reset form
+      setSelectedFirstFace('');
+      setSelectedDepartment('');
+      setShowFirstFaceModal(false);
+      
+      toast.success(`First Face assignment added for ${selectedDepartment}!`);
+    } catch (error) {
+      console.error('❌ Error creating First Face assignment:', error);
+      toast.error(error.message || 'Failed to create First Face assignment');
+    } finally {
+      setSavingFirstFace(false);
+    }
+  };
+
+  // Add function to load active users
+  const loadActiveUsers = async () => {
+    setLoadingActiveUsers(true);
+    try {
+      // Filter active users from existing users list
+      const activeUsersList = users.filter(u => u.status === 'active');
+      setActiveUsers(activeUsersList);
+      console.log('✅ Active users filtered successfully:', activeUsersList.length);
+    } catch (error) {
+      console.error('Failed to filter active users:', error);
+      toast.error('Error while preparing active users list');
+    } finally {
+      setLoadingActiveUsers(false);
+    }
   };
 
   const handleEditUser = userId => {
@@ -782,7 +887,10 @@ export default function AdminPanel() {
                   <div className="d-flex gap-2">
                     <button
                       className="btn btn-warning btn-sm"
-                      onClick={() => setShowFirstFaceModal(true)}
+                      onClick={() => {
+                        loadActiveUsers(); // Load active users when opening the modal
+                        setShowFirstFaceModal(true);
+                      }}
                       disabled={loadingActiveUsers}
                     >
                       {loadingActiveUsers ? (
@@ -896,8 +1004,8 @@ export default function AdminPanel() {
                     <div className="col-md-3">
                       <div className="card border-primary text-center h-100">
                         <div className="card-body">
-                          <h3 className="text-primary mb-0">{users.filter(u => u.role === 'team_leader').length}</h3>
-                          <small className="text-muted">Team Leaders</small>
+                          <h3 className="text-primary mb-0">{users.filter(u => u.role === 'admin').length}</h3>
+                          <small className="text-muted">Admin</small>
                         </div>
                       </div>
                     </div>
@@ -1105,9 +1213,9 @@ export default function AdminPanel() {
                 ></button>
               </div>
               <div className="modal-body">
-                <div className="alert alert-info">
+                {/* <div className="alert alert-info">
                   <strong>First Face System:</strong> New problems will be automatically assigned to First Face users based on department.
-                </div>
+                </div> */}
                 
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Select First Face User:</label>

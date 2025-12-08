@@ -56,9 +56,14 @@ export default function FirstFaceAssignment() {
     } catch (error) {
       console.error('❌ Error loading team members:', error);
       // Fallback to localStorage
-      const users = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const activeMembers = users.filter(u => u.status === 'active');
-      setTeamMembers(activeMembers);
+      try {
+        const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+        const activeMembers = users.filter(u => u.status === 'active');
+        setTeamMembers(activeMembers);
+      } catch (localError) {
+        console.error('❌ Local storage error:', localError);
+        toast.error('Failed to load team members');
+      }
     }
   };
 
@@ -76,7 +81,48 @@ export default function FirstFaceAssignment() {
       setNewAssignment({ department: '', user_id: '', type: 'specific' });
     } catch (error) {
       console.error('❌ Error creating assignment:', error);
-      toast.error(error.message || 'Failed to create assignment');
+      // Fallback to localStorage
+      try {
+        // Find the selected user
+        const users = JSON.parse(localStorage.getItem('system_users') || '[]');
+        const userToAssign = users.find(u => u.id == newAssignment.user_id);
+        
+        if (!userToAssign) {
+          throw new Error('Selected user not found');
+        }
+
+        // Create assignment object
+        const assignment = {
+          id: Date.now(), // Simple ID generation
+          userId: newAssignment.user_id,
+          userName: userToAssign.name,
+          department: newAssignment.department,
+          type: newAssignment.type,
+          assignedAt: new Date().toISOString(),
+          assignedBy: 'System (Local)',
+          isActive: true
+        };
+
+        // Get existing assignments from localStorage
+        const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+        
+        // Add new assignment
+        const updatedAssignments = [...existingAssignments, assignment];
+        
+        // Save to localStorage
+        localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+        
+        // Update state
+        setAssignments(updatedAssignments);
+        
+        // Reset form
+        setNewAssignment({ department: '', user_id: '', type: 'specific' });
+        
+        toast.success(`First Face assignment added for ${newAssignment.department}!`);
+      } catch (localError) {
+        console.error('❌ Local storage error:', localError);
+        toast.error(localError.message || 'Failed to create assignment');
+      }
     } finally {
       setLoading(false);
     }
@@ -93,7 +139,25 @@ export default function FirstFaceAssignment() {
       await loadAssignments(); // Refresh the list
     } catch (error) {
       console.error('❌ Error removing assignment:', error);
-      toast.error(error.message || 'Failed to remove assignment');
+      // Fallback to localStorage
+      try {
+        // Get existing assignments from localStorage
+        const existingAssignments = JSON.parse(localStorage.getItem('firstFace_assignments') || '[]');
+        
+        // Filter out the assignment to remove
+        const updatedAssignments = existingAssignments.filter(assignment => assignment.id !== assignmentId);
+        
+        // Save to localStorage
+        localStorage.setItem('firstFace_assignments', JSON.stringify(updatedAssignments));
+        
+        // Update state
+        setAssignments(updatedAssignments);
+        
+        toast.success('First Face assignment removed!');
+      } catch (localError) {
+        console.error('❌ Local storage error:', localError);
+        toast.error(localError.message || 'Failed to remove assignment');
+      }
     }
   };
 
@@ -103,7 +167,8 @@ export default function FirstFaceAssignment() {
       await loadAssignments();
       toast.success('Assignments synced with server!');
     } catch (error) {
-      toast.error('Failed to sync assignments');
+      // Even if API fails, we still have localStorage data
+      toast.info('Using local data. API sync failed.');
     } finally {
       setSyncing(false);
     }
@@ -127,7 +192,6 @@ export default function FirstFaceAssignment() {
     <div>
       <Navbar />
       <div className="container mt-4">
-        {/* ... (same JSX as before) ... */}
         <div className="card shadow-sm">
           <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <div>
