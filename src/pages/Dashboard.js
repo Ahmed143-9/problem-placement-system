@@ -82,10 +82,34 @@ export default function EmployeeDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await api.get('/dashboard/stats');
-      setStats(response.data);
+      // Since there's no backend endpoint for dashboard stats yet,
+      // we'll use localStorage as a fallback
+      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
+      const currentUser = JSON.parse(localStorage.getItem('current_user') || '{}');
+      
+      // Calculate stats from localStorage data
+      const userProblems = storedProblems.filter(p => p.createdBy === currentUser.name);
+      const assignedProblems = storedProblems.filter(p => p.assignedTo === currentUser.id);
+      const inProgressProblems = storedProblems.filter(p => p.status === 'in_progress');
+      const completedProblems = storedProblems.filter(p => p.status === 'done');
+      
+      const calculatedStats = {
+        my_problems: userProblems.length,
+        assigned_to_me: assignedProblems.length,
+        in_progress: inProgressProblems.length,
+        completed: completedProblems.length
+      };
+      
+      setStats(calculatedStats);
     } catch (error) {
       console.error('Failed to fetch dashboard stats:', error);
+      // Set default stats if there's an error
+      setStats({
+        my_problems: 0,
+        assigned_to_me: 0,
+        in_progress: 0,
+        completed: 0
+      });
     } finally {
       setLoading(false);
     }

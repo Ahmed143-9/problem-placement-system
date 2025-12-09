@@ -28,6 +28,7 @@ export default function AdminPanel() {
   });
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const [showPassword, setShowPassword] = useState(false); // 👈 NEW: Password visibility state
+  const [passwordVisible, setPasswordVisible] = useState(false); // 👈 NEW: Track if password is visible
   
   // Add missing state variables
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
@@ -81,6 +82,11 @@ export default function AdminPanel() {
         headers: headers,
       });
 
+      // Check if response is OK before parsing JSON
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -100,7 +106,15 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('Failed to load users:', error);
-      toast.error('Network error while loading users');
+      if (error instanceof SyntaxError) {
+        toast.error('Invalid response from server. Please check if the backend is running.');
+      } else if (error.message.includes('HTTP error! status: 404')) {
+        toast.error('User API endpoint not found. Please check backend configuration.');
+      } else if (error.message.includes('Failed to fetch')) {
+        toast.error('Unable to connect to the backend server. Please ensure it is running on port 8000.');
+      } else {
+        toast.error('Network error while loading users: ' + error.message);
+      }
     }
   };
 
@@ -562,8 +576,8 @@ export default function AdminPanel() {
 
     setSavingFirstFace(true);
     try {
-      // Find the selected user
-      const userToAssign = users.find(u => u.id === selectedFirstFace);
+      // Find the selected user - Convert selectedFirstFace to number for comparison
+      const userToAssign = users.find(u => u.id == selectedFirstFace);
       if (!userToAssign) {
         throw new Error('Selected user not found');
       }
@@ -676,6 +690,51 @@ export default function AdminPanel() {
       }
     } catch (error) {
       toast.error('Failed to update status');
+      console.error(error);
+    }
+  };
+
+  // New function to reset user password
+  const handleResetPassword = async (userId, userName) => {
+    if (!isAdmin) return toast.error('Only Admin can reset passwords!');
+    
+    const newPassword = prompt(`Enter new password for ${userName}:`);
+    if (!newPassword) return;
+    
+    // Basic password validation
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ password: newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Password reset successfully for ${userName}!`);
+        loadUsers();
+      } else {
+        toast.error(data.error || 'Failed to reset password');
+      }
+    } catch (error) {
+      toast.error('Failed to reset password');
       console.error(error);
     }
   };
@@ -1130,6 +1189,14 @@ export default function AdminPanel() {
                                       {u.status === 'active' ? '⏸' : '▶'}
                                     </button>
                                     <button 
+                                      className="btn btn-sm btn-outline-info" 
+                                      onClick={() => handleResetPassword(u.id, u.name)} 
+                                      title="Reset Password"
+                                      style={{ padding: '6px 10px' }}
+                                    >
+                                      <FaKey />
+                                    </button>
+                                    <button 
                                       className="btn btn-sm btn-outline-danger" 
                                       onClick={() => handleDeleteUser(u.id)} 
                                       title="Delete"
@@ -1235,7 +1302,7 @@ export default function AdminPanel() {
                         <option value="">-- Select User --</option>
                         {activeUsers.length > 0 ? (
                           activeUsers.map(user => (
-                            <option key={user.id} value={user.id}>
+                            <option key={user.id} value={user.id.toString()}>
                               {user.name} 
                               {user.role === 'team_leader' && ' '} 
                               {user.role === 'user' && ' '} 

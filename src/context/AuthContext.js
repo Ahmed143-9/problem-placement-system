@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  const API_BASE_URL = 'https://ticketapi.wineds.com/api';
+  const API_BASE_URL = 'http://localhost:8000/api';
 
   // 🔥 SUPER ADMIN CREDENTIALS
   const SUPER_ADMIN = {

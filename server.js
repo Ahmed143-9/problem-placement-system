@@ -206,6 +206,45 @@ app.patch('/api/users/:id/toggle-status', async (req, res) => {
   }
 });
 
+// New endpoint to reset user password
+app.post('/api/users/:id/reset-password', async (req, res) => {
+  try {
+    const users = await readUsers();
+    const userId = parseInt(req.params.id);
+    const { password } = req.body;
+    
+    // Validate password
+    if (!password || password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters long'
+      });
+    }
+    
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    // Update password
+    users[userIndex].password = password;
+    await writeUsers(users);
+    
+    res.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reset password'
+    });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;

@@ -20,7 +20,9 @@ import {
   FaArrowUp,
   FaArrowDown,
   FaBell,
-  FaExclamationCircle
+  FaExclamationCircle,
+  FaPlus,
+  FaTrash
 } from 'react-icons/fa';
 
 export default function DomainStatus() {
@@ -32,6 +34,9 @@ export default function DomainStatus() {
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [previousDomains, setPreviousDomains] = useState({});
   const [domainChanges, setDomainChanges] = useState([]);
+  // New state for adding domains
+  const [newDomain, setNewDomain] = useState('');
+  const [addingDomain, setAddingDomain] = useState(false);
 
   useEffect(() => {
     fetchDomainStatus();
@@ -67,6 +72,110 @@ export default function DomainStatus() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 🔥 NEW: Function to add a new domain
+  const addNewDomain = async () => {
+    if (!newDomain.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Invalid Domain',
+        message: 'Please enter a valid domain name',
+        icon: '⚠️',
+        color: 'warning',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    try {
+      setAddingDomain(true);
+      
+      // Format domain if needed (ensure it has protocol)
+      let formattedDomain = newDomain.trim();
+      if (!formattedDomain.startsWith('http')) {
+        formattedDomain = `https://${formattedDomain}`;
+      }
+      
+      // Check if domain already exists
+      if (domains[formattedDomain]) {
+        addNotification({
+          type: 'error',
+          title: 'Domain Exists',
+          message: 'This domain is already being monitored',
+          icon: 'ℹ️',
+          color: 'info',
+          timestamp: new Date().toISOString()
+        });
+        setAddingDomain(false);
+        return;
+      }
+      
+      // Add the domain to our local state (in a real app, this would be an API call)
+      const newDomainEntry = {
+        [formattedDomain]: {
+          is_up: false, // Will be checked shortly
+          updated_at: new Date().toISOString()
+        }
+      };
+      
+      // Update domains state
+      const updatedDomains = { ...domains, ...newDomainEntry };
+      setDomains(updatedDomains);
+      
+      // Clear input
+      setNewDomain('');
+      
+      // Notify user
+      addNotification({
+        type: 'new_domain_added',
+        title: 'Domain Added',
+        message: `${formattedDomain.replace('https://', '')} has been added to monitoring`,
+        domain: formattedDomain,
+        icon: '✅',
+        color: 'success',
+        timestamp: new Date().toISOString()
+      });
+      
+      // Check the status of the newly added domain
+      setTimeout(() => {
+        checkSingleDomainStatus(formattedDomain);
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Error adding domain:', err);
+      addNotification({
+        type: 'error',
+        title: 'Add Domain Failed',
+        message: 'Failed to add domain. Please try again.',
+        icon: '❌',
+        color: 'danger',
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setAddingDomain(false);
+    }
+  };
+
+  // 🔥 NEW: Function to delete a domain
+  const deleteDomain = (domainToDelete) => {
+    // Create a new object without the domain to delete
+    const updatedDomains = { ...domains };
+    delete updatedDomains[domainToDelete];
+    
+    // Update state
+    setDomains(updatedDomains);
+    
+    // Notify user
+    addNotification({
+      type: 'domain_deleted',
+      title: 'Domain Removed',
+      message: `${domainToDelete.replace('https://', '')} has been removed from monitoring`,
+      domain: domainToDelete,
+      icon: '🗑️',
+      color: 'info',
+      timestamp: new Date().toISOString()
+    });
   };
 
   // 🔥 NEW: Check for domain status changes and send notifications
@@ -165,6 +274,16 @@ export default function DomainStatus() {
       }).catch(() => ({ ok: false }));
       
       const isUp = response.ok;
+      
+      // Update the domain status in our local state
+      setDomains(prev => ({
+        ...prev,
+        [domain]: {
+          ...prev[domain],
+          is_up: isUp,
+          updated_at: new Date().toISOString()
+        }
+      }));
       
       addNotification({
         type: 'manual_domain_check',
@@ -375,6 +494,49 @@ export default function DomainStatus() {
             </div>
           )}
 
+          {/* Add New Domain Section */}
+          <div className="card border-0 shadow-sm mb-4">
+            <div className="card-header bg-white">
+              <h5 className="mb-0" style={{ color: '#333' }}>
+                <FaPlus className="me-2" />
+                Add New Domain
+              </h5>
+            </div>
+            <div className="card-body">
+              <div className="input-group">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Enter domain (e.g., example.com or https://example.com)"
+                  value={newDomain}
+                  onChange={(e) => setNewDomain(e.target.value)}
+                  disabled={addingDomain}
+                />
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={addNewDomain}
+                  disabled={addingDomain || !newDomain.trim()}
+                >
+                  {addingDomain ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <FaPlus className="me-1" />
+                      Add Domain
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="form-text mt-2">
+                Enter a domain name with or without "https://" - the system will automatically format it correctly.
+              </div>
+            </div>
+          </div>
+
           {/* Recent Changes */}
           {domainChanges.length > 0 && (
             <div className="alert alert-info mb-4">
@@ -478,9 +640,10 @@ export default function DomainStatus() {
                 <table className="table mb-0">
                   <thead className="thead-light" style={{ backgroundColor: '#f8f9fa' }}>
                     <tr>
-                      <th className="text-center align-middle border-0" style={{ width: '40%', color: '#333' }}>Domain</th>
+                      <th className="text-center align-middle border-0" style={{ width: '35%', color: '#333' }}>Domain</th>
                       <th className="text-center align-middle border-0" style={{ width: '20%', color: '#333' }}>Status</th>
-                      <th className="text-center align-middle border-0" style={{ width: '40%', color: '#333' }}>Last Checked</th>
+                      <th className="text-center align-middle border-0" style={{ width: '30%', color: '#333' }}>Last Checked</th>
+                      <th className="text-center align-middle border-0" style={{ width: '15%', color: '#333' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -535,6 +698,15 @@ export default function DomainStatus() {
                         </td>
                         <td className="text-center text-muted">
                           {info.updated_at ? new Date(info.updated_at).toLocaleString() : 'N/A'}
+                        </td>
+                        <td className="text-center">
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => deleteDomain(domain)}
+                            title="Remove domain from monitoring"
+                          >
+                            <FaTrash />
+                          </button>
                         </td>
                       </tr>
                     ))}
