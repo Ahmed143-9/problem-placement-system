@@ -10,7 +10,7 @@ import './ProblemList.css';
 export default function ProblemList() {
   const { user, isAuthenticated } = useAuth();
   const { notifyAssignment, notifyTransfer } = useNotifications();
-  const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Match AuthContext
+  const API_BASE_URL = 'https://ticketapi.wineds.com/api'; // Match AuthContext
   const navigate = useNavigate();
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
