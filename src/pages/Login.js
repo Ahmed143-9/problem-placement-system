@@ -9,23 +9,47 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, user } = useAuth();
+  const { login, user, isAuthenticated, permissions, roles } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in based on role
+  // Debug logs
   useEffect(() => {
-    if (user) {
-      if (user.role === 'admin' || user.role === 'team_leader') {
+    console.log('🔍 Login Component State:', { 
+      isAuthenticated, 
+      user,
+      permissions,
+      roles
+    });
+  }, [isAuthenticated, user, permissions, roles]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('🔀 Redirecting authenticated user:', user);
+      
+      // Check if password needs to be changed
+      if (user.force_password) {
+        toast.info('Please change your password');
+        navigate('/change-password');
+        return;
+      }
+
+      // Redirect based on role
+      const userRole = user.role;
+      console.log('🎭 User role for redirect:', userRole);
+      
+      if (userRole === 'admin' || userRole === 'team_leader' || roles.includes('admin')) {
         navigate('/dashboard');
       } else {
-    navigate('/employee-dashboard'); // Normal user এখানে যাবে
-  }
+        navigate('/employee-dashboard');
+      }
     }
-  }, [user, navigate]);
+  }, [isAuthenticated, user, roles, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    console.log('📤 Login form submitted');
 
     if (!username || !password) {
       toast.error('Please fill in all fields');
@@ -33,33 +57,45 @@ export default function Login() {
       return;
     }
 
-    // Password validation regex
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};:'",.<>?/\\|`~]).{8,}$/;
+    // For super admin, skip password validation
+    if (username !== 'superadmin@system.com') {
+      // Password validation regex
+      const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};:'",.<>?/\\|`~]).{8,}$/;
 
-    if (!passwordRegex.test(password)) {
-      toast.error('Password must be at least 8 characters, include 1 uppercase letter, 1 number, and 1 special character');
-      setLoading(false);
-      return;
+      if (!passwordRegex.test(password)) {
+        toast.error('Password must be at least 8 characters, include 1 uppercase letter, 1 number, and 1 special character');
+        setLoading(false);
+        return;
+      }
     }
 
     try {
       const result = await login(username, password);
+      console.log('📊 Login result:', result);
 
       if (result.success) {
-        toast.success('Login successful!');
-        const userData = JSON.parse(localStorage.getItem('current_user'));
-        if (userData.role === 'admin' || userData.role === 'team_leader') {
-          navigate('/dashboard');
-        } 
-        else {
-          navigate('/employee-dashboard');
+        toast.success(result.message || 'Login successful!');
+        
+        // Check if password needs to be changed
+        if (result.force_password) {
+          toast.info('Please change your password');
+          navigate('/change-password');
+          return;
         }
+
+        // Show user info
+        console.log('👤 User logged in:', result.user);
+        console.log('🔑 Permissions:', permissions);
+        console.log('👥 Roles:', roles);
+
+        // The useEffect above will handle redirection based on authentication state
       } else {
         toast.error(result.error || 'Login failed');
+        console.error('❌ Login failed:', result.error);
       }
     } catch (error) {
-      console.error('Login error:', error);
-      // toast.error('An error occurred during login');
+      console.error('❌ Login error:', error);
+      toast.error('An error occurred during login');
     } finally {
       setLoading(false);
     }
@@ -118,11 +154,11 @@ export default function Login() {
                   Issue Management System
                 </h2>
                 <p style={{ 
-                  color: '#333333', 
-                  fontWeight: '500',
-                  fontSize: '0.9rem'
+                  color: '#666', 
+                  fontSize: '0.85rem',
+                  marginTop: '10px'
                 }}>
-                  {/* Login to your account */}
+                  API v1 Login
                 </p>
               </div>
 
@@ -133,14 +169,14 @@ export default function Login() {
                     fontWeight: '600',
                     fontSize: '0.9rem'
                   }}>
-                    Username
+                    Username/Email
                   </label>
                   <input
                     type="text"
                     className="form-control form-control-lg"
                     style={{
-                      background: 'transparent', // Changed to transparent
-                      border: '2px solid #000000', // Black border
+                      background: 'transparent',
+                      border: '2px solid #000000',
                       color: '#000000',
                       fontWeight: '600',
                       borderRadius: '10px',
@@ -149,7 +185,7 @@ export default function Login() {
                     }}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
+                    placeholder="Enter your username or email"
                     autoComplete="username"
                     disabled={loading}
                     required
@@ -168,8 +204,8 @@ export default function Login() {
                     type={showPassword ? 'text' : 'password'}
                     className="form-control form-control-lg"
                     style={{
-                      background: 'transparent', // Changed to transparent
-                      border: '2px solid #000000', // Black border
+                      background: 'transparent',
+                      border: '2px solid #000000',
                       color: '#000000',
                       fontWeight: '600',
                       borderRadius: '10px',
@@ -196,6 +232,13 @@ export default function Login() {
                     {showPassword ? <FaEye /> : <FaEyeSlash />}
                   </span>
                 </div>
+
+                {/* Super Admin Hint */}
+                {username === 'superadmin@system.com' && (
+                  <div className="alert alert-info mb-3 py-2">
+                    <small>Super Admin emergency access</small>
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -231,6 +274,15 @@ export default function Login() {
                   )}
                 </button>
               </form>
+
+              {/* Debug info - only in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-3 text-center">
+                  <small className="text-muted">
+                    API: {process.env.REACT_APP_API_URL || 'http://localhost:8000/api'}
+                  </small>
+                </div>
+              )}
             </div>
           </div>
         </div>

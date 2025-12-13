@@ -1,10 +1,10 @@
-// src/utils/api.js - UPDATED VERSION
+// src/utils/api.js - UPDATED FOR NEW API STRUCTURE
 const API_BASE_URL = 'http://localhost:8000/api';
 
 // Get auth headers with token
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
-  console.log('🔑 Token being sent:', token); // Debug log
+  console.log('🔑 Token being sent:', token);
   
   return {
     'Content-Type': 'application/json',
@@ -13,7 +13,7 @@ const getAuthHeaders = () => {
   };
 };
 
-// Main API request function - FIXED
+// Main API request function - UPDATED FOR NEW RESPONSE STRUCTURE
 export const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -29,7 +29,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     console.log(`🟡 API CALL: ${config.method || 'GET'} ${url}`);
-    console.log('🔑 Headers:', config.headers); // Debug headers
+    console.log('🔑 Headers:', config.headers);
     
     const response = await fetch(url, config);
     
@@ -39,6 +39,8 @@ export const apiRequest = async (endpoint, options = {}) => {
     if (response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('permissions');
+      localStorage.removeItem('roles');
       window.location.href = '/login';
       throw new Error('Authentication failed. Please login again.');
     }
@@ -52,13 +54,18 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     const data = await response.json();
+    console.log('📊 API Response Data:', data);
 
-    if (!response.ok) {
-      console.error('❌ API Error Response:', data);
-      throw new Error(data.message || data.error || `HTTP error! status: ${response.status}`);
+    // Handle API error responses
+    if (response.status >= 400) {
+      const errorMessage = data.message || 
+                          data.error || 
+                          (Array.isArray(data.errors) ? data.errors.join(', ') : 'Unknown error');
+      console.error('❌ API Error:', errorMessage);
+      throw new Error(errorMessage);
     }
 
-    console.log('✅ API Success:', data);
+    console.log('✅ API Success');
     return data;
 
   } catch (error) {
@@ -67,37 +74,69 @@ export const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
-// Specific API methods
-export const userAPI = {
-  getUsers: () => apiRequest('/users'),
-  createUser: (userData) => apiRequest('/users', { method: 'POST', body: userData }),
-  updateUser: (id, userData) => apiRequest(`/users/${id}`, { method: 'PUT', body: userData }),
-  deleteUser: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
-  toggleUserStatus: (id) => apiRequest(`/users/${id}/toggle-status`, { method: 'PATCH' }),
-  getActiveUsers: () => apiRequest('/active-users'),
-  // Add reset password method
-  resetUserPassword: (id, newPassword) => apiRequest(`/users/${id}/reset-password`, { 
+// Auth API functions
+export const authAPI = {
+  login: (credentials) => apiRequest('/v1/login', { 
     method: 'POST', 
-    body: { password: newPassword } 
+    body: credentials 
   }),
-  // Add method to get user password for admin users
-  getUserPassword: (id) => apiRequest(`/users/${id}/password`)
-};
-
-export const problemAPI = {
-  getProblems: () => apiRequest('/problems'),
-  createProblem: (problemData) => apiRequest('/problems', { method: 'POST', body: problemData }),
-  updateProblem: (id, problemData) => apiRequest(`/problems/${id}`, { method: 'PUT', body: problemData }),
-  deleteProblem: (id) => apiRequest(`/problems/${id}`, { method: 'DELETE' }),
-};
-
-export const firstFaceAPI = {
-  getAssignments: () => apiRequest('/first-face-assignments'),
-  createAssignment: (data) => apiRequest('/first-face-assignments', { 
+  logout: () => apiRequest('/v1/logout', { method: 'POST' }),
+  changePassword: (data) => apiRequest('/v1/change-password', { 
     method: 'POST', 
     body: data 
   }),
-  deleteAssignment: (id) => apiRequest(`/first-face-assignments/${id}`, { 
+  getProfile: () => apiRequest('/v1/profile'),
+};
+
+// User API functions
+export const userAPI = {
+  getUsers: () => apiRequest('/v1/users'),
+  createUser: (userData) => apiRequest('/v1/users', { 
+    method: 'POST', 
+    body: userData 
+  }),
+  updateUser: (id, userData) => apiRequest(`/v1/users/${id}`, { 
+    method: 'PUT', 
+    body: userData 
+  }),
+  deleteUser: (id) => apiRequest(`/v1/users/${id}`, { 
+    method: 'DELETE' 
+  }),
+  toggleUserStatus: (id) => apiRequest(`/v1/users/${id}/toggle-status`, { 
+    method: 'PATCH' 
+  }),
+  getActiveUsers: () => apiRequest('/v1/active-users'),
+  resetUserPassword: (id, newPassword) => apiRequest(`/v1/users/${id}/reset-password`, { 
+    method: 'POST', 
+    body: { password: newPassword } 
+  }),
+  getUserPassword: (id) => apiRequest(`/v1/users/${id}/password`)
+};
+
+// Problem API functions
+export const problemAPI = {
+  getProblems: () => apiRequest('/v1/problems'),
+  createProblem: (problemData) => apiRequest('/v1/problems', { 
+    method: 'POST', 
+    body: problemData 
+  }),
+  updateProblem: (id, problemData) => apiRequest(`/v1/problems/${id}`, { 
+    method: 'PUT', 
+    body: problemData 
+  }),
+  deleteProblem: (id) => apiRequest(`/v1/problems/${id}`, { 
+    method: 'DELETE' 
+  }),
+};
+
+// First Face API functions
+export const firstFaceAPI = {
+  getAssignments: () => apiRequest('/v1/first-face-assignments'),
+  createAssignment: (data) => apiRequest('/v1/first-face-assignments', { 
+    method: 'POST', 
+    body: data 
+  }),
+  deleteAssignment: (id) => apiRequest(`/v1/first-face-assignments/${id}`, { 
     method: 'DELETE' 
   }),
 };
