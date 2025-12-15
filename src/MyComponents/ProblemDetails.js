@@ -1,4 +1,4 @@
-// src/pages/ProblemDetails.js - UPDATED FOR NEW COMMENT API
+// src/pages/ProblemDetails.js - UPDATED FOR NEW COMMENT API WITH SIDEBAR
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -12,7 +12,9 @@ import {
   FaCheckCircle, FaTimesCircle, FaCheck, FaHistory, FaCalendar, FaTag,
   FaBuilding, FaUserTie, FaUserCheck, FaUserTimes, FaArrowRight, FaPaperclip,
   FaImage, FaInfoCircle, FaBell, FaShareAlt, FaSync, FaPhone, FaEnvelope,
-  FaThumbsUp, FaThumbsDown, FaStar, FaChartLine, FaFileDownload
+  FaThumbsUp, FaThumbsDown, FaStar, FaChartLine, FaFileDownload,
+  FaGlobe, FaClipboardList, FaTasks, FaCheckCircle as FaCheckCircleIcon,
+  FaSpinner as FaSpinnerIcon
 } from 'react-icons/fa';
 
 export default function ProblemDetails() {
@@ -29,17 +31,17 @@ export default function ProblemDetails() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [showSolutionComment, setShowSolutionComment] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
-  const [rightSidebarMinimized, setRightSidebarMinimized] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferTo, setTransferTo] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [loadingProblem, setLoadingProblem] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
-  const [showHistory, setShowHistory] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignTo, setAssignTo] = useState('');
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     fetchProblemDetails();
@@ -48,12 +50,19 @@ export default function ProblemDetails() {
     }
   }, [id, showTransferModal]);
 
+  // Load available users when assign modal opens
+  useEffect(() => {
+    if (showAssignModal) {
+      loadAvailableUsers();
+    }
+  }, [showAssignModal]);
+
   // Load problem details from backend API
   const fetchProblemDetails = async () => {
     if (!refreshing) setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/problems/get', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/get', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +106,7 @@ export default function ProblemDetails() {
     setLoadingUsers(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/getAllUsers', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/getAllUsers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,170 +147,148 @@ export default function ProblemDetails() {
     // Regular users cannot transfer
     return false;
   };
- const handleTransferProblem = async () => {
-  if (!transferTo) {
-    toast.error('Please select a user to transfer to');
-    return;
-  }
 
-  const selectedUser = availableUsers.find(u => u.id == transferTo);
-  if (!selectedUser) {
-    toast.error('Selected user not found');
-    return;
-  }
+  const handleTransferProblem = async () => {
+    if (!transferTo) {
+      toast.error('Please select a user to transfer to');
+      return;
+    }
 
-  // ✅ FIXED: Only non-admin users can't transfer to problem creator
-  if (problem.created_by && selectedUser.id === problem.created_by.id && user?.role !== 'admin') {
-    toast.error('Cannot transfer problem to the person who created it');
-    return;
-  }
+    const selectedUser = availableUsers.find(u => u.id == transferTo);
+    if (!selectedUser) {
+      toast.error('Selected user not found');
+      return;
+    }
 
-  // Prevent transferring to current assignee
-  if (problem.assigned_to && selectedUser.id === problem.assigned_to.id) {
-    toast.error('Cannot transfer problem to the current assignee');
-    return;
-  }
+    // ✅ FIXED: Only non-admin users can't transfer to problem creator
+    if (problem.created_by && selectedUser.id === problem.created_by.id && user?.role !== 'admin') {
+      toast.error('Cannot transfer problem to the person who created it');
+      return;
+    }
 
-  setTransferring(true);
-  try {
-    const token = localStorage.getItem('token');
-    
-    // Create transfer record for history
-    const transferRecord = {
-      assigned_to: selectedUser.id,
-      assigned_to_name: selectedUser.name,
-      assigned_by: user.id,
-      assigned_by_name: user.name,
-      assigned_at: new Date().toISOString(),
-      type: 'reassignment',
-      reason: comment.trim() || 'No reason provided'
-    };
+    // Prevent transferring to current assignee
+    if (problem.assigned_to && selectedUser.id === problem.assigned_to.id) {
+      toast.error('Cannot transfer problem to the current assignee');
+      return;
+    }
 
-    // Get current assignment history - handle both array and string formats
-    let currentHistory = [];
+    setTransferring(true);
     try {
-      if (problem.assignment_history) {
-        if (Array.isArray(problem.assignment_history)) {
-          // Already an array
-          currentHistory = problem.assignment_history;
-        } else if (typeof problem.assignment_history === 'string') {
-          // Parse JSON string
-          currentHistory = JSON.parse(problem.assignment_history);
+      const token = localStorage.getItem('token');
+      
+      // Create transfer record for history
+      const transferRecord = {
+        assigned_to: selectedUser.id,
+        assigned_to_name: selectedUser.name,
+        assigned_by: user.id,
+        assigned_by_name: user.name,
+        assigned_at: new Date().toISOString(),
+        type: 'reassignment',
+        reason: comment.trim() || 'No reason provided'
+      };
+
+      // Get current assignment history - handle both array and string formats
+      let currentHistory = [];
+      try {
+        if (problem.assignment_history) {
+          if (Array.isArray(problem.assignment_history)) {
+            // Already an array
+            currentHistory = problem.assignment_history;
+          } else if (typeof problem.assignment_history === 'string') {
+            // Parse JSON string
+            currentHistory = JSON.parse(problem.assignment_history);
+          }
         }
+      } catch (e) {
+        console.error('Error parsing assignment history:', e);
+        currentHistory = [];
       }
-    } catch (e) {
-      console.error('Error parsing assignment history:', e);
-      currentHistory = [];
-    }
 
-    // ✅ FIX: Ensure currentHistory is an array
-    if (!Array.isArray(currentHistory)) {
-      currentHistory = [];
-    }
+      // ✅ FIX: Ensure currentHistory is an array
+      if (!Array.isArray(currentHistory)) {
+        currentHistory = [];
+      }
 
-    // ✅ FIX: Send as array, not JSON string
-    const updatePayload = {
-      id: parseInt(id),
-      assigned_to: selectedUser.id,
-      status: 'pending',
-      transfer_reason: comment.trim() || 'Transferred by ' + user.name,
-      assignment_history: [...currentHistory, transferRecord] // ✅ Send as array, not string
-    };
+      // ✅ FIX: Send as array, not JSON string
+      const updatePayload = {
+        id: parseInt(id),
+        assigned_to: selectedUser.id,
+        status: 'pending',
+        transfer_reason: comment.trim() || 'Transferred by ' + user.name,
+        assignment_history: [...currentHistory, transferRecord] // ✅ Send as array, not string
+      };
 
-    console.log('📤 Transfer update payload:', updatePayload);
-    console.log('📊 Assignment history type:', typeof updatePayload.assignment_history);
-    console.log('🔢 Assignment history is array?', Array.isArray(updatePayload.assignment_history));
+      console.log('📤 Transfer update payload:', updatePayload);
+      console.log('📊 Assignment history type:', typeof updatePayload.assignment_history);
+      console.log('🔢 Assignment history is array?', Array.isArray(updatePayload.assignment_history));
 
-    const updateResponse = await fetch('http://localhost:8000/api/problems/update', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify(updatePayload),
-    });
-
-    const updateData = await updateResponse.json();
-    console.log('📥 Update response:', updateData);
-
-    if (updateData.status !== 'success') {
-      throw new Error(updateData.messages?.[0] || 'Failed to transfer problem');
-    }
-
-    // Add transfer comment
-    const transferText = `Problem transferred from ${problem.assigned_to?.name || 'Unassigned'} to ${selectedUser.name}${comment.trim() ? `: ${comment}` : ''}`;
-
-    // Try to add comment
-    try {
-      const commentResponse = await fetch('http://localhost:8000/api/problems/comment', {
+      const updateResponse = await fetch('https://ticketapi.wineds.com/api/problems/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': token ? `Bearer ${token}` : '',
         },
-        body: JSON.stringify({
-          problem_id: parseInt(id),
-          text: transferText,
-          type: 'transfer'
-        }),
+        body: JSON.stringify(updatePayload),
       });
 
-      const commentData = await commentResponse.json();
-      if (commentData.status !== 'success') {
-        console.warn('Could not add transfer comment:', commentData.messages?.[0]);
-      }
-    } catch (commentError) {
-      console.warn('Failed to add comment:', commentError);
-    }
+      const updateData = await updateResponse.json();
+      console.log('📥 Update response:', updateData);
 
-    toast.success(`✅ Problem transferred to ${selectedUser.name} successfully!`);
-    
-    if (notifyStatusChange && typeof notifyStatusChange === 'function') {
+      if (updateData.status !== 'success') {
+        throw new Error(updateData.messages?.[0] || 'Failed to transfer problem');
+      }
+
+      // Add transfer comment
+      const transferText = `Problem transferred from ${problem.assigned_to?.name || 'Unassigned'} to ${selectedUser.name}${comment.trim() ? `: ${comment}` : ''}`;
+
+      // Try to add comment
       try {
-        notifyStatusChange(problem.id, 'pending', user.name, selectedUser.name);
-      } catch (notifyError) {
-        console.error('Notification error:', notifyError);
-      }
-    }
-    
-    setShowTransferModal(false);
-    setTransferTo('');
-    setComment('');
-    
-    setTimeout(() => {
-      fetchProblemDetails();
-    }, 500);
-    
-  } catch (error) {
-    console.error('❌ Transfer error:', error);
-    toast.error(error.message || 'Failed to transfer problem');
-  } finally {
-    setTransferring(false);
-  }
-};
+        const commentResponse = await fetch('https://ticketapi.wineds.com/api/problems/comment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+          body: JSON.stringify({
+            problem_id: parseInt(id),
+            text: transferText,
+            type: 'transfer'
+          }),
+        });
 
-  // Calculate duration between two dates
-  const calculateDuration = (start, end) => {
-    if (!start || !end) return 'N/A';
-    
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffMs = endDate - startDate;
-    
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (days > 0) {
-      return `${days}d ${hours}h`;
-    } else if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m`;
-    } else {
-      return 'Just now';
+        const commentData = await commentResponse.json();
+        if (commentData.status !== 'success') {
+          console.warn('Could not add transfer comment:', commentData.messages?.[0]);
+        }
+      } catch (commentError) {
+        console.warn('Failed to add comment:', commentError);
+      }
+
+      toast.success(`✅ Problem transferred to ${selectedUser.name} successfully!`);
+      
+      if (notifyStatusChange && typeof notifyStatusChange === 'function') {
+        try {
+          notifyStatusChange(problem.id, 'pending', user.name, selectedUser.name);
+        } catch (notifyError) {
+          console.error('Notification error:', notifyError);
+        }
+      }
+      
+      setShowTransferModal(false);
+      setTransferTo('');
+      setComment('');
+      
+      setTimeout(() => {
+        fetchProblemDetails();
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Transfer error:', error);
+      toast.error(error.message || 'Failed to transfer problem');
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -340,7 +327,7 @@ export default function ProblemDetails() {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:8000/api/problems/comment', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/comment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -375,119 +362,213 @@ export default function ProblemDetails() {
     }
   };
 
-  // Handle status change via backend API
-  const handleStatusChange = async (newStatus) => {
-    if ((newStatus === 'resolved' || newStatus === 'pending_approval') && !comment.trim()) { // Adjusted 'done' to 'resolved'
-      toast.error('Please add a comment explaining the solution before marking as solved');
-      setShowSolutionComment(true);
-      setPendingStatus(newStatus);
-      return;
+  // Handle status change via backend API - Using correct status values
+const handleStatusChange = async (newStatus) => {
+  console.log('🔍 DEBUG: handleStatusChange called with:', newStatus, 'User can approve?', canApprove());
+  
+  // Store the original status for UI messages
+  const originalStatus = newStatus;
+  
+  // Check if this is a regular user trying to mark as resolved
+  const isRegularUserResolving = newStatus === 'resolved' && !canApprove();
+  
+  if (isRegularUserResolving) {
+    console.log('🔍 Regular user wants to mark as resolved - will go to pending_approval');
+  }
+
+  // Require comment for resolved or approval submission
+  if ((originalStatus === 'resolved') && !comment.trim()) {
+    console.log('🔍 Comment required, showing solution modal');
+    toast.error('Please add a comment explaining the solution before marking as resolved');
+    setShowSolutionComment(true);
+    setPendingStatus(originalStatus);
+    return;
+  }
+
+  setUpdatingStatus(true);
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Add comment if provided
+    if (comment.trim()) {
+      const commentType = (originalStatus === 'resolved') ? 'solution' : 'status_change';
+      const commentResponse = await fetch('https://ticketapi.wineds.com/api/problems/comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          problem_id: parseInt(id),
+          text: comment.trim(),
+          type: commentType
+        }),
+      });
+
+      const commentData = await commentResponse.json();
+      if (commentData.status !== 'success') {
+        throw new Error(commentData.messages?.[0] || 'Failed to add comment');
+      }
     }
 
-    if (newStatus === 'resolved' && !canApprove()) {
-      newStatus = 'pending_approval';
+    // Determine the final status based on user role
+    let finalStatus = newStatus;
+    
+    // If regular user is marking as resolved, change to pending_approval
+    if (isRegularUserResolving) {
+      finalStatus = 'pending_approval';
     }
 
-    setUpdatingStatus(true);
-    try {
-      const token = localStorage.getItem('token');
+    console.log('🔍 Final status to send to backend:', finalStatus);
+
+    // Update status using the /problems/update endpoint
+    const updateData = {
+      id: parseInt(id),
+      status: finalStatus
+    };
+
+    // Add resolved_at only when admin/team_leader marks as resolved
+    if (newStatus === 'resolved' && canApprove()) {
+      updateData.resolved_at = new Date().toISOString();
+    }
+
+    console.log('📤 Sending update request:', updateData);
+
+    const response = await fetch('https://ticketapi.wineds.com/api/problems/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify(updateData),
+    });
+
+    const data = await response.json();
+    
+    console.log('📥 Response received:', {
+      status: response.status,
+      data: data
+    });
+
+    if (data.status === 'success') {
+      let statusMsg = '✅ Status updated successfully!';
       
-      // Add comment if provided
-      if (comment.trim()) {
-        const commentType = (newStatus === 'resolved' || newStatus === 'pending_approval') ? 'solution' : 'status_change';
-        const commentResponse = await fetch('http://localhost:8000/api/problems/comment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : '',
-          },
-          body: JSON.stringify({
-            problem_id: parseInt(id),
-            text: comment.trim(),
-            type: commentType
-          }),
-        });
-
-        const commentData = await commentResponse.json();
-        if (commentData.status !== 'success') {
-          throw new Error(commentData.messages?.[0] || 'Failed to add comment');
-        }
+      if (finalStatus === 'resolved') {
+        statusMsg = '✅ Problem marked as solved!';
+      } else if (finalStatus === 'in_progress') {
+        statusMsg = '✅ Problem is now in progress!';
+      } else if (finalStatus === 'pending') {
+        statusMsg = '✅ Problem status reset to pending!';
+      } else if (finalStatus === 'pending_approval') {
+        statusMsg = '✅ Solution submitted for approval!';
       }
+      
+      toast.success(statusMsg);
+      setComment('');
+      setShowSolutionComment(false);
+      setPendingStatus(null);
+      
+      // Send notifications
+      if (finalStatus === 'resolved' && canApprove() && notifyCompletion) {
+        notifyCompletion(problem.id, user.name);
+      }
+      
+      // Notify admins when user submits for approval
+      if (finalStatus === 'pending_approval' && notifySolutionComment) {
+        console.log('🔔 Notifying admins about solution submission');
+        notifySolutionComment(
+          problem.id, 
+          user.name, 
+          comment.trim(), 
+          problem
+        );
+      }
+      
+      if (problem.assigned_to && finalStatus !== 'resolved' && notifyStatusChange) {
+        notifyStatusChange(problem.id, finalStatus, user.name, problem.assigned_to.name);
+      }
+      
+      // Redirect user to dashboard after submitting solution for approval
+      if (finalStatus === 'pending_approval') {
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+      } else {
+        fetchProblemDetails();
+      }
+    } else {
+      // Handle specific error messages
+      let errorMessage = data.messages?.[0] || 'Failed to update status';
+      
+      // If it's a status validation error, provide more helpful feedback
+      if (errorMessage.includes('status is invalid')) {
+        errorMessage = 'The selected status is invalid. Please try again.';
+        console.log('⚠️ Status validation error. Final status sent:', finalStatus);
+      }
+      
+      toast.error(errorMessage);
+      console.error('Backend error details:', data);
+    }
+  } catch (error) {
+    console.error('❌ Status change error:', error);
+    toast.error('Failed to update status: ' + error.message);
+  } finally {
+    setUpdatingStatus(false);
+  }
+};
 
-      // Update status
-      const updateData = {
+// Handle approve completion via backend API
+const handleApproveCompletion = async () => {
+  if (!window.confirm('Are you sure this problem is resolved and ready to be marked as completed?')) {
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('https://ticketapi.wineds.com/api/problems/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({
         id: parseInt(id),
-        status: newStatus
-      };
+        status: 'resolved',
+        resolved_at: new Date().toISOString()
+      }),
+    });
 
-      // Add resolved_at for resolved status (if field exists; otherwise remove)
-      if (newStatus === 'resolved') {
-        updateData.resolved_at = new Date().toISOString();
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      toast.success('✅ Problem marked as solved!');
+      fetchProblemDetails();
+      
+      if (notifyCompletion) {
+        notifyCompletion(problem.id, user.name);
       }
-
-      const response = await fetch('http://localhost:8000/api/problems/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        const statusMsg = newStatus === 'pending_approval'
-          ? '✅ Submitted for approval! Admin/Team Leader will review.'
-          : '✅ Status updated successfully!';
-        
-        toast.success(statusMsg);
-        setComment('');
-        setShowSolutionComment(false);
-        setPendingStatus(null);
-        fetchProblemDetails();
-        
-        // Send notifications
-        if (newStatus === 'pending_approval' && notifyStatusChange) {
-          // Notify all admins and team leaders
-          notifyStatusChange(problem.id, 'pending_approval', user.name, 'admin');
-        } else if (problem.assigned_to && newStatus !== 'resolved' && notifyStatusChange) {
-          notifyStatusChange(problem.id, newStatus, user.name, problem.assigned_to.name);
-        }
-        
-        if (newStatus === 'resolved' && canApprove() && notifyCompletion) {
-          notifyCompletion(problem.id, user.name);
-        }
-      } else {
-        toast.error(data.messages?.[0] || 'Failed to update status');
-      }
-    } catch (error) {
-      console.error('❌ Status change error:', error);
-      toast.error('Failed to update status');
-    } finally {
-      setUpdatingStatus(false);
+    } else {
+      toast.error(data.messages?.[0] || 'Failed to approve completion');
     }
-  };
+  } catch (error) {
+    console.error('❌ Approve completion error:', error);
+    toast.error('Failed to approve completion');
+  }
+};
 
-  const handleSubmitSolution = () => {
-    if (!comment.trim()) {
-      toast.error('Please add a comment explaining the solution');
-      return;
-    }
-    handleStatusChange(pendingStatus);
-  };
+// Handle reject completion via backend API
+const handleRejectCompletion = async () => {
+  const reason = window.prompt('Reason for rejection (optional):');
 
-  // Handle approve completion via backend API
-  const handleApproveCompletion = async () => {
-    if (!window.confirm('Are you sure this problem is resolved and ready to be marked as completed?')) {
-      return;
-    }
+  try {
+    const token = localStorage.getItem('token');
 
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/problems/update', {
+    // Add rejection comment if reason provided
+    if (reason?.trim()) {
+      const commentResponse = await fetch('https://ticketapi.wineds.com/api/problems/comment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -495,63 +576,179 @@ export default function ProblemDetails() {
           'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({
-          id: parseInt(id),
-          status: 'resolved', // Adjusted from 'done'
-          // approved_by: user.id, // Remove if field doesn't exist
-          // approved_at: new Date().toISOString(),
-          // resolved_at: new Date().toISOString()
+          problem_id: parseInt(id),
+          text: `Completion rejected: ${reason.trim()}`,
+          type: 'status_change'
         }),
       });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        toast.success('✅ Problem marked as completed!');
-        fetchProblemDetails();
-        
-        if (notifyCompletion) {
-          notifyCompletion(problem.id, user.name);
-        }
-      } else {
-        toast.error(data.messages?.[0] || 'Failed to approve completion');
+      const commentData = await commentResponse.json();
+      if (commentData.status !== 'success') {
+        throw new Error(commentData.messages?.[0] || 'Failed to add rejection comment');
       }
-    } catch (error) {
-      console.error('❌ Approve completion error:', error);
-      toast.error('Failed to approve completion');
     }
-  };
 
-  // Handle reject completion via backend API
-  const handleRejectCompletion = async () => {
-    const reason = window.prompt('Reason for rejection (optional):');
+    // Update status back to in_progress
+    const response = await fetch('https://ticketapi.wineds.com/api/problems/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({
+        id: parseInt(id),
+        status: 'in_progress',
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      toast.warning('⚠️ Completion rejected. Status changed to In Progress.');
+      fetchProblemDetails();
+      
+      // Redirect back to all problems page after rejection
+      setTimeout(() => {
+        navigate('/problems');
+      }, 2000);
+    } else {
+      toast.error(data.messages?.[0] || 'Failed to reject completion');
+    }
+  } catch (error) {
+    console.error('❌ Reject completion error:', error);
+    toast.error('Failed to reject completion');
+  }
+};
+
+// Handle submit solution
+const handleSubmitSolution = () => {
+  if (!comment.trim()) {
+    toast.error('Please add a comment explaining the solution');
+    return;
+  }
+  
+  // Call handleStatusChange with the pending status
+  handleStatusChange(pendingStatus);
+  
+  // Close the modal immediately
+  setShowSolutionComment(false);
+  setPendingStatus(null);
+};
+const getUserInitials = (name) => {
+  return name.split(' ').map(word => word[0]).join('').toUpperCase();
+};
+
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleString();
+};
+
+// Check if user can approve
+const canApprove = () => {
+  return user.role === 'admin' || user.role === 'team_leader';
+};
+
+// Check if user can assign problem
+const canAssignProblem = () => {
+  if (!problem || !user) return false;
+  
+  // Admin and Team Leaders can always assign
+  if (user.role === 'admin' || user.role === 'team_leader') {
+    return true;
+  }
+  
+  // Regular users cannot assign
+  return false;
+};
+
+// Handle assign problem
+const handleAssignProblem = async () => {
+  if (!assignTo) {
+    toast.error('Please select a user to assign to');
+    return;
+  }
+
+  const selectedUser = availableUsers.find(u => u.id == assignTo);
+  if (!selectedUser) {
+    toast.error('Selected user not found');
+    return;
+  }
+
+  // Prevent assigning to problem creator
+  if (problem.created_by && selectedUser.id === problem.created_by.id) {
+    toast.error('Cannot assign problem to the person who created it');
+    return;
+  }
+
+  // Prevent assigning to current assignee
+  if (problem.assigned_to && selectedUser.id === problem.assigned_to.id) {
+    toast.error('Problem is already assigned to this user');
+    return;
+  }
+
+  setAssigning(true);
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Create assignment record for history
+    const assignmentRecord = {
+      assigned_to: selectedUser.id,
+      assigned_to_name: selectedUser.name,
+      assigned_by: user.id,
+      assigned_by_name: user.name,
+      assigned_at: new Date().toISOString(),
+      type: 'assignment'
+    };
+
+    // Get current assignment history - handle both array and string formats
+    let currentHistory = [];
+    try {
+      if (problem.assignment_history) {
+        if (Array.isArray(problem.assignment_history)) {
+          // Already an array
+          currentHistory = problem.assignment_history;
+        } else if (typeof problem.assignment_history === 'string') {
+          // Parse JSON string
+          currentHistory = JSON.parse(problem.assignment_history);
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing assignment history:', e);
+      currentHistory = [];
+    }
+
+    // Ensure currentHistory is an array
+    if (!Array.isArray(currentHistory)) {
+      currentHistory = [];
+    }
+
+    const updatePayload = {
+      id: parseInt(id),
+      assigned_to: selectedUser.id,
+      assignment_history: [...currentHistory, assignmentRecord]
+    };
+
+    const updateResponse = await fetch('https://ticketapi.wineds.com/api/problems/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify(updatePayload),
+    });
+
+    const updateData = await updateResponse.json();
+
+    if (updateData.status !== 'success') {
+      throw new Error(updateData.messages?.[0] || 'Failed to assign problem');
+    }
+
+    // Add assignment comment
+    const assignmentText = `Problem assigned to ${selectedUser.name}`;
 
     try {
-      const token = localStorage.getItem('token');
-
-      // Add rejection comment if reason provided
-      if (reason?.trim()) {
-        const commentResponse = await fetch('http://localhost:8000/api/problems/comment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : '',
-          },
-          body: JSON.stringify({
-            problem_id: parseInt(id),
-            text: `Completion rejected: ${reason.trim()}`,
-            type: 'status_change'
-          }),
-        });
-
-        const commentData = await commentResponse.json();
-        if (commentData.status !== 'success') {
-          throw new Error(commentData.messages?.[0] || 'Failed to add rejection comment');
-        }
-      }
-
-      // Update status
-      const response = await fetch('http://localhost:8000/api/problems/update', {
+      const commentResponse = await fetch('https://ticketapi.wineds.com/api/problems/comment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -559,49 +756,49 @@ export default function ProblemDetails() {
           'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({
-          id: parseInt(id),
-          status: 'in_progress',
-          // rejection_reason: reason || 'Needs more work', // Remove if no field
-          // rejected_by: user.id,
-          // rejected_at: new Date().toISOString()
+          problem_id: parseInt(id),
+          text: assignmentText,
+          type: 'assignment'
         }),
       });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        toast.warning('⚠️ Completion rejected. Status changed to In Progress.');
-        fetchProblemDetails();
-      } else {
-        toast.error(data.messages?.[0] || 'Failed to reject completion');
+      const commentData = await commentResponse.json();
+      if (commentData.status !== 'success') {
+        console.warn('Could not add assignment comment:', commentData.messages?.[0]);
       }
-    } catch (error) {
-      console.error('❌ Reject completion error:', error);
-      toast.error('Failed to reject completion');
+    } catch (commentError) {
+      console.warn('Failed to add comment:', commentError);
     }
-  };
 
-  // Assume getUserInitials and formatDate are defined elsewhere
-  const getUserInitials = (name) => {
-    return name.split(' ').map(word => word[0]).join('').toUpperCase();
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  // Check if user can approve
-  const canApprove = () => {
-    return user.role === 'admin' || user.role === 'team_leader';
-  };
-
-  // Placeholder for images/attachments if needed
-  // Assuming problem.images is an array of image URLs
+    toast.success(`✅ Problem assigned to ${selectedUser.name} successfully!`);
+    
+    setShowAssignModal(false);
+    setAssignTo('');
+    
+    setTimeout(() => {
+      fetchProblemDetails();
+    }, 500);
+    
+  } catch (error) {
+    console.error('❌ Assignment error:', error);
+    toast.error(error.message || 'Failed to assign problem');
+  } finally {
+    setAssigning(false);
+  }
+};// Toggle sidebar
+const toggleSidebar = () => {
+  setSidebarMinimized(!sidebarMinimized);
+};
 
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <FaSpinner className="fa-spin text-primary" size={48} />
+      <div>
+        <Navbar />
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -622,38 +819,144 @@ export default function ProblemDetails() {
   }
 
   return (
-    <div className="d-flex flex-column min-vh-100 bg-light">
+    <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: '#f8f9fa' }}>
       <Navbar />
-      <div className="container-fluid flex-grow-1 d-flex">
-        {/* Left Sidebar */}
-        <div className={`bg-white border-end transition-all ${sidebarMinimized ? 'w-20' : 'w-250px'}`} style={{ transition: 'width 0.3s' }}>
-          {/* Sidebar content */}
+      
+      <div className="d-flex flex-grow-1">
+        {/* Sidebar - Same as Dashboard */}
+        <div 
+          className="bg-dark text-white position-relative"
+          style={{ 
+            width: sidebarMinimized ? '70px' : '250px',
+            minHeight: '100%',
+            transition: 'width 0.3s ease'
+          }}
+        >
+          <button
+            onClick={toggleSidebar}
+            className="position-absolute d-flex align-items-center justify-content-center"
+            style={{
+              top: '10px',
+              right: '-12px',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#fff',
+              border: '1px solid #ccc',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              cursor: 'pointer',
+            }}
+          >
+            {sidebarMinimized 
+              ? <FaChevronRight size={14} color="#333" /> 
+              : <FaChevronLeft size={14} color="#333" />
+            }
+          </button>
+
           <div className="p-3">
-            <button onClick={() => setSidebarMinimized(!sidebarMinimized)} className="btn btn-sm btn-light mb-3">
-              {sidebarMinimized ? <FaChevronRight /> : <FaChevronLeft />}
-            </button>
             {!sidebarMinimized && (
-              <>
-                <h6 className="mb-3">Navigation</h6>
-                <ul className="list-unstyled">
-                  <li className="mb-2"><Link to="/dashboard"><FaHome className="me-2" /> Dashboard</Link></li>
-                  <li className="mb-2"><Link to="/problems"><FaFileAlt className="me-2" /> All Problems</Link></li>
-                  <li className="mb-2"><Link to="/users"><FaUsersCog className="me-2" /> Users</Link></li>
-                </ul>
-              </>
+              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+                Navigation
+              </h5>
             )}
+            <ul className="nav flex-column">
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/dashboard" 
+                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
+                  style={{ transition: 'all 0.2s ease' }}
+                  title="Dashboard"
+                >
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+                </Link>
+              </li>
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/problem/create" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={{ transition: 'all 0.2s ease' }}
+                  title="Create Problem"
+                >
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+                </Link>
+              </li>
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/problems" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={{ transition: 'all 0.2s ease' }}
+                  title="All Problems"
+                >
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+                </Link>
+              </li>
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/reports" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  style={{ transition: 'all 0.2s ease' }}
+                  title="Reports"
+                >
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+                </Link>
+              </li>
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <>
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/admin" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      style={{ transition: 'all 0.2s ease' }}
+                      title="Admin Panel"
+                    >
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+                    </Link>
+                  </li>
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/domain-status" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      style={{ transition: 'all 0.2s ease' }}
+                      title="Domain Status"
+                    >
+                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+                    </Link>
+                  </li>
+                </>
+              )}
+            </ul>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-grow-1 p-4">
+        <div 
+          className="flex-grow-1 p-4" 
+          style={{ 
+            overflowY: 'auto',
+            transition: 'margin-left 0.3s ease'
+          }}
+        >
+          {/* Header Section */}
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h2 className="mb-0">
-              Problem #{problem.id}: {problem.statement}
-            </h2>
+            <div>
+              <h1 className="h4 mb-1" style={{ color: '#2c3e50', fontWeight: '600' }}>
+                Problem Details
+              </h1>
+              <p className="text-muted mb-0" style={{ fontSize: '0.8rem' }}>
+                Created: {formatDate(problem.created_at)} • Last updated: {getTimeElapsed(problem.created_at)}
+              </p>
+            </div>
             <div className="d-flex gap-2">
               <button className="btn btn-outline-secondary" onClick={refreshProblem} disabled={refreshing}>
                 <FaSync className={refreshing ? 'fa-spin' : ''} />
+                {!sidebarMinimized && ' Refresh'}
               </button>
               {canTransferProblem() && (
                 <button className="btn btn-warning" onClick={() => setShowTransferModal(true)}>
@@ -661,7 +964,93 @@ export default function ProblemDetails() {
                   Transfer
                 </button>
               )}
-              {/* Add other buttons as needed */}
+            </div>
+          </div>
+
+          {/* Status Action Buttons */}
+          <div className="card border-0 shadow-sm mb-4">
+            <div className="card-body">
+              <h6 className="card-title mb-3">Update Status</h6>
+              <div className="d-flex gap-2 flex-wrap">
+                <button 
+                  className={`btn ${problem.status === 'pending' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => handleStatusChange('pending')}
+                  disabled={updatingStatus || problem.status === 'pending'}
+                >
+                  {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
+                  Mark as Pending
+                </button>
+                <button 
+                  className={`btn ${problem.status === 'in_progress' ? 'btn-info text-white' : 'btn-outline-info'}`}
+                  onClick={() => handleStatusChange('in_progress')}
+                  disabled={updatingStatus || problem.status === 'in_progress'}
+                >
+                  {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
+                  Start Progress
+                </button>
+                <button 
+                  className={`btn ${problem.status === 'resolved' ? 'btn-success' : 'btn-outline-success'}`}
+                  onClick={() => {
+                    if (!canApprove()) {
+                      // For regular users, show the solution comment modal
+                      setShowSolutionComment(true);
+                      setPendingStatus('resolved');
+                    } else {
+                      // For admin/team leaders, directly mark as resolved
+                      handleStatusChange('resolved');
+                    }
+                  }}
+                  disabled={updatingStatus || problem.status === 'resolved' || problem.status === 'pending_approval'}
+                >
+                  {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
+                  Mark as Resolved
+                </button>
+                
+                {/* Admin approval buttons */}
+                {canApprove() && problem.status === 'pending_approval' && (
+                  <button 
+                    className="btn btn-success"
+                    onClick={handleApproveCompletion}
+                    disabled={updatingStatus}
+                  >
+                    <FaCheckCircle className="me-2" />
+                    Approve Solution
+                  </button>
+                )}
+                
+                {canApprove() && problem.status === 'pending_approval' && (
+                  <button 
+                    className="btn btn-danger"
+                    onClick={handleRejectCompletion}
+                    disabled={updatingStatus}
+                  >
+                    <FaTimesCircle className="me-2" />
+                    Reject Solution
+                  </button>
+                )}
+                
+                {/* Show regular approval buttons for pending status */}
+                {canApprove() && problem.status === 'pending' && (
+                  <>
+                    <button 
+                      className="btn btn-success"
+                      onClick={handleApproveCompletion}
+                      disabled={updatingStatus}
+                    >
+                      <FaCheckCircle className="me-2" />
+                      Approve Resolution
+                    </button>
+                    <button 
+                      className="btn btn-danger"
+                      onClick={handleRejectCompletion}
+                      disabled={updatingStatus}
+                    >
+                      <FaTimesCircle className="me-2" />
+                      Reject Resolution
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -674,10 +1063,9 @@ export default function ProblemDetails() {
             </li>
             <li className="nav-item">
               <button className={`nav-link ${activeTab === 'discussion' ? 'active' : ''}`} onClick={() => setActiveTab('discussion')}>
-                Discussion
+                Discussion ({problem.comments?.length || 0})
               </button>
             </li>
-            {/* Add more tabs if needed */}
           </ul>
 
           {activeTab === 'details' && (
@@ -697,19 +1085,42 @@ export default function ProblemDetails() {
                       </dd>
                       <dt className="col-sm-4">Status</dt>
                       <dd className="col-sm-8">
-                        <span className={`badge bg-${problem.status === 'resolved' ? 'success' : problem.status === 'in_progress' ? 'primary' : 'secondary'}`}>
-                          {problem.status.replace('_', ' ').toUpperCase()}
+                        <span className={`badge bg-${
+                          problem.status === 'resolved' ? 'success' : 
+                          problem.status === 'in_progress' ? 'primary' : 
+                          problem.status === 'pending_approval' ? 'warning' : 'secondary'
+                        }`}>
+                          {problem.status === 'pending_approval' ? 'Waiting for Approval' : 
+                          problem.status === 'in_progress' ? 'In Progress' : 
+                          problem.status.charAt(0).toUpperCase() + problem.status.slice(1)}
                         </span>
                       </dd>
                       <dt className="col-sm-4">Created By</dt>
-                      <dd className="col-sm-8">{problem.created_by.name}</dd>
+                      <dd className="col-sm-8">{problem.created_by?.name || 'N/A'}</dd>
                       <dt className="col-sm-4">Assigned To</dt>
-                      <dd className="col-sm-8">{problem.assigned_to?.name || 'Unassigned'}</dd>
+                      <dd className="col-sm-8">
+                        {problem.assigned_to?.name || 'Unassigned'}
+                        {canAssignProblem() && (
+                          <button 
+                            className="btn btn-sm btn-outline-primary ms-2"
+                            onClick={() => setShowAssignModal(true)}
+                          >
+                            Assign
+                          </button>
+                        )}
+                      </dd>
                       <dt className="col-sm-4">Created At</dt>
                       <dd className="col-sm-8">{formatDate(problem.created_at)}</dd>
+                      {problem.resolved_at && (
+                        <>
+                          <dt className="col-sm-4">Resolved At</dt>
+                          <dd className="col-sm-8">{formatDate(problem.resolved_at)}</dd>
+                        </>
+                      )}
                     </dl>
-                    <h6>Description</h6>
-                    <p>{problem.description || 'No description provided'}</p>
+                    <h6>Problem Statement</h6>
+                    <p>{problem.statement || 'No problem statement provided'}</p>
+                    
                   </div>
                 </div>
               </div>
@@ -784,20 +1195,20 @@ export default function ProblemDetails() {
                                 width: '36px', 
                                 height: '36px', 
                                 fontSize: '0.9rem',
-                                backgroundColor: comment.user.role === 'admin' ? '#dc3545' : 
-                                              comment.user.role === 'team_leader' ? '#0d6efd' : '#6c757d'
+                                backgroundColor: comment.user?.role === 'admin' ? '#dc3545' : 
+                                              comment.user?.role === 'team_leader' ? '#0d6efd' : '#6c757d'
                               }}>
-                              {getUserInitials(comment.user.name)}
+                              {getUserInitials(comment.user?.name || 'UU')}
                             </div>
                           </div>
                           <div className="flex-grow-1 ms-3">
                             <div className="d-flex justify-content-between align-items-start">
                               <div>
-                                <h6 className="mb-0">{comment.user.name}</h6>
+                                <h6 className="mb-0">{comment.user?.name || 'Unknown User'}</h6>
                                 <small className="text-muted">
-                                  {comment.user.role === 'admin' && 'Admin • '}
-                                  {comment.user.role === 'team_leader' && 'Team Leader • '}
-                                  {comment.user.role === 'user' && 'User • '}
+                                  {comment.user?.role === 'admin' && 'Admin • '}
+                                  {comment.user?.role === 'team_leader' && 'Team Leader • '}
+                                  {comment.user?.role === 'user' && 'User • '}
                                   {formatDate(comment.created_at)}
                                 </small>
                               </div>
@@ -954,19 +1365,6 @@ export default function ProblemDetails() {
                       </small>
                     </div>
 
-                    {/* <div className="mb-3">
-                      <label className="form-label fw-semibold">Transfer Reason (Optional):</label>
-                      <textarea
-                        className="form-control"
-                        rows="3"
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        placeholder="Explain why you are transferring this problem..."
-                        disabled={transferring}
-                      ></textarea>
-                      <small className="text-muted">This will be added as a comment</small>
-                    </div> */}
-
                     <div className="d-flex gap-2 mt-4">
                       <button 
                         className="btn btn-warning flex-grow-1"
@@ -1005,62 +1403,159 @@ export default function ProblemDetails() {
 
           {/* Solution Comment Required Modal */}
           {showSolutionComment && (
+  <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content">
+        <div className="modal-header bg-warning text-dark">
+          <h5 className="modal-title">
+            <FaCheckCircle className="me-2" />
+            {canApprove() ? 'Mark as Resolved' : 'Submit Solution for Approval'}
+          </h5>
+          <button 
+            type="button" 
+            className="btn-close" 
+            onClick={() => {
+              setShowSolutionComment(false);
+              setPendingStatus(null);
+              setComment('');
+            }}
+          ></button>
+        </div>
+        <div className="modal-body">
+          <div className="alert alert-warning">
+            <h6 className="alert-heading mb-2">💡 Please Describe Your Solution</h6>
+            <p className="mb-0">
+              {canApprove() 
+                ? 'Please describe how you resolved this problem.'
+                : 'Your solution will be submitted for approval. Please describe your solution in detail.'}
+            </p>
+          </div>
+          
+          <div className="mb-3">
+            <label className="form-label fw-semibold">Solution Description:</label>
+            <textarea
+              className="form-control"
+              rows="4"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Describe your solution in detail..."
+              autoFocus
+            ></textarea>
+            <small className="text-muted">Be specific about the steps taken and resolution</small>
+          </div>
+
+          <div className="d-flex gap-2 mt-4">
+            <button 
+              className="btn btn-success flex-grow-1"
+              onClick={handleSubmitSolution}
+              disabled={!comment.trim()}
+            >
+              <FaCheckCircle className="me-2" />
+              {canApprove() 
+                ? 'Submit Solution & Mark as Resolved'
+                : 'Submit Solution for Approval'}
+            </button>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowSolutionComment(false);
+                setPendingStatus(null);
+                setComment('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+          )}
+          {/* Assign Problem Modal */}
+          {showAssignModal && (
             <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
               <div className="modal-dialog modal-dialog-centered">
                 <div className="modal-content">
-                  <div className="modal-header bg-warning text-dark">
+                  <div className="modal-header bg-primary text-white">
                     <h5 className="modal-title">
-                      <FaCheckCircle className="me-2" />
-                      Solution Comment Required
+                      <FaUserTie className="me-2" />
+                      Assign Problem #{problem.id}
                     </h5>
                     <button 
                       type="button" 
                       className="btn-close" 
                       onClick={() => {
-                        setShowSolutionComment(false);
-                        setPendingStatus(null);
-                        setComment('');
+                        setShowAssignModal(false);
+                        setAssignTo('');
                       }}
+                      disabled={assigning}
                     ></button>
                   </div>
                   <div className="modal-body">
-                    <div className="alert alert-warning">
-                      <h6 className="alert-heading mb-2">💡 Please Describe Your Solution</h6>
-                      <p className="mb-0">
-                        Before marking this problem as {pendingStatus === 'resolved' ? 'solved' : 'pending approval'}, 
-                        please describe how you resolved it. This helps with documentation and future reference.
-                      </p>
+                    <div className="alert alert-info">
+                      <h6 className="alert-heading mb-2">Assignment Rules</h6>
+                      <ul className="mb-0 small">
+                        <li>Only Admin and Team Leaders can assign problems</li>
+                        <li>You cannot assign problems to the person who created it</li>
+                        <li>The assigned user will receive a notification</li>
+                      </ul>
                     </div>
                     
                     <div className="mb-3">
-                      <label className="form-label fw-semibold">Solution Description:</label>
-                      <textarea
-                        className="form-control"
-                        rows="4"
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        placeholder="Describe your solution in detail..."
-                        autoFocus
-                      ></textarea>
-                      <small className="text-muted">Be specific about the steps taken and resolution</small>
+                      <label className="form-label fw-semibold">Assign To:</label>
+                      {loadingUsers ? (
+                        <div className="text-center py-4">
+                          <FaSpinner className="fa-spin text-primary me-2" />
+                          Loading available users...
+                        </div>
+                      ) : (
+                        <select
+                          className="form-control"
+                          value={assignTo}
+                          onChange={(e) => setAssignTo(e.target.value)}
+                          disabled={assigning}
+                        >
+                          <option value="">-- Select User --</option>
+                          {availableUsers.map(user => (
+                            <option key={user.id} value={user.id}>
+                              {user.name} 
+                              {user.role === 'team_leader' && ' (Team Leader)'} 
+                              {user.role === 'admin' && ' (Admin)'} 
+                              {user.department && ` - ${user.department}`}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <small className="text-muted">
+                        Available users for assignment (excluding problem creator)
+                      </small>
                     </div>
 
                     <div className="d-flex gap-2 mt-4">
                       <button 
-                        className="btn btn-success flex-grow-1"
-                        onClick={handleSubmitSolution}
-                        disabled={!comment.trim()}
+                        className="btn btn-primary flex-grow-1"
+                        onClick={handleAssignProblem}
+                        disabled={!assignTo || assigning || loadingUsers}
                       >
-                        <FaCheckCircle className="me-2" />
-                        Submit Solution & Mark as {pendingStatus === 'resolved' ? 'Solved' : 'Pending Approval'}
+                        {assigning ? (
+                          <>
+                            <FaSpinner className="fa-spin me-2" />
+                            Assigning...
+                          </>
+                        ) : (
+                          <>
+                            <FaUserTie className="me-2" />
+                            Assign Problem
+                          </>
+                        )}
                       </button>
                       <button 
                         className="btn btn-secondary"
                         onClick={() => {
-                          setShowSolutionComment(false);
-                          setPendingStatus(null);
-                          setComment('');
+                          setShowAssignModal(false);
+                          setAssignTo('');
                         }}
+                        disabled={assigning}
                       >
                         Cancel
                       </button>

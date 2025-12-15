@@ -1,4 +1,4 @@
-// src/pages/AdminPanel.js - UPDATED FOR NEW API ENDPOINTS
+// src/pages/AdminPanel.js - WITHOUT SUPERADMIN DEPENDENCY
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -12,23 +12,22 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 
 export default function AdminPanel() {
-  const { user, isSuperAdmin, isHiddenUser } = useAuth();
+  const { user } = useAuth(); // Removed isSuperAdmin, isHiddenUser
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({
-  name: '',
-  email: '',
-  password: '',
-  role_ids: [2], // Default to 'user' role (id: 2)
-  status: 1, // 1 for active, 0 for inactive
-  department: '' // Add this line
-});
+    name: '',
+    email: '',
+    password: '',
+    role_ids: [2], // Default to 'user' role (id: 2)
+    status: 1, // 1 for active, 0 for inactive
+    department: ''
+  });
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [passwordVisible, setPasswordVisible] = useState(false);
   
   // Add missing state variables
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
@@ -46,30 +45,33 @@ export default function AdminPanel() {
   const [activeUsers, setActiveUsers] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
   
-  const isAdmin = user?.role === 'admin' || isSuperAdmin;
+  // Only regular admin role check
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadUsers();
     loadRoles();
     loadFirstFaceAssignmentsFromStorage();
   }, []);
-   const departments = [
-  'Enterprise Business Solutions',
-  'Board Management',
-  'Support Stuff',
-  'Administration and Human Resources',
-  'Finance and Accounts',
-  'Business Dev and Operations',
-  'Implementation and Support',
-  'Technical and Networking Department'
-];
+
+  const departments = [
+    'Enterprise Business Solutions',
+    'Board Management',
+    'Support Stuff',
+    'Administration and Human Resources',
+    'Finance and Accounts',
+    'Business Dev and Operations',
+    'Implementation and Support',
+    'Technical and Networking Department'
+  ];
+
   // Load all roles from API
   const loadRoles = async () => {
     try {
       setLoadingRoles(true);
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:8000/api/v1/role/getAllRoles', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/role/getAllRoles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -110,95 +112,94 @@ export default function AdminPanel() {
     }
   };
 
-// Load Users with New API
-const loadUsers = async () => {
-  try {
-    setLoadingUsers(true);
-    const token = localStorage.getItem('token');
-    
-    const response = await fetch('http://localhost:8000/api/v1/getAllUsers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-    });
+  // Load Users with New API - REMOVED Super Admin filtering
+  const loadUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/getAllUsers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.status === 'success' && data.data) {
-      // Fetch detailed user info for each user to get their role
-      const detailedUsers = await Promise.all(
-        data.data.map(async (user) => {
-          try {
-            const userDetailResponse = await fetch('http://localhost:8000/api/v1/getUser', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : '',
-              },
-              body: JSON.stringify({ id: user.id }),
-            });
+      if (data.status === 'success' && data.data) {
+        // Fetch detailed user info for each user to get their role
+        const detailedUsers = await Promise.all(
+          data.data.map(async (user) => {
+            try {
+              const userDetailResponse = await fetch('https://ticketapi.wineds.com/api/v1/getUser', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'Authorization': token ? `Bearer ${token}` : '',
+                },
+                body: JSON.stringify({ id: user.id }),
+              });
 
-            if (userDetailResponse.ok) {
-              const userDetailData = await userDetailResponse.json();
-              if (userDetailData.status === 'success') {
-                return {
-                  ...user,
-                  role: userDetailData.data.roles && userDetailData.data.roles.length > 0 
-                    ? userDetailData.data.roles[0] 
-                    : 'user',
-                  username: userDetailData.data.username || user.email.split('@')[0],
-                  status: userDetailData.data.status === 1 ? 'active' : 'inactive',
-                  department: userDetailData.data.department || 'Not Assigned' // Fixed this line
-                };
+              if (userDetailResponse.ok) {
+                const userDetailData = await userDetailResponse.json();
+                if (userDetailData.status === 'success') {
+                  return {
+                    ...user,
+                    role: userDetailData.data.roles && userDetailData.data.roles.length > 0 
+                      ? userDetailData.data.roles[0] 
+                      : 'user',
+                    username: userDetailData.data.username || user.email.split('@')[0],
+                    status: userDetailData.data.status === 1 ? 'active' : 'inactive',
+                    department: userDetailData.data.department || 'Not Assigned'
+                  };
+                }
               }
+              return {
+                ...user,
+                role: 'user',
+                username: user.email.split('@')[0],
+                status: 'active',
+                department: 'Not Assigned'
+              };
+            } catch (error) {
+              console.error(`Error fetching details for user ${user.id}:`, error);
+              return {
+                ...user,
+                role: 'user',
+                username: user.email.split('@')[0],
+                status: 'active',
+                department: 'Not Assigned'
+              };
             }
-            return {
-              ...user,
-              role: 'user',
-              username: user.email.split('@')[0],
-              status: 'active',
-              department: 'Not Assigned' // Fixed this line - removed invalid reference
-            };
-          } catch (error) {
-            console.error(`Error fetching details for user ${user.id}:`, error);
-            return {
-              ...user,
-              role: 'user',
-              username: user.email.split('@')[0],
-              status: 'active',
-              department: 'Not Assigned' // Fixed this line
-            };
-          }
-        })
-      );
+          })
+        );
 
-      // Filter out hidden users (Super Admin)
-      const filteredUsers = detailedUsers.filter(user => !isHiddenUser(user));
-      setUsers(filteredUsers);
-      console.log('✅ Users loaded successfully (filtered):', filteredUsers.length);
-      
-      // Also set active users for First Face assignment
-      const activeUsersList = filteredUsers.filter(u => u.status === 'active');
-      setActiveUsers(activeUsersList);
-      
-    } else {
-      toast.error(data.message || 'Failed to load users');
+        // REMOVED: Filter out hidden users (no Super Admin filtering)
+        setUsers(detailedUsers);
+        console.log('✅ Users loaded successfully:', detailedUsers.length);
+        
+        // Also set active users for First Face assignment
+        const activeUsersList = detailedUsers.filter(u => u.status === 'active');
+        setActiveUsers(activeUsersList);
+        
+      } else {
+        toast.error(data.message || 'Failed to load users');
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      toast.error('Network error while loading users');
+    } finally {
+      setLoadingUsers(false);
     }
-  } catch (error) {
-    console.error('Failed to load users:', error);
-    toast.error('Network error while loading users');
-  } finally {
-    setLoadingUsers(false);
-  }
-};
+  };
 
   // Handle input changes for form fields
   const handleInputChange = (e) => {
@@ -214,125 +215,125 @@ const loadUsers = async () => {
     const selectedRoleId = parseInt(e.target.value);
     setFormData(prev => ({
       ...prev,
-      role_ids: [selectedRoleId] // Currently only one role, but kept as array for API compatibility
+      role_ids: [selectedRoleId]
     }));
   };
 
-const handleSaveUser = async () => {
-  if (!isAdmin) {
-    toast.error('Only Admin can add or edit users!');
-    return;
-  }
-
-  if (!formData.name || !formData.email) {
-    toast.error('Name and Email are required fields');
-    return;
-  }
-
-  console.log('📥 Form data:', formData);
-
-  // Password validation for new users
-  if (!editingUser && !formData.password) {
-    toast.error('Password is required for new user');
-    return;
-  }
-
-  if (formData.password && !validatePassword(formData.password)) {
-    toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char (@$!%*?&.)');
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem('token');
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : '',
-    };
-
-    let url, method, requestBody;
-
-    if (editingUser) {
-      // Update user
-      url = 'http://localhost:8000/api/v1/updateUser';
-      method = 'POST';
-      requestBody = {
-        id: editingUser.id,
-        name: formData.name,
-        email: formData.email,
-        password: formData.password || undefined, // Only include if provided
-        role_ids: formData.role_ids,
-        status: formData.status ? 1 : 0,
-        department: formData.department || '' // Add this line
-      };
-    } else {
-      // Create user
-      url = 'http://localhost:8000/api/v1/createUser';
-      method = 'POST';
-      requestBody = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role_ids: formData.role_ids,
-        status: formData.status ? 1 : 0,
-        department: formData.department || '' // Add this line
-      };
+  const handleSaveUser = async () => {
+    if (!isAdmin) {
+      toast.error('Only Admin can add or edit users!');
+      return;
     }
 
-    // Remove password field if it's empty (for updates)
-    if (editingUser && !formData.password) {
-      delete requestBody.password;
+    if (!formData.name || !formData.email) {
+      toast.error('Name and Email are required fields');
+      return;
     }
 
-    console.log('📡 Sending request to:', url);
-    console.log('📦 Request body:', requestBody);
+    console.log('📥 Form data:', formData);
 
-    const response = await fetch(url, {
-      method: method,
-      headers: headers,
-      body: JSON.stringify(requestBody),
-    });
+    // Password validation for new users
+    if (!editingUser && !formData.password) {
+      toast.error('Password is required for new user');
+      return;
+    }
 
-    console.log('📊 Response status:', response.status);
-    
-    const data = await response.json();
-    console.log('🟢 Response data:', data);
+    if (formData.password && !validatePassword(formData.password)) {
+      toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char (@$!%*?&.)');
+      return;
+    }
 
-    if (data.status === 'success') {
-      // Send notification
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      };
+
+      let url, method, requestBody;
+
       if (editingUser) {
-        sendUserUpdateNotification(editingUser, formData);
-        toast.success('User updated successfully!');
+        // Update user
+        url = 'https://ticketapi.wineds.com/api/v1/updateUser';
+        method = 'POST';
+        requestBody = {
+          id: editingUser.id,
+          name: formData.name,
+          email: formData.email,
+          password: formData.password || undefined,
+          role_ids: formData.role_ids,
+          status: formData.status ? 1 : 0,
+          department: formData.department || ''
+        };
       } else {
-        sendUserCreationNotification(formData);
-        toast.success('User created successfully!');
+        // Create user
+        url = 'https://ticketapi.wineds.com/api/v1/createUser';
+        method = 'POST';
+        requestBody = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role_ids: formData.role_ids,
+          status: formData.status ? 1 : 0,
+          department: formData.department || ''
+        };
       }
 
-      // Reset form and close modal
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        role_ids: [2], // Default to 'user' role
-        status: 1,
-        department: '' // Add this line
+      // Remove password field if it's empty (for updates)
+      if (editingUser && !formData.password) {
+        delete requestBody.password;
+      }
+
+      console.log('📡 Sending request to:', url);
+      console.log('📦 Request body:', requestBody);
+
+      const response = await fetch(url, {
+        method: method,
+        headers: headers,
+        body: JSON.stringify(requestBody),
       });
-      setShowModal(false);
-      setEditingUser(null);
-      setShowPassword(false);
+
+      console.log('📊 Response status:', response.status);
       
-      // Reload users
-      loadUsers();
-      
-    } else {
-      console.error('❌ API Error:', data);
-      toast.error(data.message || data.errors || 'Failed to save user');
+      const data = await response.json();
+      console.log('🟢 Response data:', data);
+
+      if (data.status === 'success') {
+        // Send notification
+        if (editingUser) {
+          sendUserUpdateNotification(editingUser, formData);
+          toast.success('User updated successfully!');
+        } else {
+          sendUserCreationNotification(formData);
+          toast.success('User created successfully!');
+        }
+
+        // Reset form and close modal
+        setFormData({
+          name: '',
+          email: '',
+          password: '',
+          role_ids: [2],
+          status: 1,
+          department: ''
+        });
+        setShowModal(false);
+        setEditingUser(null);
+        setShowPassword(false);
+        
+        // Reload users
+        loadUsers();
+        
+      } else {
+        console.error('❌ API Error:', data);
+        toast.error(data.message || data.errors || 'Failed to save user');
+      }
+    } catch (error) {
+      console.error('❌ Save user error:', error);
+      toast.error(error.message || 'Failed to save user');
     }
-  } catch (error) {
-    console.error('❌ Save user error:', error);
-    toast.error(error.message || 'Failed to save user');
-  }
-};
+  };
 
   // Send Notification for User Creation
   const sendUserCreationNotification = async (newUserData) => {
@@ -353,7 +354,7 @@ const handleSaveUser = async () => {
         sender_id: user?.id,
       };
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(notificationPayload),
@@ -390,7 +391,7 @@ const handleSaveUser = async () => {
         sender_id: user?.id,
       };
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(notificationPayload),
@@ -427,7 +428,7 @@ const handleSaveUser = async () => {
         sender_id: user?.id,
       };
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(notificationPayload),
@@ -464,7 +465,7 @@ const handleSaveUser = async () => {
         sender_id: user?.id,
       };
 
-      const response = await fetch('http://localhost:8000/api/v1/notifications', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(notificationPayload),
@@ -487,57 +488,58 @@ const handleSaveUser = async () => {
     setSidebarMinimized(!sidebarMinimized);
   };
 
-const resetForm = () => {
-  setFormData({
-    name: '',
-    email: '',
-    password: '',
-    role_ids: [2],
-    status: 1,
-    department: '' // Changed from 'departments' to empty string
-  });
-  setEditingUser(null);
-  setShowPassword(false);
-};
-const openEditModal = async (userToEdit) => {
-  try {
-    const token = localStorage.getItem('token');
-    
-    // Fetch detailed user info
-    const response = await fetch('http://localhost:8000/api/v1/getUser', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify({ id: userToEdit.id }),
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      role_ids: [2],
+      status: 1,
+      department: ''
     });
+    setEditingUser(null);
+    setShowPassword(false);
+  };
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data.status === 'success') {
-        const userData = data.data;
-        setEditingUser(userData);
-        setFormData({
-          name: userData.name,
-          email: userData.email,
-          password: '', // Keep empty for security
-          role_ids: userData.roles && userData.roles.length > 0 
-            ? [roles.find(r => r.name === userData.roles[0])?.id || 2] 
-            : [2],
-          status: userData.status,
-          department: userData.department || '' // Add this line
-        });
-        setShowModal(true);
-        setShowPassword(false);
+  const openEditModal = async (userToEdit) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Fetch detailed user info
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/getUser', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({ id: userToEdit.id }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'success') {
+          const userData = data.data;
+          setEditingUser(userData);
+          setFormData({
+            name: userData.name,
+            email: userData.email,
+            password: '',
+            role_ids: userData.roles && userData.roles.length > 0 
+              ? [roles.find(r => r.name === userData.roles[0])?.id || 2] 
+              : [2],
+            status: userData.status,
+            department: userData.department || ''
+          });
+          setShowModal(true);
+          setShowPassword(false);
+        }
       }
+    } catch (error) {
+      console.error('Error loading user details:', error);
+      toast.error('Failed to load user details');
     }
-  } catch (error) {
-    console.error('Error loading user details:', error);
-    toast.error('Failed to load user details');
-  }
-};
+  };
 
   // ✅ validatePassword function
   const validatePassword = (password) => {
@@ -589,108 +591,105 @@ const openEditModal = async (userToEdit) => {
     setShowEmailModal(true);
   };
 
-// Load First Face assignments from backend
-const loadFirstFaceAssignments = async () => {
-  setLoadingFirstFace(true);
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8000/api/first-face-assignments/getAll', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-    });
+  // Load First Face assignments from backend
+  const loadFirstFaceAssignments = async () => {
+    setLoadingFirstFace(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://ticketapi.wineds.com/api/first-face-assignments/getAll', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data.status === 'success') {
-        setFirstFaceAssignments(data.data);
-        console.log('✅ First Face assignments loaded from backend:', data.data.length);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'success') {
+          setFirstFaceAssignments(data.data);
+          console.log('✅ First Face assignments loaded from backend:', data.data.length);
+        }
       }
+    } catch (error) {
+      console.error('❌ Error loading First Face assignments:', error);
+      toast.error('Failed to load First Face assignments');
+    } finally {
+      setLoadingFirstFace(false);
     }
-  } catch (error) {
-    console.error('❌ Error loading First Face assignments:', error);
-    toast.error('Failed to load First Face assignments');
-  } finally {
-    setLoadingFirstFace(false);
-  }
-};
+  };
 
-// Create First Face assignment via backend
-const handleFirstFaceAssignment = async () => {
-  if (!selectedFirstFace || !selectedDepartment) {
-    toast.error('Please select both a user and a department');
-    return;
-  }
-
-  setSavingFirstFace(true);
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8000/api/first-face-assignments/create', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify({
-        user_id: parseInt(selectedFirstFace),
-        department: selectedDepartment === 'all' ? null : selectedDepartment,
-        is_active: true,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (data.status === 'success') {
-      setSelectedFirstFace('');
-      setSelectedDepartment('');
-      setShowFirstFaceModal(false);
-      loadFirstFaceAssignments();
-      toast.success(data.messages[0]);
-    } else {
-     
-      toast.error(data.messages?.[0] || 'Failed to create First Face assignment');
-
+  // Create First Face assignment via backend
+  const handleFirstFaceAssignment = async () => {
+    if (!selectedFirstFace || !selectedDepartment) {
+      toast.error('Please select both a user and a department');
+      return;
     }
-  } catch (error) {
-    console.error('❌ Error creating First Face assignment:', error);
-    toast.error(error.message || 'Failed to create First Face assignment');
-  } finally {
-    setSavingFirstFace(false);
-  }
-};
 
-// Remove First Face assignment via backend
-const handleRemoveFirstFace = async (id) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8000/api/first-face-assignments/delete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      },
-      body: JSON.stringify({ id }),
-    });
+    setSavingFirstFace(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://ticketapi.wineds.com/api/first-face-assignments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          user_id: parseInt(selectedFirstFace),
+          department: selectedDepartment === 'all' ? null : selectedDepartment,
+          is_active: true,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.status === 'success') {
-      loadFirstFaceAssignments();
-      toast.success('First Face assignment removed!');
-    } else {
-      toast.error(data.messages[0] || 'Failed to remove First Face assignment');
+      if (data.status === 'success') {
+        setSelectedFirstFace('');
+        setSelectedDepartment('');
+        setShowFirstFaceModal(false);
+        loadFirstFaceAssignments();
+        toast.success(data.messages[0]);
+      } else {
+        toast.error(data.messages?.[0] || 'Failed to create First Face assignment');
+      }
+    } catch (error) {
+      console.error('❌ Error creating First Face assignment:', error);
+      toast.error(error.message || 'Failed to create First Face assignment');
+    } finally {
+      setSavingFirstFace(false);
     }
-  } catch (error) {
-    console.error('❌ Error removing First Face assignment:', error);
-    toast.error(error.message || 'Failed to remove First Face assignment');
-  }
-};
+  };
 
+  // Remove First Face assignment via backend
+  const handleRemoveFirstFace = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://ticketapi.wineds.com/api/first-face-assignments/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        loadFirstFaceAssignments();
+        toast.success('First Face assignment removed!');
+      } else {
+        toast.error(data.messages[0] || 'Failed to remove First Face assignment');
+      }
+    } catch (error) {
+      console.error('❌ Error removing First Face assignment:', error);
+      toast.error(error.message || 'Failed to remove First Face assignment');
+    }
+  };
 
   const loadActiveUsers = async () => {
     setLoadingActiveUsers(true);
@@ -717,7 +716,7 @@ const handleRemoveFirstFace = async (id) => {
     }
   };
 
-  // Toggle user status - NOTE: You'll need to create this API endpoint
+  // Toggle user status
   const handleToggleStatus = async (userId) => {
     if (!isAdmin) {
       toast.error('Only Admin can change user status!');
@@ -735,10 +734,14 @@ const handleRemoveFirstFace = async (id) => {
         'Authorization': token ? `Bearer ${token}` : '',
       };
 
-      // You'll need to create this API endpoint
-      const response = await fetch(`http://localhost:8000/api/v1/users/${userId}/toggle-status`, {
-        method: 'PATCH',
+      // Update user status endpoint
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
+        method: 'POST',
         headers: headers,
+        body: JSON.stringify({
+          id: userId,
+          status: newStatus === 'active' ? 1 : 0
+        }),
       });
 
       const data = await response.json();
@@ -756,7 +759,7 @@ const handleRemoveFirstFace = async (id) => {
     }
   };
 
-  // Reset user password - NOTE: You'll need to create this API endpoint
+  // Reset user password
   const handleResetPassword = async (userId, userName) => {
     if (!isAdmin) {
       toast.error('Only Admin can reset passwords!');
@@ -779,11 +782,14 @@ const handleRemoveFirstFace = async (id) => {
         'Authorization': token ? `Bearer ${token}` : '',
       };
 
-      // You'll need to create this API endpoint
-      const response = await fetch(`http://localhost:8000/api/v1/users/${userId}/reset-password`, {
+      // Reset password endpoint
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ password: newPassword }),
+        body: JSON.stringify({
+          id: userId,
+          password: newPassword
+        }),
       });
 
       const data = await response.json();
@@ -800,7 +806,7 @@ const handleRemoveFirstFace = async (id) => {
     }
   };
 
-  // Delete user - NOTE: You'll need to create this API endpoint
+  // Delete user
   const handleDeleteUser = async (userId) => {
     if (!isAdmin) {
       toast.error('Only Admin can delete users!');
@@ -818,10 +824,11 @@ const handleRemoveFirstFace = async (id) => {
         'Authorization': token ? `Bearer ${token}` : '',
       };
 
-      // You'll need to create this API endpoint
-      const response = await fetch(`http://localhost:8000/api/v1/users/${userId}`, {
-        method: 'DELETE',
+      // Delete user endpoint
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/deleteUser', {
+        method: 'POST',
         headers: headers,
+        body: JSON.stringify({ id: userId }),
       });
 
       const data = await response.json();
@@ -956,7 +963,7 @@ const handleRemoveFirstFace = async (id) => {
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
-              {(user?.role === 'admin' || isSuperAdmin) && (
+              {isAdmin && (
                 <li className="nav-item mb-2">
                   <Link 
                     to="/admin" 
@@ -989,12 +996,6 @@ const handleRemoveFirstFace = async (id) => {
                   <h4 className="mb-1 fw-semibold text-truncate">
                     <FaUsers className="me-2" /> 
                     User Management Panel
-                    {isSuperAdmin && (
-                        <span className="badge bg-warning text-dark ms-2">
-                          <FaShieldAlt className="me-1" />
-                          Super Admin
-                        </span>
-                      )}
                   </h4>
                   <small className="opacity-75">
                     {isAdmin ? 'Add and manage Team Leaders and Users' : 'View team members (Read-only access)'}
@@ -1026,10 +1027,8 @@ const handleRemoveFirstFace = async (id) => {
                     <button
                       className="btn btn-light btn-sm"
                       onClick={() => {
-                        setEditingUser(null);
-                        setFormData({ name: '', email: '', password: '', role_ids: [2], status: 1 });
+                        resetForm();
                         setShowModal(true);
-                        setShowPassword(false);
                       }}
                     >
                       <FaUserPlus className="me-1" />
@@ -1080,11 +1079,9 @@ const handleRemoveFirstFace = async (id) => {
                             <FaSpinner className="fa-spin text-warning me-2" />
                             Loading First Face assignments...
                           </div>
-                        ) : firstFaceAssignments.filter(ff => ff.is_active)
-.length > 0 ? (
+                        ) : firstFaceAssignments.filter(ff => ff.is_active).length > 0 ? (
                           <div className="row g-2">
-                            {firstFaceAssignments.filter(ff => ff.is_active)
-.map(assignment => (
+                            {firstFaceAssignments.filter(ff => ff.is_active).map(assignment => (
                               <div key={assignment.id} className="col-md-6">
                                 <div className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
                                   <div>
@@ -1147,8 +1144,7 @@ const handleRemoveFirstFace = async (id) => {
                     <div className="col-md-3">
                       <div className="card border-warning text-center h-100">
                         <div className="card-body">
-                          <h3 className="text-warning mb-0">{firstFaceAssignments.filter(ff => ff.is_active)
-.length}</h3>
+                          <h3 className="text-warning mb-0">{firstFaceAssignments.filter(ff => ff.is_active).length}</h3>
                           <small className="text-muted">First Face Assignments</small>
                         </div>
                       </div>
@@ -1179,10 +1175,8 @@ const handleRemoveFirstFace = async (id) => {
                                 <button 
                                   className="btn btn-primary" 
                                   onClick={() => {
-                                    setEditingUser(null);
-                                    setFormData({ name: '', email: '', password: '', role_ids: [2], status: 1 });
+                                    resetForm();
                                     setShowModal(true);
-                                    setShowPassword(false);
                                   }}
                                 >
                                   <FaUserPlus className="me-2" /> 
@@ -1361,10 +1355,9 @@ const handleRemoveFirstFace = async (id) => {
                           activeUsers.map(user => (
                             <option key={user.id} value={user.id.toString()}>
                               {user.name} 
-                              {user.role === 'team_leader' && ' '} 
-                              {user.role === 'user' && ' '} 
+                              {user.role === 'team_leader' && ' (Team Leader)'} 
+                              {user.role === 'admin' && ' (Admin)'} 
                               - {user.department}
-                              {user.role === 'admin' && ' '}
                             </option>
                           ))
                         ) : (
@@ -1475,6 +1468,7 @@ const handleRemoveFirstFace = async (id) => {
                     setShowModal(false); 
                     setEditingUser(null); 
                     setShowPassword(false);
+                    resetForm();
                   }}
                 ></button>
               </div>
@@ -1602,22 +1596,22 @@ const handleRemoveFirstFace = async (id) => {
                     </select>
                   </div>
                   <div className="col-md-6">
-  <label className="form-label fw-semibold">Department</label>
-  <select
-    className="form-control"
-    name="department"
-    value={formData.department}
-    onChange={handleInputChange}
-  >
-    <option value="">Not Assigned</option>
-    {departments.map(dept => (
-      <option key={dept} value={dept}>
-        {dept}
-      </option>
-    ))}
-  </select>
-  <small className="text-muted">Optional: Assign user to a department</small>
-</div>
+                    <label className="form-label fw-semibold">Department</label>
+                    <select
+                      className="form-control"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Not Assigned</option>
+                      {departments.map(dept => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="text-muted">Optional: Assign user to a department</small>
+                  </div>
                 </div>
 
                 <div className="d-flex gap-2 mt-4 pt-3 border-top">
@@ -1633,6 +1627,7 @@ const handleRemoveFirstFace = async (id) => {
                       setShowModal(false); 
                       setEditingUser(null); 
                       setShowPassword(false);
+                      resetForm();
                     }}
                   >
                     Cancel

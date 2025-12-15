@@ -1,4 +1,4 @@
-// src/pages/ProblemForm.js - COMPLETE WORKING VERSION WITH BACKEND IMAGE UPLOAD
+// src/pages/ProblemForm.js - FIXED VERSION WITH CONSISTENT SIDEBAR
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -8,7 +8,7 @@ import {
   FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, 
   FaExclamationTriangle, FaUserPlus, FaBan, FaSpinner, FaUserTie,
   FaBuilding, FaTag, FaClock, FaUsersCog, FaArrowLeft, FaImage,
-  FaTimes, FaUpload, FaCheckCircle, FaInfoCircle
+  FaTimes, FaUpload, FaCheckCircle, FaInfoCircle, FaChevronDown
 } from 'react-icons/fa';
 
 const SERVICES = [
@@ -16,9 +16,9 @@ const SERVICES = [
   'Topup -> Winfin',
   'Whatsapp Solution -> Infobip <-> Omnichannel channel',
   'Email Solution -> Infobip <-> Omnichannel channel',
-  'Push-Pull -> VAS',
-  'Games -> VAS',
-  'DCB -> VAS',
+  'Push-Pull -> VAS & EBS',
+  'Games -> VAS & EBS',
+  'DCB -> VAS & EBS',
   'Emergency Balance Service -> platform(Win vantage)',
   'International SMS -> infoBip <--> international channel',
   'Invoice Solution -> Win Vantage (platform)',
@@ -49,7 +49,7 @@ export default function ProblemForm() {
     description: '',
     client: '',
     assigned_to: '',
-    images: [] // Will store uploaded image URLs from backend
+    images: []
   });
 
   const [loading, setLoading] = useState(false);
@@ -59,22 +59,19 @@ export default function ProblemForm() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [showManualAssignment, setShowManualAssignment] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [firstFaceUsers, setFirstFaceUsers] = useState([]);
 
   useEffect(() => {
     loadTeamMembers();
-    // Auto-select user's department if available
     if (user?.department && !formData.department) {
       setFormData(prev => ({ ...prev, department: user.department }));
     }
   }, [user]);
 
-  // Load team members from backend API (EXCLUDING CURRENT USER)
   const loadTeamMembers = async () => {
     setLoadingUsers(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/getAllUsers', {
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/getAllUsers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,7 +83,6 @@ export default function ProblemForm() {
       if (response.ok) {
         const data = await response.json();
         if (data.status === 'success') {
-          // Filter active users (excluding current user)
           const activeUsers = data.data.filter(u => 
             u.status === 'active' && u.id !== user?.id
           );
@@ -107,176 +103,152 @@ export default function ProblemForm() {
     setFormData({ ...formData, [name]: value });
   };
 
-  // ✅ WORKING: Upload images to backend API immediately when selected
- // ✅ ENHANCED: handleImageUpload with prefix and better error handling
-// ✅ FIXED: handleImageUpload with proper state updates
-const handleImageUpload = async (e) => {
-  const files = Array.from(e.target.files);
-  
-  if (files.length === 0) return;
-  
-  // Check total images limit
-  if (files.length + previewImages.length > 5) {
-    toast.warning('Maximum 5 images allowed');
-    e.target.value = '';
-    return;
-  }
-  
-  setUploadingImages(true);
-  const token = localStorage.getItem('token');
-  
-  // Process files sequentially to avoid state conflicts
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
     
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-      toast.warning(`${file.name} is not an image file`);
-      continue;
+    if (files.length === 0) return;
+    
+    if (files.length + previewImages.length > 5) {
+      toast.warning('Maximum 5 images allowed');
+      e.target.value = '';
+      return;
     }
     
-    if (file.size > 5 * 1024 * 1024) {
-      toast.warning(`${file.name} exceeds 5MB limit`);
-      continue;
-    }
-
-    // Create temporary preview
-    const previewUrl = URL.createObjectURL(file);
-    const tempPreview = {
-      url: previewUrl,
-      name: file.name,
-      uploading: true,
-      originalName: file.name,
-      index: i
-    };
+    setUploadingImages(true);
+    const token = localStorage.getItem('token');
     
-    // Add temporary preview
-    setPreviewImages(prev => [...prev, tempPreview]);
-
-    // Prepare FormData
-    const uploadData = new FormData();
-    uploadData.append('file', file);
-    
-    // Extract filename
-    const originalFileName = file.name;
-    const fileNameWithoutExt = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
-    const fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.') + 1);
-    
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 8);
-    const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}.${fileExtension}`;
-    
-    uploadData.append('file_path', 'uploads/modules/general');
-    uploadData.append('file_name', uniqueFileName);
-
-    try {
-      console.log('📤 Uploading image:', file.name);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       
-      const response = await fetch('http://localhost:8000/api/v1/general/file/file-upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        },
-        body: uploadData
-      });
-
-      const data = await response.json();
-      console.log('📥 Upload response:', data);
+      if (!file.type.startsWith('image/')) {
+        toast.warning(`${file.name} is not an image file`);
+        continue;
+      }
       
-      if (data.status === 'success') {
-        // ✅ FIXED: Construct proper URL from file_path
-        let imageUrl = '';
-        
-        if (data.data?.file_path) {
-          // Clean up the file_path string
-          const filePath = data.data.file_path
-            .replace(/\\/g, '') // Remove backslashes
-            .replace(/^\/+/, ''); // Remove leading slashes
-          
-          // Construct full URL
-          imageUrl = `http://localhost:8000/${filePath}`;
-          
-          // Test if URL is accessible
-          console.log('🔗 Testing image URL:', imageUrl);
-          
-          // Quick test of the URL
-          const imgTest = new Image();
-          imgTest.onload = () => console.log('✅ Image URL is accessible');
-          imgTest.onerror = () => console.log('⚠️ Image URL might not be accessible');
-          imgTest.src = imageUrl;
-        }
-        
-        console.log('✅ Final image URL:', imageUrl);
-        
-        if (!imageUrl) {
-          throw new Error('Could not construct valid image URL');
-        }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.warning(`${file.name} exceeds 5MB limit`);
+        continue;
+      }
 
-        // ✅ FIXED: Update preview with actual URL
-        setPreviewImages(prev => 
-          prev.map(img => 
-            img.originalName === file.name 
-              ? { 
-                  ...img, 
-                  url: imageUrl, 
-                  uploading: false,
-                  backendUrl: imageUrl
-                } 
-              : img
-          )
-        );
+      const previewUrl = URL.createObjectURL(file);
+      const tempPreview = {
+        url: previewUrl,
+        name: file.name,
+        uploading: true,
+        originalName: file.name,
+        index: i
+      };
+      
+      setPreviewImages(prev => [...prev, tempPreview]);
 
-        // ✅ FIXED: Update formData.images using functional update
-        setFormData(prev => {
-          const newImages = [...prev.images, imageUrl];
-          console.log('🔄 Updated formData.images:', newImages);
-          console.log('📊 Previous images:', prev.images);
-          console.log('➕ Added image URL:', imageUrl);
-          return {
-            ...prev,
-            images: newImages
-          };
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      
+      const originalFileName = file.name;
+      const fileNameWithoutExt = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
+      const fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.') + 1);
+      
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}.${fileExtension}`;
+      
+      uploadData.append('file_path', 'uploads/modules/general/');
+      uploadData.append('file_name', uniqueFileName);
+
+      try {
+        console.log('📤 Uploading image:', file.name);
+        
+        const response = await fetch('https://ticketapi.wineds.com/api/v1/general/file/file-upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: uploadData
         });
 
-        toast.success(`${file.name} uploaded successfully`);
+        const data = await response.json();
+        console.log('📥 Upload response:', data);
         
-      } else {
-        throw new Error(data.message?.[0] || 'Upload failed');
-      }
-    } catch (error) {
-      console.error('❌ Upload error:', error);
-      toast.error(`Failed to upload ${file.name}`);
-      
-      // Remove failed upload
-      setPreviewImages(prev => prev.filter(img => img.originalName !== file.name));
-      URL.revokeObjectURL(previewUrl);
-    }
-  }
-  
-  // Give state time to update
-  setTimeout(() => {
-    setUploadingImages(false);
-    console.log('🔄 Final formData.images after upload:', formData.images);
-  }, 500);
-  
-  e.target.value = '';
-};
+        if (data.status === 'success') {
+          let imageUrl = '';
+          
+          if (data.data?.file_path) {
+            const filePath = data.data.file_path
+              .replace(/\\/g, '')
+              .replace(/^\/+/, '');
+            
+            imageUrl = `https://ticketapi.wineds.com/${filePath}`;
+            
+            console.log('🔗 Testing image URL:', imageUrl);
+            
+            const imgTest = new Image();
+            imgTest.onload = () => console.log('✅ Image URL is accessible');
+            imgTest.onerror = () => console.log('⚠️ Image URL might not be accessible');
+            imgTest.src = imageUrl;
+          }
+          
+          console.log('✅ Final image URL:', imageUrl);
+          
+          if (!imageUrl) {
+            throw new Error('Could not construct valid image URL');
+          }
 
-  // ✅ WORKING: Remove image with cleanup
+          setPreviewImages(prev => 
+            prev.map(img => 
+              img.originalName === file.name 
+                ? { 
+                    ...img, 
+                    url: imageUrl, 
+                    uploading: false,
+                    backendUrl: imageUrl
+                  } 
+                : img
+            )
+          );
+
+          setFormData(prev => {
+            const newImages = [...prev.images, imageUrl];
+            console.log('🔄 Updated formData.images:', newImages);
+            console.log('📊 Previous images:', prev.images);
+            console.log('➕ Added image URL:', imageUrl);
+            return {
+              ...prev,
+              images: newImages
+            };
+          });
+
+          toast.success(`${file.name} uploaded successfully`);
+          
+        } else {
+          throw new Error(data.message?.[0] || 'Upload failed');
+        }
+      } catch (error) {
+        console.error('❌ Upload error:', error);
+        toast.error(`Failed to upload ${file.name}`);
+        
+        setPreviewImages(prev => prev.filter(img => img.originalName !== file.name));
+        URL.revokeObjectURL(previewUrl);
+      }
+    }
+    
+    setTimeout(() => {
+      setUploadingImages(false);
+      console.log('🔄 Final formData.images after upload:', formData.images);
+    }, 500);
+    
+    e.target.value = '';
+  };
+
   const removeImage = (index) => {
     const imageToRemove = previewImages[index];
     
-    // Clean up object URL if it's a temporary blob URL
     if (imageToRemove.url.startsWith('blob:')) {
       URL.revokeObjectURL(imageToRemove.url);
     }
     
-    // Remove from preview
     const newPreviews = previewImages.filter((_, i) => i !== index);
     setPreviewImages(newPreviews);
     
-    // Remove from form data (find by index)
     const newImages = [...formData.images];
     newImages.splice(index, 1);
     
@@ -288,7 +260,6 @@ const handleImageUpload = async (e) => {
     toast.info('Image removed');
   };
 
-  // ✅ WORKING: Auto-assignment logic
   const getAutoAssignedUser = (department) => {
     try {
       console.log('🔄 Checking First Face assignments for department:', department);
@@ -296,13 +267,11 @@ const handleImageUpload = async (e) => {
       
       let assignedUser = null;
 
-      // Check for users in the same department (excluding creator)
       const deptUsers = teamMembers.filter(member => 
         member.department === department && member.id !== user?.id
       );
 
       if (deptUsers.length > 0) {
-        // Assign to first available user in department
         assignedUser = {
           id: deptUsers[0].id,
           name: deptUsers[0].name,
@@ -310,7 +279,6 @@ const handleImageUpload = async (e) => {
         };
         console.log('✅ Assigned to Department First Face:', assignedUser);
       } else {
-        // Check for global first face (users not in same department)
         const otherUsers = teamMembers.filter(member => member.id !== user?.id);
         if (otherUsers.length > 0) {
           assignedUser = {
@@ -332,17 +300,14 @@ const handleImageUpload = async (e) => {
     }
   };
 
-  // ✅ WORKING: Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Check if images are still uploading
     if (uploadingImages) {
       toast.warning('Please wait for images to finish uploading');
       return;
     }
     
-    // Check for any still uploading images
     const stillUploading = previewImages.some(img => img.uploading);
     if (stillUploading) {
       toast.warning('Some images are still uploading. Please wait.');
@@ -352,7 +317,6 @@ const handleImageUpload = async (e) => {
     setLoading(true);
 
     try {
-      // Validate required fields
       if (!formData.department || !formData.priority || !formData.statement.trim()) {
         toast.error('Please fill all required fields (Department, Priority, Problem Statement)');
         setLoading(false);
@@ -362,15 +326,12 @@ const handleImageUpload = async (e) => {
       console.log('🔄 Starting problem creation...');
       console.log('👤 Problem creator:', user?.name);
 
-      // 🔥 ASSIGNMENT LOGIC: Manual > Auto (WITH CREATOR PROTECTION)
       let assignedTo = null;
       let assignmentType = 'NOT_ASSIGNED';
 
-      // 1. Check for manual assignment first
       if (formData.assigned_to) {
         const selectedUser = teamMembers.find(member => member.id == formData.assigned_to);
         
-        // 🔥 DOUBLE CHECK: Ensure we're not assigning to problem creator
         if (selectedUser && selectedUser.id !== user?.id) {
           assignedTo = selectedUser.id;
           assignmentType = 'MANUAL_ASSIGNMENT';
@@ -383,7 +344,6 @@ const handleImageUpload = async (e) => {
         }
       }
 
-      // 2. If no manual assignment, check for auto assignment
       if (!assignedTo) {
         const autoUser = getAutoAssignedUser(formData.department);
         if (autoUser) {
@@ -393,7 +353,6 @@ const handleImageUpload = async (e) => {
         }
       }
 
-      // 🔥 FINAL CHECK: Ensure we're not assigning to problem creator
       if (assignedTo === user?.id) {
         console.error('🚨 CRITICAL: Attempted to assign problem to creator - BLOCKED');
         assignedTo = null;
@@ -401,7 +360,6 @@ const handleImageUpload = async (e) => {
         toast.warning('Problem cannot be assigned to the creator. Please select another team member.');
       }
 
-      // ✅ CORRECT: Prepare payload for backend
       const problemData = {
         statement: formData.statement,
         department: formData.department,
@@ -409,15 +367,14 @@ const handleImageUpload = async (e) => {
         description: formData.description || '',
         created_by: user?.userId || user?.id,
         assigned_to: assignedTo || null,
-        images: formData.images // ✅ Contains uploaded URLs from backend
+        images: formData.images
       };
 
       console.log('📝 Problem data for backend:', problemData);
       console.log('🖼️ Images to send:', formData.images);
 
-      // Send to backend API
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/problems/create', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -433,7 +390,6 @@ const handleImageUpload = async (e) => {
       if (data.status === 'success') {
         const problem = data.data;
         
-        // Show success message with assignment info
         if (assignedTo) {
           const assignedUser = teamMembers.find(u => u.id === assignedTo);
           if (assignmentType === 'MANUAL_ASSIGNMENT') {
@@ -445,14 +401,12 @@ const handleImageUpload = async (e) => {
           toast.success(`✅ Problem #${problem.id} submitted successfully! Will be assigned manually.`);
         }
         
-        // Clean up all object URLs
         previewImages.forEach(img => {
           if (img.url.startsWith('blob:')) {
             URL.revokeObjectURL(img.url);
           }
         });
         
-        // Reset form
         setFormData({ 
           department: '', 
           service: '', 
@@ -466,7 +420,6 @@ const handleImageUpload = async (e) => {
         setPreviewImages([]);
         setShowManualAssignment(false);
         
-        // Redirect based on role
         setTimeout(() => {
           if (user?.role === 'admin' || user?.role === 'team_leader') {
             navigate('/problems');
@@ -504,7 +457,7 @@ const handleImageUpload = async (e) => {
       <Navbar />
       
       <div className="d-flex flex-grow-1">
-        {/* Sidebar */}
+        {/* Sidebar - FIXED */}
         <div 
           className="bg-dark text-white position-relative"
           style={{ 
@@ -513,7 +466,6 @@ const handleImageUpload = async (e) => {
             transition: 'width 0.3s ease'
           }}
         >
-          {/* Toggle Button */}
           <button
             onClick={toggleSidebar}
             className="position-absolute d-flex align-items-center justify-content-center"
@@ -630,7 +582,7 @@ const handleImageUpload = async (e) => {
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
                       <h4 className="mb-1 fw-semibold">
-                        <FaExclamationTriangle className="me-2" />
+                        {/* <FaExclamationTriangle className="me-2" /> */}
                         Submit Problem Ticket
                       </h4>
                       <small className="opacity-75">Please provide detailed information about the issue</small>
@@ -653,40 +605,50 @@ const handleImageUpload = async (e) => {
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          <FaBuilding className="me-2" />
+                          {/* <FaBuilding className="me-2" /> */}
                           Department <span className="text-danger">*</span>
                         </label>
-                        <select
-                          className="form-control"
-                          name="department"
-                          value={formData.department}
-                          onChange={handleChange}
-                          required
-                        >
-                          <option value="">Select Department</option>
-                          {DEPARTMENTS.map(dept => (
-                            <option key={dept} value={dept}>{dept}</option>
-                          ))}
-                        </select>
+                        <div className="position-relative">
+                          <select
+                            className="form-control pe-4"
+                            name="department"
+                            value={formData.department}
+                            onChange={handleChange}
+                            required
+                          >
+                            <option value="">Select Department</option>
+                            {DEPARTMENTS.map(dept => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                          <span className="position-absolute end-0 top-50 translate-middle-y me-3">
+                            <FaChevronDown />
+                          </span>
+                        </div>
                       </div>
 
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          <FaTag className="me-2" />
-                          Service <span className="text-muted">(Optional)</span>
+                          {/* <FaTag className="me-2" /> */}
+                          Service <span className="text-muted"></span>
                         </label>
-                        <select
-                          className="form-control"
-                          name="service"
-                          value={formData.service}
-                          onChange={handleChange}
-                        >
-                          <option value="">Select Service (Optional)</option>
-                          {SERVICES.map(service => (
-                            <option key={service} value={service}>{service}</option>
-                          ))}
-                        </select>
-                        <small className="text-muted">Helps categorize the problem</small>
+                        <div className="position-relative">
+                          <select
+                            className="form-control pe-4"
+                            name="service"
+                            value={formData.service}
+                            onChange={handleChange}
+                          >
+                            <option value="">Select Service</option>
+                            {SERVICES.map(service => (
+                              <option key={service} value={service}>{service}</option>
+                            ))}
+                          </select>
+                          <span className="position-absolute end-0 top-50 translate-middle-y me-3">
+                            <FaChevronDown />
+                          </span>
+                        </div>
+                        {/* <small className="text-muted">Helps categorize the problem</small> */}
                       </div>
                     </div>
 
@@ -694,31 +656,36 @@ const handleImageUpload = async (e) => {
                     <div className="row g-3 mt-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          <FaClock className="me-2" />
+                          {/* <FaClock className="me-2" /> */}
                           Priority <span className="text-danger">*</span>
                         </label>
-                        <select
-                          className="form-control"
-                          name="priority"
-                          value={formData.priority}
-                          onChange={handleChange}
-                          required
-                        >
-                          <option value="Low">Low - Can wait</option>
-                          <option value="Medium">Medium - Important</option>
-                          <option value="High">High - Urgent</option>
-                        </select>
-                        <small className="text-muted">
+                        <div className="position-relative">
+                          <select
+                            className="form-control pe-4"
+                            name="priority"
+                            value={formData.priority}
+                            onChange={handleChange}
+                            required
+                          >
+                            <option value="Low">Low - Can wait</option>
+                            <option value="Medium">Medium - Important</option>
+                            <option value="High">High - Urgent</option>
+                          </select>
+                          <span className="position-absolute end-0 top-50 translate-middle-y me-3">
+                            <FaChevronDown />
+                          </span>
+                        </div>
+                        {/* <small className="text-muted">
                           {formData.priority === 'High' && '🚨 Will be prioritized immediately'}
                           {formData.priority === 'Medium' && '⚠️ Important but not urgent'}
                           {formData.priority === 'Low' && '📅 Can be addressed when available'}
-                        </small>
+                        </small> */}
                       </div>
 
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          <FaUserTie className="me-2" />
-                          Client <span className="text-muted">(Optional)</span>
+                          {/* <FaUserTie className="me-2" /> */}
+                          Client <span className="text-muted"></span>
                         </label>
                         <input
                           type="text"
@@ -728,12 +695,12 @@ const handleImageUpload = async (e) => {
                           onChange={handleChange}
                           placeholder="Enter client name or company..."
                         />
-                        <small className="text-muted">Helpful for tracking client-related issues</small>
+                        {/* <small className="text-muted">Helpful for tracking client-related issues</small> */}
                       </div>
                     </div>
 
-                    {/* 🔥 MANUAL ASSIGNMENT SECTION */}
-                    <div className="mt-4">
+                    {/* Manual Assignment Section */}
+                    {/* <div className="mt-4">
                       <div className="d-flex justify-content-between align-items-center mb-2">
                         <label className="form-label fw-semibold mb-0">
                           <FaUserPlus className="me-2" />
@@ -791,12 +758,12 @@ const handleImageUpload = async (e) => {
                           : 'Leave empty for First Face auto-assignment (excluding yourself)'
                         }
                       </small>
-                    </div>
+                    </div> */}
 
                     {/* Problem Statement */}
                     <div className="mt-4">
                       <label className="form-label fw-semibold">
-                        <FaExclamationTriangle className="me-2" />
+                        {/* <FaExclamationTriangle className="me-2" /> */}
                         Problem Statement <span className="text-danger">*</span>
                       </label>
                       <textarea
@@ -814,7 +781,7 @@ const handleImageUpload = async (e) => {
                     </div>
 
                     {/* Additional Description */}
-                    <div className="mt-3">
+                    {/* <div className="mt-3">
                       <label className="form-label fw-semibold">
                         <FaInfoCircle className="me-2" />
                         Additional Description <span className="text-muted">(Optional)</span>
@@ -829,16 +796,15 @@ const handleImageUpload = async (e) => {
                         style={{ resize: 'vertical' }}
                         disabled={uploadingImages}
                       ></textarea>
-                    </div>
+                    </div> */}
 
-                    {/* ✅ WORKING: Image Upload Section */}
+                    {/* Image Upload Section */}
                     <div className="mt-4">
                       <label className="form-label fw-semibold">
-                        <FaImage className="me-2" />
+                        {/* <FaImage className="me-2" /> */}
                         Attach Screenshots <span className="text-muted">(Optional)</span>
                       </label>
                       
-                      {/* Upload Status */}
                       {uploadingImages && (
                         <div className="alert alert-info d-flex align-items-center mb-2 py-2">
                           <FaSpinner className="fa-spin me-2" />
@@ -890,14 +856,12 @@ const handleImageUpload = async (e) => {
                                     }}
                                   />
                                   
-                                  {/* Uploading Spinner */}
                                   {img.uploading && (
                                     <div className="position-absolute top-50 start-50 translate-middle">
                                       <FaSpinner className="fa-spin text-primary" size={20} />
                                     </div>
                                   )}
                                   
-                                  {/* Remove Button */}
                                   <button
                                     type="button"
                                     className="btn btn-danger btn-sm position-absolute"
@@ -919,7 +883,6 @@ const handleImageUpload = async (e) => {
                                     <FaTimes />
                                   </button>
                                   
-                                  {/* Image Status */}
                                   <small className="d-block text-center text-truncate mt-1" style={{ fontSize: '0.7rem' }}>
                                     {img.uploading ? 'Uploading...' : 
                                      img.name.length > 15 ? `${img.name.substring(0, 12)}...` : img.name}
@@ -933,7 +896,7 @@ const handleImageUpload = async (e) => {
                     </div>
 
                     {/* Submission Summary */}
-                    <div className="alert alert-light border mt-4">
+                    {/* <div className="alert alert-light border mt-4">
                       <h6 className="mb-2">
                         <FaCheckCircle className="me-2 text-success" />
                         Submission Summary
@@ -963,7 +926,7 @@ const handleImageUpload = async (e) => {
                           {uploadingImages && ' (Uploading...)'}
                         </div>
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Submit Buttons */}
                     <div className="d-flex gap-2 mt-4 pt-3 border-top">
@@ -996,7 +959,6 @@ const handleImageUpload = async (e) => {
                         type="button" 
                         className="btn btn-outline-info px-3"
                         onClick={() => {
-                          // Clean up object URLs
                           previewImages.forEach(img => {
                             if (img.url.startsWith('blob:')) {
                               URL.revokeObjectURL(img.url);
@@ -1026,7 +988,7 @@ const handleImageUpload = async (e) => {
               </div>
               
               {/* Help Card */}
-              <div className="card shadow-sm border-0 mt-4">
+              {/* <div className="card shadow-sm border-0 mt-4">
                 <div className="card-header bg-white">
                   <h6 className="mb-0">
                     <FaInfoCircle className="me-2" />
@@ -1043,7 +1005,7 @@ const handleImageUpload = async (e) => {
                     <li>✅ First Face assignment excludes you automatically</li>
                   </ul>
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

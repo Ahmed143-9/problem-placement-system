@@ -41,9 +41,28 @@ export default function DomainStatus() {
   useEffect(() => {
     fetchDomainStatus();
     
-    // Auto-refresh every 5 minutes
-    const interval = setInterval(fetchDomainStatus, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Listen for domain status updates from other tabs/windows
+    const handleStorageChange = (e) => {
+      if (e.key === 'domainStatusData') {
+        try {
+          const parsedData = JSON.parse(e.newValue);
+          setDomains(parsedData.domains);
+          setLoading(false);
+        } catch (err) {
+          console.error('Error parsing domain status data from storage:', err);
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Remove automatic refresh interval as requested
+    // Only manual refresh will be used
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      // No need to clear interval since we're not setting any
+    };
   }, []);
 
   const fetchDomainStatus = async () => {
@@ -54,13 +73,22 @@ export default function DomainStatus() {
       // Save current domains as previous before fetching new data
       setPreviousDomains(domains);
       
-      const response = await fetch('https://ticketapi.wineds.com/api/domains/status');
+      // Use the same api service as Dashboard.js for consistency
+      const response = await api.get('/domains/status');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch domain status');
-      }
+      // Process the API response based on its structure
+      const data = response.data;
       
-      const data = await response.json();
+      // Save to localStorage so Dashboard can access it
+      const domainData = {
+        domains: data,
+        lastUpdated: new Date().toISOString(),
+        timestamp: Date.now()
+      };
+      localStorage.setItem('domainStatusData', JSON.stringify(domainData));
+      
+      // Dispatch a custom event to notify other components
+      window.dispatchEvent(new CustomEvent('domainStatusUpdated', { detail: domainData }));
       
       // Check for domain status changes and send notifications
       checkDomainStatusChanges(data);

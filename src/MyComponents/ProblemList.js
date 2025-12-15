@@ -49,7 +49,7 @@ export default function ProblemList() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/problems/getAll', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/getAll', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +135,7 @@ export default function ProblemList() {
   const loadStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/problems/getAll', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/getAll', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ export default function ProblemList() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/problems/delete', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/delete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -412,7 +412,7 @@ export default function ProblemList() {
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   title="All Problems"
                 >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {/* <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />  */}
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
@@ -458,7 +458,7 @@ export default function ProblemList() {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <h4 className="mb-1 fw-semibold">
-                    <FaExclamationTriangle className="me-2" />
+                    {/* <FaExclamationTriangle className="me-2" /> */}
                     All Problems
                   </h4>
                   <small className="opacity-75">Manage and track all reported problems</small>
@@ -538,7 +538,7 @@ export default function ProblemList() {
             </div>
 
             {/* Filters and Actions */}
-            <div className="p-3 border-bottom">
+            {/* <div className="p-3 border-bottom">
               <div className="row g-3">
                 <div className="col-md-4">
                   <form onSubmit={handleSearch} className="input-group">
@@ -630,7 +630,7 @@ export default function ProblemList() {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Problems Table */}
             <div className="card-body p-0">
@@ -701,25 +701,12 @@ export default function ProblemList() {
                             </div>
                           </th>
                           <th style={{ width: '80px' }}>ID</th>
-                          <th>
-                            <button 
-                              className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
-                              onClick={() => handleSort('statement')}
-                            >
-                              Problem Statement
-                              {sortField === 'statement' && (
-                                <span className="ms-1">
-                                  {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
-                                </span>
-                              )}
-                            </button>
-                          </th>
                           <th style={{ width: '150px' }}>
                             <button 
                               className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
                               onClick={() => handleSort('department')}
                             >
-                              <FaBuilding className="me-1" />
+                              {/* <FaBuilding className="me-1" /> */}
                               Department
                               {sortField === 'department' && (
                                 <span className="ms-1">
@@ -746,13 +733,13 @@ export default function ProblemList() {
                               className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
                               onClick={() => handleSort('assigned_to')}
                             >
-                              <FaUser className="me-1" />
+                              {/* <FaUser className="me-1" /> */}
                               Assigned To
-                              {sortField === 'assigned_to' && (
+                              {/* {sortField === 'assigned_to' && (
                                 <span className="ms-1">
                                   {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
                                 </span>
-                              )}
+                              )} */}
                             </button>
                           </th>
                           <th style={{ width: '120px' }}>
@@ -773,13 +760,13 @@ export default function ProblemList() {
                               className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
                               onClick={() => handleSort('created_at')}
                             >
-                              <FaCalendar className="me-1" />
+                              {/* <FaCalendar className="me-1" /> */}
                               Created
-                              {sortField === 'created_at' && (
+                              {/* {sortField === 'created_at' && (
                                 <span className="ms-1">
                                   {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
                                 </span>
-                              )}
+                              )} */}
                             </button>
                           </th>
                           <th style={{ width: '100px' }} className="text-center">Actions</th>
@@ -799,30 +786,7 @@ export default function ProblemList() {
                               </div>
                             </td>
                             <td>
-                              <span className="badge bg-secondary">#{problem.id}</span>
-                            </td>
-                            <td>
-                              <div style={{ maxWidth: '300px' }}>
-                                <div className="fw-semibold text-truncate" title={problem.statement}>
-                                  {problem.statement}
-                                </div>
-                                {problem.service && (
-                                  <small className="text-muted d-block text-truncate">
-                                    <FaTag className="me-1" size={10} />
-                                    {problem.service}
-                                  </small>
-                                )}
-                                {problem.client && (
-                                  <small className="text-muted d-block">
-                                    <FaUser className="me-1" size={10} />
-                                    {problem.client}
-                                  </small>
-                                )}
-                                <small className="text-muted d-block">
-                                  <FaClock className="me-1" size={10} />
-                                  {getTimeElapsed(problem.created_at)}
-                                </small>
-                              </div>
+                              <span className="badge bg-secondary">{problem.id}</span>
                             </td>
                             <td>
                               <div className="text-truncate" title={problem.department}>

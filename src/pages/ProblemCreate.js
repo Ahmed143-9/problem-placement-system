@@ -107,7 +107,7 @@ export default function ProblemCreate() {
 
       try {
         // Replace {{url}} with your actual API base URL
-        const uploadUrl = 'http://localhost:8000/api/v1/general/file/file-upload';
+        const uploadUrl = 'https://ticketapi.wineds.com/api/v1/general/file/file-upload';
         
         const response = await fetch(uploadUrl, {
           method: 'POST',
@@ -217,7 +217,7 @@ export default function ProblemCreate() {
       // Log payload for debugging
       console.log('Submitting payload:', payload);
 
-      const response = await fetch('http://localhost:8000/api/problems/create', {
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

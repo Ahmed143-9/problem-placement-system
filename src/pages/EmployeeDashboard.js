@@ -24,7 +24,7 @@ export default function EmployeeDashboard() {
     setLoadingAssigned(true);
     try {
       const res = await fetch(
-        'http://localhost:8000/api/problems/assigned-by-user',
+        'https://ticketapi.wineds.com/api/problems/assigned-by-user',
         {
           method: 'POST',
           headers: {
@@ -61,7 +61,7 @@ const loadMyCreatedProblems = async () => {
   setLoadingCreated(true);
   try {
     const res = await fetch(
-      'http://localhost:8000/api/problems/getAll',
+      'https://ticketapi.wineds.com/api/problems/getAll',
       {
         method: 'POST',
         headers: {

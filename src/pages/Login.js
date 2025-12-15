@@ -46,6 +46,31 @@ export default function Login() {
     }
   }, [isAuthenticated, user, roles, navigate]);
 
+  // Helper function to display errors
+  const displayErrors = (error) => {
+    if (Array.isArray(error)) {
+      // If error is an array, show each error
+      error.forEach(err => {
+        toast.error(err);
+      });
+    } else if (typeof error === 'object' && error !== null) {
+      // If error is an object with nested errors
+      Object.values(error).forEach(err => {
+        if (Array.isArray(err)) {
+          err.forEach(e => toast.error(e));
+        } else {
+          toast.error(err);
+        }
+      });
+    } else if (typeof error === 'string') {
+      // If error is a simple string
+      toast.error(error);
+    } else {
+      // Fallback for any other type
+      toast.error('Login failed. Please check your credentials.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -90,12 +115,23 @@ export default function Login() {
 
         // The useEffect above will handle redirection based on authentication state
       } else {
-        toast.error(result.error || 'Login failed');
+        // Handle login failure with proper error display
         console.error('❌ Login failed:', result.error);
+        displayErrors(result.error || 'Login failed. Please try again.');
       }
     } catch (error) {
       console.error('❌ Login error:', error);
-      toast.error('An error occurred during login');
+      
+      // Handle different error formats
+      if (error.response?.data?.error) {
+        displayErrors(error.response.data.error);
+      } else if (error.response?.data?.errors) {
+        displayErrors(error.response.data.errors);
+      } else if (error.message) {
+        toast.error(error.message);
+      } else {
+        toast.error('An error occurred during login. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -153,13 +189,6 @@ export default function Login() {
                 >
                   Issue Management System
                 </h2>
-                <p style={{ 
-                  color: '#666', 
-                  fontSize: '0.85rem',
-                  marginTop: '10px'
-                }}>
-                  API v1 Login
-                </p>
               </div>
 
               <form onSubmit={handleSubmit}>
@@ -169,7 +198,7 @@ export default function Login() {
                     fontWeight: '600',
                     fontSize: '0.9rem'
                   }}>
-                    Username/Email
+                    Username
                   </label>
                   <input
                     type="text"
@@ -274,15 +303,6 @@ export default function Login() {
                   )}
                 </button>
               </form>
-
-              {/* Debug info - only in development */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-3 text-center">
-                  <small className="text-muted">
-                    API: {process.env.REACT_APP_API_URL || 'http://localhost:8000/api'}
-                  </small>
-                </div>
-              )}
             </div>
           </div>
         </div>

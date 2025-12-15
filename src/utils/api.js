@@ -1,5 +1,5 @@
 // src/utils/api.js - UPDATED FOR NEW API STRUCTURE
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'https://ticketapi.wineds.com/api';
 
 // Get auth headers with token
 const getAuthHeaders = () => {
