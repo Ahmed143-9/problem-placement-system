@@ -155,7 +155,7 @@ const loadMyCreatedProblems = async () => {
                         <th>#</th>
                         <th>Department</th>
                         <th>Status</th>
-                        <th></th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -204,7 +204,7 @@ const loadMyCreatedProblems = async () => {
                         <th>Department</th>
                         <th>Priority</th>
                         <th>Status</th>
-                        <th></th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>

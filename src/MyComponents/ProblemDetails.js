@@ -20,10 +20,8 @@ import {
 export default function ProblemDetails() {
   const { id } = useParams();
   const { user } = useAuth();
-  const { notifyStatusChange, notifyCompletion, notifyDiscussionComment, notifySolutionComment } = useNotifications();
-  const navigate = useNavigate();
-
-  const [problem, setProblem] = useState(null);
+  const { notifyStatusChange, notifyCompletion, notifyDiscussionComment, notifySolutionComment, notifyAssignment } = useNotifications();
+  const navigate = useNavigate();  const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -266,7 +264,7 @@ export default function ProblemDetails() {
         console.warn('Failed to add comment:', commentError);
       }
 
-      toast.success(`✅ Problem transferred to ${selectedUser.name} successfully!`);
+      toast.success(`Problem transferred to ${selectedUser.name} successfully!`);
       
       if (notifyStatusChange && typeof notifyStatusChange === 'function') {
         try {
@@ -344,7 +342,7 @@ export default function ProblemDetails() {
       const data = await response.json();
 
       if (data.status === 'success') {
-        toast.success('💬 Comment added successfully!');
+        toast.success(' Comment added successfully!');
         setComment('');
         fetchProblemDetails();
         
@@ -363,25 +361,14 @@ export default function ProblemDetails() {
   };
 
   // Handle status change via backend API - Using correct status values
+// Handle status change - SIMPLIFIED VERSION WITHOUT APPROVAL WORKFLOW
 const handleStatusChange = async (newStatus) => {
-  console.log('🔍 DEBUG: handleStatusChange called with:', newStatus, 'User can approve?', canApprove());
+  console.log('🔍 DEBUG: handleStatusChange called with:', newStatus);
   
-  // Store the original status for UI messages
-  const originalStatus = newStatus;
-  
-  // Check if this is a regular user trying to mark as resolved
-  const isRegularUserResolving = newStatus === 'resolved' && !canApprove();
-  
-  if (isRegularUserResolving) {
-    console.log('🔍 Regular user wants to mark as resolved - will go to pending_approval');
-  }
-
-  // Require comment for resolved or approval submission
-  if ((originalStatus === 'resolved') && !comment.trim()) {
-    console.log('🔍 Comment required, showing solution modal');
-    toast.error('Please add a comment explaining the solution before marking as resolved');
+  // Require comment for resolved submission
+  if (newStatus === 'resolved' && !comment.trim()) {
     setShowSolutionComment(true);
-    setPendingStatus(originalStatus);
+    setPendingStatus(newStatus);
     return;
   }
 
@@ -391,7 +378,7 @@ const handleStatusChange = async (newStatus) => {
     
     // Add comment if provided
     if (comment.trim()) {
-      const commentType = (originalStatus === 'resolved') ? 'solution' : 'status_change';
+      const commentType = (newStatus === 'resolved') ? 'solution' : 'status_change';
       const commentResponse = await fetch('https://ticketapi.wineds.com/api/problems/comment', {
         method: 'POST',
         headers: {
@@ -408,28 +395,18 @@ const handleStatusChange = async (newStatus) => {
 
       const commentData = await commentResponse.json();
       if (commentData.status !== 'success') {
-        throw new Error(commentData.messages?.[0] || 'Failed to add comment');
+        console.warn('Could not add comment:', commentData.messages?.[0]);
       }
     }
-
-    // Determine the final status based on user role
-    let finalStatus = newStatus;
-    
-    // If regular user is marking as resolved, change to pending_approval
-    if (isRegularUserResolving) {
-      finalStatus = 'pending_approval';
-    }
-
-    console.log('🔍 Final status to send to backend:', finalStatus);
 
     // Update status using the /problems/update endpoint
     const updateData = {
       id: parseInt(id),
-      status: finalStatus
+      status: newStatus
     };
 
-    // Add resolved_at only when admin/team_leader marks as resolved
-    if (newStatus === 'resolved' && canApprove()) {
+    // Add resolved_at when marking as resolved
+    if (newStatus === 'resolved') {
       updateData.resolved_at = new Date().toISOString();
     }
 
@@ -453,16 +430,14 @@ const handleStatusChange = async (newStatus) => {
     });
 
     if (data.status === 'success') {
-      let statusMsg = '✅ Status updated successfully!';
+      let statusMsg = 'Status updated successfully!';
       
-      if (finalStatus === 'resolved') {
-        statusMsg = '✅ Problem marked as solved!';
-      } else if (finalStatus === 'in_progress') {
-        statusMsg = '✅ Problem is now in progress!';
-      } else if (finalStatus === 'pending') {
-        statusMsg = '✅ Problem status reset to pending!';
-      } else if (finalStatus === 'pending_approval') {
-        statusMsg = '✅ Solution submitted for approval!';
+      if (newStatus === 'resolved') {
+        statusMsg = 'Problem marked as solved!';
+      } else if (newStatus === 'in_progress') {
+        statusMsg = 'Problem is now in progress!';
+      } else if (newStatus === 'pending') {
+        statusMsg = 'Problem status reset to pending!';
       }
       
       toast.success(statusMsg);
@@ -471,41 +446,24 @@ const handleStatusChange = async (newStatus) => {
       setPendingStatus(null);
       
       // Send notifications
-      if (finalStatus === 'resolved' && canApprove() && notifyCompletion) {
+      if (newStatus === 'resolved' && notifyCompletion) {
         notifyCompletion(problem.id, user.name);
       }
       
-      // Notify admins when user submits for approval
-      if (finalStatus === 'pending_approval' && notifySolutionComment) {
-        console.log('🔔 Notifying admins about solution submission');
-        notifySolutionComment(
-          problem.id, 
-          user.name, 
-          comment.trim(), 
-          problem
-        );
-      }
-      
-      if (problem.assigned_to && finalStatus !== 'resolved' && notifyStatusChange) {
-        notifyStatusChange(problem.id, finalStatus, user.name, problem.assigned_to.name);
-      }
-      
-      // Redirect user to dashboard after submitting solution for approval
-      if (finalStatus === 'pending_approval') {
+      // Redirect user to dashboard after marking as resolved
+      if (newStatus === 'resolved') {
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/EmployeeDashboard');
         }, 2000);
       } else {
         fetchProblemDetails();
       }
     } else {
-      // Handle specific error messages
       let errorMessage = data.messages?.[0] || 'Failed to update status';
       
-      // If it's a status validation error, provide more helpful feedback
       if (errorMessage.includes('status is invalid')) {
         errorMessage = 'The selected status is invalid. Please try again.';
-        console.log('⚠️ Status validation error. Final status sent:', finalStatus);
+        console.log('⚠️ Status validation error. Status sent:', newStatus);
       }
       
       toast.error(errorMessage);
@@ -550,6 +508,11 @@ const handleApproveCompletion = async () => {
       if (notifyCompletion) {
         notifyCompletion(problem.id, user.name);
       }
+      
+      // Notify the user who submitted the solution that it has been approved
+      if (problem.created_by && problem.created_by.id !== user.id && notifyStatusChange) {
+        notifyStatusChange(problem.id, 'resolved', user.name, problem.created_by.name);
+      }
     } else {
       toast.error(data.messages?.[0] || 'Failed to approve completion');
     }
@@ -577,7 +540,7 @@ const handleRejectCompletion = async () => {
         },
         body: JSON.stringify({
           problem_id: parseInt(id),
-          text: `Completion rejected: ${reason.trim()}`,
+          text: `Solution rejected: ${reason.trim()}`,
           type: 'status_change'
         }),
       });
@@ -588,7 +551,7 @@ const handleRejectCompletion = async () => {
       }
     }
 
-    // Update status back to in_progress
+    // Change status back to in_progress since we're rejecting the solution
     const response = await fetch('https://ticketapi.wineds.com/api/problems/update', {
       method: 'POST',
       headers: {
@@ -605,19 +568,19 @@ const handleRejectCompletion = async () => {
     const data = await response.json();
 
     if (data.status === 'success') {
-      toast.warning('⚠️ Completion rejected. Status changed to In Progress.');
+      toast.warning('⚠️ Solution rejected. Problem status changed back to In Progress.');
       fetchProblemDetails();
       
-      // Redirect back to all problems page after rejection
-      setTimeout(() => {
-        navigate('/problems');
-      }, 2000);
+      // Notify the user who submitted the solution that it has been rejected
+      if (problem.created_by && problem.created_by.id !== user.id && notifyStatusChange) {
+        notifyStatusChange(problem.id, 'solution_rejected', user.name, problem.created_by.name);
+      }
     } else {
-      toast.error(data.messages?.[0] || 'Failed to reject completion');
+      toast.error(data.messages?.[0] || 'Failed to reject solution');
     }
   } catch (error) {
-    console.error('❌ Reject completion error:', error);
-    toast.error('Failed to reject completion');
+    console.error('❌ Reject solution error:', error);
+    toast.error('Failed to reject solution');
   }
 };
 
@@ -770,11 +733,15 @@ const handleAssignProblem = async () => {
       console.warn('Failed to add comment:', commentError);
     }
 
-    toast.success(`✅ Problem assigned to ${selectedUser.name} successfully!`);
+    toast.success(`Problem assigned to ${selectedUser.name} successfully!`);
+    
+    // Send assignment notification
+    if (typeof notifyAssignment === 'function') {
+      notifyAssignment(parseInt(id), selectedUser.name, user.name);
+    }
     
     setShowAssignModal(false);
-    setAssignTo('');
-    
+    setAssignTo('');    
     setTimeout(() => {
       fetchProblemDetails();
     }, 500);
@@ -968,91 +935,46 @@ const toggleSidebar = () => {
           </div>
 
           {/* Status Action Buttons */}
-          <div className="card border-0 shadow-sm mb-4">
-            <div className="card-body">
-              <h6 className="card-title mb-3">Update Status</h6>
-              <div className="d-flex gap-2 flex-wrap">
-                <button 
-                  className={`btn ${problem.status === 'pending' ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => handleStatusChange('pending')}
-                  disabled={updatingStatus || problem.status === 'pending'}
-                >
-                  {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
-                  Mark as Pending
-                </button>
-                <button 
-                  className={`btn ${problem.status === 'in_progress' ? 'btn-info text-white' : 'btn-outline-info'}`}
-                  onClick={() => handleStatusChange('in_progress')}
-                  disabled={updatingStatus || problem.status === 'in_progress'}
-                >
-                  {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
-                  Start Progress
-                </button>
-                <button 
-                  className={`btn ${problem.status === 'resolved' ? 'btn-success' : 'btn-outline-success'}`}
-                  onClick={() => {
-                    if (!canApprove()) {
-                      // For regular users, show the solution comment modal
-                      setShowSolutionComment(true);
-                      setPendingStatus('resolved');
-                    } else {
-                      // For admin/team leaders, directly mark as resolved
-                      handleStatusChange('resolved');
-                    }
-                  }}
-                  disabled={updatingStatus || problem.status === 'resolved' || problem.status === 'pending_approval'}
-                >
-                  {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
-                  Mark as Resolved
-                </button>
-                
-                {/* Admin approval buttons */}
-                {canApprove() && problem.status === 'pending_approval' && (
-                  <button 
-                    className="btn btn-success"
-                    onClick={handleApproveCompletion}
-                    disabled={updatingStatus}
-                  >
-                    <FaCheckCircle className="me-2" />
-                    Approve Solution
-                  </button>
-                )}
-                
-                {canApprove() && problem.status === 'pending_approval' && (
-                  <button 
-                    className="btn btn-danger"
-                    onClick={handleRejectCompletion}
-                    disabled={updatingStatus}
-                  >
-                    <FaTimesCircle className="me-2" />
-                    Reject Solution
-                  </button>
-                )}
-                
-                {/* Show regular approval buttons for pending status */}
-                {canApprove() && problem.status === 'pending' && (
-                  <>
-                    <button 
-                      className="btn btn-success"
-                      onClick={handleApproveCompletion}
-                      disabled={updatingStatus}
-                    >
-                      <FaCheckCircle className="me-2" />
-                      Approve Resolution
-                    </button>
-                    <button 
-                      className="btn btn-danger"
-                      onClick={handleRejectCompletion}
-                      disabled={updatingStatus}
-                    >
-                      <FaTimesCircle className="me-2" />
-                      Reject Resolution
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+         {/* Status Action Buttons - SIMPLIFIED */}
+<div className="card border-0 shadow-sm mb-4">
+  <div className="card-body">
+    <h6 className="card-title mb-3">Update Status</h6>
+    <div className="d-flex gap-2 flex-wrap">
+      <button 
+        className={`btn ${problem.status === 'pending' ? 'btn-primary' : 'btn-outline-primary'}`}
+        onClick={() => handleStatusChange('pending')}
+        disabled={updatingStatus || problem.status === 'pending'}
+      >
+        {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
+        Mark as Pending
+      </button>
+      <button 
+        className={`btn ${problem.status === 'in_progress' ? 'btn-info text-white' : 'btn-outline-info'}`}
+        onClick={() => handleStatusChange('in_progress')}
+        disabled={updatingStatus || problem.status === 'in_progress'}
+      >
+        {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
+        Start Progress
+      </button>
+      <button 
+        className={`btn ${problem.status === 'resolved' ? 'btn-success' : 'btn-outline-success'}`}
+        onClick={() => handleStatusChange('resolved')}
+        disabled={updatingStatus || problem.status === 'resolved'}
+      >
+        {updatingStatus ? <FaSpinner className="fa-spin me-2" /> : null}
+        Mark as Resolved
+      </button>
+    </div>
+    
+    {/* Solution Comment Required Message */}
+    {showSolutionComment && (
+      <div className="alert alert-warning mt-3 mb-0">
+        <FaInfoCircle className="me-2" />
+        Please add a comment explaining your solution before marking as resolved.
+      </div>
+    )}
+  </div>
+</div>
 
           {/* Tabs */}
           <ul className="nav nav-tabs mb-4">
@@ -1088,11 +1010,12 @@ const toggleSidebar = () => {
                         <span className={`badge bg-${
                           problem.status === 'resolved' ? 'success' : 
                           problem.status === 'in_progress' ? 'primary' : 
-                          problem.status === 'pending_approval' ? 'warning' : 'secondary'
+                          problem.status === 'pending_approval' ? 'secondary' :
+                          'secondary'
                         }`}>
-                          {problem.status === 'pending_approval' ? 'Waiting for Approval' : 
-                          problem.status === 'in_progress' ? 'In Progress' : 
-                          problem.status.charAt(0).toUpperCase() + problem.status.slice(1)}
+                          {problem.status === 'in_progress' ? 'In Progress' : 
+                           problem.status === 'pending_approval' ? 'Pending Approval' :
+                           problem.status.charAt(0).toUpperCase() + problem.status.slice(1)}
                         </span>
                       </dd>
                       <dt className="col-sm-4">Created By</dt>
@@ -1325,7 +1248,7 @@ const toggleSidebar = () => {
                     ></button>
                   </div>
                   <div className="modal-body">
-                    <div className="alert alert-info">
+                    {/* <div className="alert alert-info">
                       <h6 className="alert-heading mb-2">Transfer Rules</h6>
                       <ul className="mb-0 small">
                         <li>You cannot transfer problems to the person who created it</li>
@@ -1333,7 +1256,7 @@ const toggleSidebar = () => {
                         <li>Problem status will be reset to "Pending" after transfer</li>
                         <li>The assigned user will receive a notification</li>
                       </ul>
-                    </div>
+                    </div> */}
                     
                     <div className="mb-3">
                       <label className="form-label fw-semibold">Transfer To:</label>
@@ -1360,9 +1283,9 @@ const toggleSidebar = () => {
                           ))}
                         </select>
                       )}
-                      <small className="text-muted">
+                      {/* <small className="text-muted">
                         Available users for transfer (excluding problem creator and current assignee)
-                      </small>
+                      </small> */}
                     </div>
 
                     <div className="d-flex gap-2 mt-4">
@@ -1402,18 +1325,19 @@ const toggleSidebar = () => {
           )}
 
           {/* Solution Comment Required Modal */}
-          {showSolutionComment && (
+          {/* Solution Comment Required Modal - SIMPLIFIED */}
+{showSolutionComment && (
   <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
     <div className="modal-dialog modal-dialog-centered">
       <div className="modal-content">
-        <div className="modal-header bg-warning text-dark">
+        <div className="modal-header bg-success text-white">
           <h5 className="modal-title">
             <FaCheckCircle className="me-2" />
-            {canApprove() ? 'Mark as Resolved' : 'Submit Solution for Approval'}
+            Add Solution Comment
           </h5>
           <button 
             type="button" 
-            className="btn-close" 
+            className="btn-close btn-close-white" 
             onClick={() => {
               setShowSolutionComment(false);
               setPendingStatus(null);
@@ -1422,14 +1346,12 @@ const toggleSidebar = () => {
           ></button>
         </div>
         <div className="modal-body">
-          <div className="alert alert-warning">
+          {/* <div className="alert alert-info">
             <h6 className="alert-heading mb-2">💡 Please Describe Your Solution</h6>
             <p className="mb-0">
-              {canApprove() 
-                ? 'Please describe how you resolved this problem.'
-                : 'Your solution will be submitted for approval. Please describe your solution in detail.'}
+              Please describe your solution in detail before marking as resolved.
             </p>
-          </div>
+          </div> */}
           
           <div className="mb-3">
             <label className="form-label fw-semibold">Solution Description:</label>
@@ -1447,13 +1369,17 @@ const toggleSidebar = () => {
           <div className="d-flex gap-2 mt-4">
             <button 
               className="btn btn-success flex-grow-1"
-              onClick={handleSubmitSolution}
+              onClick={() => {
+                if (comment.trim()) {
+                  handleStatusChange('resolved');
+                } else {
+                  toast.error('Please add a solution comment');
+                }
+              }}
               disabled={!comment.trim()}
             >
               <FaCheckCircle className="me-2" />
-              {canApprove() 
-                ? 'Submit Solution & Mark as Resolved'
-                : 'Submit Solution for Approval'}
+              Mark as Resolved
             </button>
             <button 
               className="btn btn-secondary"
@@ -1470,7 +1396,7 @@ const toggleSidebar = () => {
       </div>
     </div>
   </div>
-          )}
+)}
           {/* Assign Problem Modal */}
           {showAssignModal && (
             <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
@@ -1492,14 +1418,14 @@ const toggleSidebar = () => {
                     ></button>
                   </div>
                   <div className="modal-body">
-                    <div className="alert alert-info">
+                    {/* <div className="alert alert-info">
                       <h6 className="alert-heading mb-2">Assignment Rules</h6>
                       <ul className="mb-0 small">
                         <li>Only Admin and Team Leaders can assign problems</li>
                         <li>You cannot assign problems to the person who created it</li>
                         <li>The assigned user will receive a notification</li>
                       </ul>
-                    </div>
+                    </div> */}
                     
                     <div className="mb-3">
                       <label className="form-label fw-semibold">Assign To:</label>

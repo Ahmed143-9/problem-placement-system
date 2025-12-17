@@ -50,6 +50,12 @@ export default function MyIssues() {
     return badges[priority] || 'bg-secondary';
   };
 
+  const formatStatus = (status) => {
+    if (!status) return 'UNKNOWN';
+    if (status === 'pending_approval') return 'Pending Approval';
+    return status.replace('_', ' ').toUpperCase();
+  };
+
   const filteredProblems = myProblems.filter(problem => {
     const matchesStatus = filterStatus === 'all' || problem.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || problem.priority === filterPriority;
@@ -188,7 +194,7 @@ export default function MyIssues() {
                         </td>
                         <td>
                           <span className={`badge ${getStatusBadge(problem.status)}`}>
-                            {problem.status === 'pending_approval' ? 'Pending Approval' : problem.status.replace('_', ' ').toUpperCase()}
+                            {formatStatus(problem.status)}
                           </span>
                         </td>
                         <td>

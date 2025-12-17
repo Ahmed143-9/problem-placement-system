@@ -393,12 +393,12 @@ export default function ProblemForm() {
         if (assignedTo) {
           const assignedUser = teamMembers.find(u => u.id === assignedTo);
           if (assignmentType === 'MANUAL_ASSIGNMENT') {
-            toast.success(`✅ Problem #${problem.id} submitted and manually assigned to ${assignedUser?.name || 'user'}`);
+            toast.success(`Problem submitted successfully!'}`);
           } else {
-            toast.success(`✅ Problem #${problem.id} submitted and auto-assigned to ${assignedUser?.name || 'user'}`);
+            toast.success(`Problem submitted successfully!`);
           }
         } else {
-          toast.success(`✅ Problem #${problem.id} submitted successfully! Will be assigned manually.`);
+          toast.success(`Problem submitted successfully!`);
         }
         
         previewImages.forEach(img => {
@@ -489,82 +489,86 @@ export default function ProblemForm() {
           </button>
 
           <div className="p-3">
-            {!sidebarMinimized && (
-              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
-                Navigation
-              </h5>
-            )}
-            <ul className="nav flex-column">
-              <li className="nav-item mb-2">
-                <Link 
-                  to={getDashboardPath()}
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  title="Dashboard"
-                >
-                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
-                </Link>
-              </li>
-              
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/problem/create" 
-                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
-                  title="Create Problem"
-                >
-                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
-                </Link>
-              </li>
-              
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/problems" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  title="All Problems"
-                >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-                </Link>
-              </li>
-              
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/reports" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                  title="Reports"
-                >
-                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
-                </Link>
-              </li>
-              
-              {(user?.role === 'admin' || user?.role === 'team_leader') && (
-                <li className="nav-item mb-2">
-                  <Link 
-                    to="/admin" 
-                    className="nav-link text-white rounded d-flex align-items-center"
-                    style={{ transition: 'all 0.2s ease' }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    title="Admin Panel"
-                  >
-                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
-                  </Link>
-                </li>
-              )}
-            </ul>
-          </div>
+  {!sidebarMinimized && (
+    <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+      Navigation
+    </h5>
+  )}
+  <ul className="nav flex-column">
+    <li className="nav-item mb-2">
+      <Link 
+        to={getDashboardPath()}
+        className="nav-link text-white rounded d-flex align-items-center"
+        style={{ transition: 'all 0.2s ease' }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+        title="Dashboard"
+      >
+        <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+        {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+      </Link>
+    </li>
+    
+    <li className="nav-item mb-2">
+      <Link 
+        to="/problem/create" 
+        className="nav-link text-white bg-primary rounded d-flex align-items-center"
+        title="Create Problem"
+      >
+        <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+        {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+      </Link>
+    </li>
+    
+    {/* Only show "All Problems" to admins and team leaders */}
+    {(user?.role === 'admin' || user?.role === 'team_leader') && (
+      <li className="nav-item mb-2">
+        <Link 
+          to="/problems" 
+          className="nav-link text-white rounded d-flex align-items-center"
+          style={{ transition: 'all 0.2s ease' }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          title="All Problems"
+        >
+          <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+        </Link>
+      </li>
+    )}
+    
+    <li className="nav-item mb-2">
+      <Link 
+        to="/reports" 
+        className="nav-link text-white rounded d-flex align-items-center"
+        style={{ transition: 'all 0.2s ease' }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+        title="Reports"
+      >
+        <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+        {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+      </Link>
+    </li>
+    
+    {/* Only show "User Management" to admins and team leaders */}
+    {(user?.role === 'admin' || user?.role === 'team_leader') && (
+      <li className="nav-item mb-2">
+        <Link 
+          to="/admin" 
+          className="nav-link text-white rounded d-flex align-items-center"
+          style={{ transition: 'all 0.2s ease' }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          title="Admin Panel"
+        >
+          <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+        </Link>
+      </li>
+    )}
+  </ul>
+</div>
         </div>
 
         {/* Main Content */}

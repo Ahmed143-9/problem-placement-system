@@ -51,7 +51,7 @@ export default function AdminPanel() {
   useEffect(() => {
     loadUsers();
     loadRoles();
-    loadFirstFaceAssignmentsFromStorage();
+    loadFirstFaceAssignments();
   }, []);
 
   const departments = [
@@ -203,12 +203,21 @@ export default function AdminPanel() {
 
   // Handle input changes for form fields
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const { name, value, type } = e.target;
+  
+  if (name === 'status') {
+    // Convert status to number
+    setFormData(prev => ({
+      ...prev,
+      [name]: parseInt(value, 10)
+    }));
+  } else {
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-  };
+  }
+};
 
   // Handle role selection (multi-select to array)
   const handleRoleChange = (e) => {
@@ -696,7 +705,7 @@ export default function AdminPanel() {
     try {
       const activeUsersList = users.filter(u => u.status === 'active');
       setActiveUsers(activeUsersList);
-      console.log('✅ Active users filtered successfully:', activeUsersList.length);
+      console.log('Active users filtered successfully:', activeUsersList.length);
     } catch (error) {
       console.error('Failed to filter active users:', error);
       toast.error('Error while preparing active users list');
@@ -717,47 +726,63 @@ export default function AdminPanel() {
   };
 
   // Toggle user status
-  const handleToggleStatus = async (userId) => {
-    if (!isAdmin) {
-      toast.error('Only Admin can change user status!');
-      return;
-    }
+  // Toggle user status - FIXED VERSION
+const handleToggleStatus = async (userId) => {
+  if (!isAdmin) {
+    toast.error('Only Admin can change user status!');
+    return;
+  }
+  
+  try {
+    const userToUpdate = users.find(u => u.id === userId);
+    const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
     
-    try {
-      const userToUpdate = users.find(u => u.id === userId);
-      const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : '',
+    };
+
+    const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        id: userId,
+        status: newStatus === 'active' ? 1 : 0
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      sendUserStatusNotification(userToUpdate, newStatus);
+      toast.success('User status updated!');
       
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
-      // Update user status endpoint
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          id: userId,
-          status: newStatus === 'active' ? 1 : 0
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        sendUserStatusNotification(userToUpdate, newStatus);
-        toast.success('User status updated!');
-        loadUsers();
+      // Update local state immediately
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId 
+            ? { ...user, status: newStatus } 
+            : user
+        )
+      );
+      
+      // Also update activeUsers if needed
+      if (newStatus === 'active') {
+        setActiveUsers(prev => [...prev, { ...userToUpdate, status: newStatus }]);
       } else {
-        toast.error(data.message || 'Failed to update status');
+        setActiveUsers(prev => prev.filter(u => u.id !== userId));
       }
-    } catch (error) {
-      toast.error('Failed to update status');
-      console.error(error);
+      
+    } else {
+      toast.error(data.message || 'Failed to update status');
     }
-  };
+  } catch (error) {
+    toast.error('Failed to update status');
+    console.error(error);
+  }
+};
 
   // Reset user password
   const handleResetPassword = async (userId, userName) => {
@@ -824,21 +849,20 @@ export default function AdminPanel() {
         'Authorization': token ? `Bearer ${token}` : '',
       };
 
-      // Delete user endpoint
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/deleteUser', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ id: userId }),
+      // Delete user endpoint - Fixed to use correct API endpoint
+      const response = await fetch(`https://ticketapi.wineds.com/api/v1/users/${userId}`, {
+        method: 'DELETE',
+        headers: headers
       });
 
       const data = await response.json();
 
-      if (data.status === 'success') {
+      if (data.success) {
         sendUserDeletionNotification(userToDelete);
         toast.success('User deleted successfully!');
         loadUsers();
       } else {
-        toast.error(data.message || 'Failed to delete user');
+        toast.error(data.error || 'Failed to delete user');
       }
     } catch (error) {
       toast.error('Failed to delete user');
@@ -1235,7 +1259,7 @@ export default function AdminPanel() {
                                     >
                                       <FaEdit />
                                     </button>
-                                    <button 
+                                    {/* <button 
                                       className={`btn btn-sm btn-outline-${u.status === 'active' ? 'warning' : 'success'}`} 
                                       onClick={() => handleToggleStatus(u.id)} 
                                       title={u.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -1258,7 +1282,7 @@ export default function AdminPanel() {
                                       style={{ padding: '6px 10px' }}
                                     >
                                       <FaTrash />
-                                    </button>
+                                    </button> */}
                                   </div>
                                 ) : (
                                   <span className="badge bg-secondary">View Only</span>
@@ -1364,9 +1388,9 @@ export default function AdminPanel() {
                           <option value="" disabled>No active users available</option>
                         )}
                       </select>
-                      <small className="text-muted">
+                      {/* <small className="text-muted">
                         You can select any active user (Admin, Team Leader or Regular User)
-                      </small>
+                      </small> */}
                     </>
                   )}
                 </div>
@@ -1432,7 +1456,7 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Process Explanation */}
-                <div className="mt-4 p-3 bg-light rounded">
+                {/* <div className="mt-4 p-3 bg-light rounded">
                   <h6 className="text-warning mb-2">
                     <FaInfoCircle className="me-2" />
                     How First Face Works:
@@ -1444,7 +1468,7 @@ export default function AdminPanel() {
                     <li>First Face users get priority for new problem assignments</li>
                     <li>You can have different First Face users for different departments</li>
                   </ol>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
@@ -1588,14 +1612,14 @@ export default function AdminPanel() {
                     <select 
                       className="form-control" 
                       name="status" 
-                      value={formData.status} 
+                      value={formData.status.toString()}  // Convert to string for select comparison
                       onChange={handleInputChange}
                     >
-                      <option value={1}>Active</option>
-                      <option value={0}>Inactive</option>
+                      <option value="1">Active</option>
+                      <option value="0">Inactive</option>
                     </select>
                   </div>
-                  <div className="col-md-6">
+               <div className="col-md-6">
                     <label className="form-label fw-semibold">Department</label>
                     <select
                       className="form-control"

@@ -442,7 +442,7 @@ export default function ProblemList() {
                     title="Admin Panel"
                   >
                     <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Admin Panel</span>}
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                   </Link>
                 </li>
               )}
@@ -686,8 +686,8 @@ export default function ProblemList() {
                 </div>
               ) : (
                 <>
-                  <div className="table-responsive">
-                    <table className="table table-hover mb-0">
+                  <div className="">
+                    <table className="table mb-0">
                       <thead className="table-light">
                         <tr>
                           <th style={{ width: '40px' }}>

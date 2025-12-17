@@ -1,11 +1,15 @@
-// src/pages/Reports.js - Fixed Code
+// src/pages/Reports.js - Fixed with corrected API endpoints and filters
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
-import { FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaDownload, FaPrint, FaFilter, FaCalendarAlt, FaEnvelope, FaFilePdf } from 'react-icons/fa';
+import { 
+  FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, 
+  FaUsersCog, FaChevronLeft, FaChevronRight, FaDownload, 
+  FaPrint, FaFilter, FaCalendarAlt, FaFilePdf, FaSpinner
+} from 'react-icons/fa';
 
 export default function Reports() {
   const { user } = useAuth();
@@ -14,9 +18,9 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [selectedProblem, setSelectedProblem] = useState(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
-  const [users, setUsers] = useState([]); // ✅ Users state added
+  const [users, setUsers] = useState([]);
 
-  // Filter states - SMS Log Style
+  // Filter states
   const [filters, setFilters] = useState({
     department: '',
     priority: '',
@@ -27,39 +31,145 @@ export default function Reports() {
     endDate: ''
   });
 
-  // ✅ Load users from localStorage for name resolution
-  useEffect(() => {
-    const loadUsers = () => {
-      try {
-        const storedUsers = JSON.parse(localStorage.getItem('system_users') || '[]');
-        setUsers(storedUsers);
-        console.log('✅ Users loaded for name resolution:', storedUsers.length);
-      } catch (error) {
-        console.error('Failed to load users:', error);
+  // Load problems from backend API
+  const fetchProblems = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://ticketapi.wineds.com/api/problems/getAll', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    };
 
-    loadUsers();
-  }, []);
-
-  // ✅ Function to get user name by ID
-  const getUserNameById = (userId) => {
-    if (!userId) return 'Unassigned';
-    
-    const foundUser = users.find(u => u.id === userId || u.id == userId);
-    return foundUser ? foundUser.name : `User#${userId}`;
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        let filteredData = data.data;
+        
+        // Filter based on user role
+        if (!(user?.role === 'admin' || user?.role === 'team_leader')) {
+          filteredData = filteredData.filter(p => 
+            p.created_by?.id === user?.id || p.assigned_to?.id === user?.id
+          );
+        }
+        
+        setProblems(filteredData);
+        setFilteredProblems(filteredData);
+      } else {
+        toast.error(data.messages?.[0] || 'Failed to load problems');
+      }
+    } catch (error) {
+      console.error('Failed to fetch problems:', error);
+      toast.error('Network error while loading problems');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ✅ Function to get user name by username/email (for createdBy field)
-  const getUserNameByUsername = (username) => {
-    if (!username) return 'Unknown';
+  // Load users from backend - FIXED ENDPOINT
+  const loadUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://ticketapi.wineds.com/api/users/getAll', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({}) // Empty body for POST request
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'success') {
+          setUsers(data.data || []);
+        }
+      } else {
+        console.warn('Users API returned non-ok status:', response.status);
+        // Fallback to extracting users from problems data
+        extractUsersFromProblems();
+      }
+    } catch (error) {
+      console.error('Failed to load users from API:', error);
+      // Fallback to extracting users from problems data
+      extractUsersFromProblems();
+    }
+  };
+
+  // Fallback: Extract users from problems data
+  const extractUsersFromProblems = () => {
+    const userSet = new Set();
+    const userList = [];
     
-    const foundUser = users.find(u => u.username === username || u.email === username);
-    return foundUser ? foundUser.name : username;
+    problems.forEach(problem => {
+      // Add created_by user
+      if (problem.created_by?.id && problem.created_by?.name) {
+        const userKey = `creator_${problem.created_by.id}`;
+        if (!userSet.has(userKey)) {
+          userSet.add(userKey);
+          userList.push({
+            id: problem.created_by.id,
+            name: problem.created_by.name,
+            username: problem.created_by.username || problem.created_by.email || ''
+          });
+        }
+      }
+      
+      // Add assigned_to user
+      if (problem.assigned_to?.id && problem.assigned_to?.name) {
+        const userKey = `assignee_${problem.assigned_to.id}`;
+        if (!userSet.has(userKey)) {
+          userSet.add(userKey);
+          userList.push({
+            id: problem.assigned_to.id,
+            name: problem.assigned_to.name,
+            username: problem.assigned_to.username || problem.assigned_to.email || ''
+          });
+        }
+      }
+    });
+    
+    setUsers(userList);
+    console.log('Extracted users from problems data:', userList.length);
+  };
+
+  useEffect(() => {
+    fetchProblems();
+  }, []);
+
+  useEffect(() => {
+    if (problems.length > 0) {
+      loadUsers();
+    }
+  }, [problems]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [problems, filters]);
+
+  // Get user name from created_by object
+  const getUserNameFromCreatedBy = (createdByObj) => {
+    if (!createdByObj) return 'Unknown';
+    return createdByObj.name || createdByObj.username || createdByObj.email || 'Unknown';
+  };
+
+  // Get user name from assigned_to object
+  const getUserNameFromAssignedTo = (assignedToObj) => {
+    if (!assignedToObj) return 'Unassigned';
+    return assignedToObj.name || assignedToObj.username || assignedToObj.email || 'Unassigned';
   };
 
   // Helper functions for the report
   const calculateDuration = (createdAt) => {
+    if (!createdAt) return 'N/A';
     const created = new Date(createdAt);
     const now = new Date();
     const diffTime = Math.abs(now - created);
@@ -95,9 +205,8 @@ export default function Reports() {
   };
 
   const getSolvingTeam = (problem) => {
-    // ✅ Use user name instead of ID
-    if (problem.assignedTo) {
-      const assignedUserName = getUserNameById(problem.assignedTo);
+    if (problem.assigned_to) {
+      const assignedUserName = getUserNameFromAssignedTo(problem.assigned_to);
       return `${assignedUserName}'s Team`;
     }
     
@@ -122,9 +231,8 @@ export default function Reports() {
   };
 
   const downloadPDFReport = (problem) => {
-    // ✅ Use user names in PDF report
-    const assignedUserName = getUserNameById(problem.assignedTo);
-    const createdByName = getUserNameByUsername(problem.createdBy);
+    const assignedUserName = getUserNameFromAssignedTo(problem.assigned_to);
+    const createdByName = getUserNameFromCreatedBy(problem.created_by);
     
     const pdfContent = `
 PROBLEM RESOLUTION REPORT
@@ -136,8 +244,8 @@ TICKET INFORMATION:
 • Department: ${problem.department}
 • Priority: ${problem.priority}
 • Status: ${problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase()}
-• Created Date: ${new Date(problem.createdAt).toLocaleDateString('en-BD')}
-• Created Time: ${new Date(problem.createdAt).toLocaleTimeString('en-BD')}
+• Created Date: ${new Date(problem.created_at).toLocaleDateString('en-BD')}
+• Created Time: ${new Date(problem.created_at).toLocaleTimeString('en-BD')}
 
 TEAM INFORMATION:
 ────────────────
@@ -153,7 +261,7 @@ ${problem.statement || problem.description || 'No detailed description provided.
 ADDITIONAL INFORMATION:
 ──────────────────────
 • Problem Type: ${getProblemType(problem)}
-• Resolution Duration: ${calculateDuration(problem.createdAt)}
+• Resolution Duration: ${calculateDuration(problem.created_at)}
 • Report Generated: ${new Date().toLocaleString('en-BD')}
 • Generated By: ${user?.name || 'System'}
 
@@ -185,35 +293,6 @@ This is an automatically generated report.
     return 'In Progress';
   };
 
-  useEffect(() => {
-    fetchProblems();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [problems, filters]);
-
-  const fetchProblems = () => {
-    try {
-      const storedProblems = JSON.parse(localStorage.getItem('problems') || '[]');
-      
-      let filteredProblems;
-      if (user?.role === 'admin' || user?.role === 'team_leader') {
-        filteredProblems = storedProblems;
-      } else {
-        filteredProblems = storedProblems.filter(p => 
-          p.createdBy === user?.name || p.assignedTo === user?.id
-        );
-      }
-      
-      setProblems(filteredProblems);
-    } catch (error) {
-      console.error('Failed to fetch problems:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const applyFilters = () => {
     let filtered = [...problems];
 
@@ -228,33 +307,42 @@ This is an automatically generated report.
     }
 
     if (filters.status) {
-      filtered = filtered.filter(problem => problem.status === filters.status);
+      // Handle "Solved" status - map to "done"
+      const statusFilter = filters.status === 'Solved' ? 'done' : filters.status;
+      filtered = filtered.filter(problem => problem.status === statusFilter);
     }
 
     if (filters.createdBy) {
       filtered = filtered.filter(problem => {
-        const createdByName = getUserNameByUsername(problem.createdBy);
+        const createdByName = getUserNameFromCreatedBy(problem.created_by);
         return createdByName.toLowerCase().includes(filters.createdBy.toLowerCase());
       });
     }
 
     if (filters.assignedTo) {
       filtered = filtered.filter(problem => {
-        const assignedUserName = getUserNameById(problem.assignedTo);
+        const assignedUserName = getUserNameFromAssignedTo(problem.assigned_to);
         return assignedUserName.toLowerCase().includes(filters.assignedTo.toLowerCase());
       });
     }
 
+    // FIXED: Date range filtering
     if (filters.startDate) {
-      filtered = filtered.filter(problem => 
-        new Date(problem.createdAt) >= new Date(filters.startDate)
-      );
+      const startDate = new Date(filters.startDate);
+      startDate.setHours(0, 0, 0, 0); // Set to beginning of day
+      filtered = filtered.filter(problem => {
+        const problemDate = new Date(problem.created_at);
+        return problemDate >= startDate;
+      });
     }
 
     if (filters.endDate) {
-      filtered = filtered.filter(problem => 
-        new Date(problem.createdAt) <= new Date(filters.endDate)
-      );
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999); // Set to end of day
+      filtered = filtered.filter(problem => {
+        const problemDate = new Date(problem.created_at);
+        return problemDate <= endDate;
+      });
     }
 
     setFilteredProblems(filtered);
@@ -290,7 +378,7 @@ This is an automatically generated report.
     }, 500);
   };
 
-  // ✅ FIXED: CSV export function - Now shows names instead of IDs
+  // Fixed CSV export function
   const exportToCSV = () => {
     if (filteredProblems.length === 0) {
       toast.warning('No data to export');
@@ -304,9 +392,9 @@ This is an automatically generated report.
       problem.department,
       problem.priority,
       problem.status === 'pending_approval' ? 'PENDING APPROVAL' : problem.status.replace('_', ' ').toUpperCase(),
-      getUserNameByUsername(problem.createdBy), // ✅ Show name instead of username
-      getUserNameById(problem.assignedTo), // ✅ Show name instead of ID
-      new Date(problem.createdAt).toLocaleDateString(),
+      getUserNameFromCreatedBy(problem.created_by),
+      getUserNameFromAssignedTo(problem.assigned_to),
+      new Date(problem.created_at).toLocaleDateString(),
       problem.statement || problem.description || ''
     ]);
 
@@ -325,10 +413,10 @@ This is an automatically generated report.
     toast.success(`CSV exported successfully! (${filteredProblems.length} records)`);
   };
 
-  // ✅ Get unique values for dropdowns - Now using names
+  // Get unique values for dropdowns
   const departments = [...new Set(problems.map(p => p.department))].filter(Boolean);
-  const creators = [...new Set(problems.map(p => getUserNameByUsername(p.createdBy)))].filter(Boolean);
-  const assignees = [...new Set(problems.map(p => getUserNameById(p.assignedTo)))].filter(Boolean);
+  const creators = [...new Set(problems.map(p => getUserNameFromCreatedBy(p.created_by)))].filter(Boolean);
+  const assignees = [...new Set(problems.map(p => getUserNameFromAssignedTo(p.assigned_to)))].filter(Boolean);
 
   const sidebarLinkStyle = {
     transition: 'all 0.2s ease'
@@ -341,9 +429,7 @@ This is an automatically generated report.
       <div>
         <Navbar />
         <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+          <FaSpinner className="fa-spin fs-1 text-primary" />
         </div>
       </div>
     );
@@ -436,7 +522,7 @@ This is an automatically generated report.
                   </li>
                 ) : (
                   <li className="nav-item mb-2">
-                    <Link 
+                    {/* <Link 
                       to="/my-issues" 
                       className="nav-link text-white rounded d-flex align-items-center"
                       style={sidebarLinkStyle}
@@ -446,7 +532,7 @@ This is an automatically generated report.
                     >
                       <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                       {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>My Issues</span>}
-                    </Link>
+                    </Link> */}
                   </li>
                 )}
                 
@@ -502,14 +588,23 @@ This is an automatically generated report.
                         : 'Download reports for problems you created or are assigned to'}
                     </small>
                   </div>
-                  <button 
-                    className="btn btn-success"
-                    onClick={exportToCSV}
-                    disabled={filteredProblems.length === 0}
-                  >
-                    <FaDownload className="me-1" />
-                    Export CSV
-                  </button>
+                  <div className="d-flex gap-2">
+                    <button 
+                      className="btn btn-outline-light btn-sm"
+                      onClick={fetchProblems}
+                    >
+                      <FaSpinner className={loading ? 'fa-spin me-1' : 'me-1'} />
+                      Refresh
+                    </button>
+                    <button 
+                      className="btn btn-success"
+                      onClick={exportToCSV}
+                      disabled={filteredProblems.length === 0}
+                    >
+                      <FaDownload className="me-1" />
+                      Export CSV ({filteredProblems.length})
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -551,7 +646,7 @@ This is an automatically generated report.
                     </select>
                   </div>
 
-                  {/* Status Filter */}
+                  {/* Status Filter - FIXED: Show "Solved" but filter by "done" */}
                   <div className="col-md-6 col-lg-2">
                     <label className="form-label">Status:</label>
                     <select 
@@ -562,7 +657,7 @@ This is an automatically generated report.
                       <option value="">All</option>
                       <option value="pending">Pending</option>
                       <option value="in_progress">In Progress</option>
-                      <option value="done">Done</option>
+                      <option value="Solved">Solved</option>
                       <option value="pending_approval">Pending Approval</option>
                     </select>
                   </div>
@@ -628,26 +723,27 @@ This is an automatically generated report.
                     <button 
                       className="btn btn-outline-secondary w-100"
                       onClick={resetFilters}
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(108, 117, 125, 0.3)',
-                        color: '#6c757d',
-                        backdropFilter: 'blur(10px)',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)';
-                        e.target.style.borderColor = 'rgba(108, 117, 125, 0.5)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                        e.target.style.borderColor = 'rgba(108, 117, 125, 0.3)';
-                      }}
                     >
                       Reset Filters
                     </button>
                   </div>
                 </div>
+                
+                {/* Active filters info */}
+                {(filters.department || filters.priority || filters.status || filters.createdBy || filters.assignedTo || filters.startDate || filters.endDate) && (
+                  <div className="mt-3">
+                    <small className="text-muted">
+                      Active filters: 
+                      {filters.department && ` Department: ${filters.department}`}
+                      {filters.priority && ` Priority: ${filters.priority}`}
+                      {filters.status && ` Status: ${filters.status}`}
+                      {filters.createdBy && ` Created By: ${filters.createdBy}`}
+                      {filters.assignedTo && ` Assigned To: ${filters.assignedTo}`}
+                      {filters.startDate && ` From: ${filters.startDate}`}
+                      {filters.endDate && ` To: ${filters.endDate}`}
+                    </small>
+                  </div>
+                )}
               </div>
 
               {/* Problems Table */}
@@ -698,21 +794,20 @@ This is an automatically generated report.
                             </td>
                             <td>
                               <span className={`badge ${problem.status === 'pending' ? 'bg-warning text-dark' : problem.status === 'in_progress' ? 'bg-info' : problem.status === 'done' ? 'bg-success' : 'bg-secondary'}`}>
-                                {problem.status === 'pending_approval' ? ' PENDING APPROVAL' : 
-                                problem.status === 'pending' ? ' PENDING' :
+                                {problem.status === 'pending_approval' ? 'PENDING APPROVAL' : 
+                                problem.status === 'pending' ? 'PENDING' :
                                 problem.status === 'in_progress' ? 'IN PROGRESS' :
-                                'SOLVED'}
+                                problem.status === 'done' ? 'SOLVED' :
+                                problem.status.toUpperCase()}
                               </span>
                             </td>
                             <td>
-                              {/* ✅ Show user name instead of username */}
-                              <span className="fw-semibold">{getUserNameByUsername(problem.createdBy)}</span>
+                              <span className="fw-semibold">{getUserNameFromCreatedBy(problem.created_by)}</span>
                             </td>
                             <td>
-                              {/* ✅ Show user name instead of ID */}
-                              {problem.assignedTo ? (
+                              {problem.assigned_to ? (
                                 <span className="badge bg-info text-white">
-                                  {getUserNameById(problem.assignedTo)}
+                                  {getUserNameFromAssignedTo(problem.assigned_to)}
                                 </span>
                               ) : (
                                 <span className="badge bg-secondary">UNASSIGNED</span>
@@ -720,7 +815,11 @@ This is an automatically generated report.
                             </td>
                             <td>
                               <span className="text-nowrap">
-                                {new Date(problem.createdAt).toLocaleDateString('en-BD')}
+                                {new Date(problem.created_at).toLocaleDateString('en-BD')}
+                                <br />
+                                <small className="text-muted">
+                                  {new Date(problem.created_at).toLocaleTimeString('en-BD', {hour: '2-digit', minute:'2-digit'})}
+                                </small>
                               </span>
                             </td>
                             <td style={{ textAlign: 'center' }}>
@@ -746,6 +845,14 @@ This is an automatically generated report.
                       )}
                     </tbody>
                   </table>
+                </div>
+                
+                {/* Results summary */}
+                <div className="mt-3 text-end">
+                  <small className="text-muted">
+                    Showing {filteredProblems.length} of {problems.length} problems
+                    {filters.startDate && filters.endDate && ` between ${filters.startDate} and ${filters.endDate}`}
+                  </small>
                 </div>
               </div>
             </div>
@@ -785,7 +892,7 @@ This is an automatically generated report.
                   <strong style={{ color: '#2c5aa0', fontSize: '11pt' }}>Ticket # {String(selectedProblem.id).padStart(5, '0')}</strong>
                   <br />
                   <span style={{ color: '#666', fontSize: '9pt' }}>
-                    Created: {new Date(selectedProblem.createdAt).toLocaleDateString()}
+                    Created: {new Date(selectedProblem.created_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -822,7 +929,7 @@ This is an automatically generated report.
                     </div>
                     <div className="col-3">
                       <div><strong>Service</strong></div>
-                      <div>{selectedProblem.service}</div>
+                      <div>{selectedProblem.service || 'N/A'}</div>
                     </div>
                     <div className="col-3">
                       <div><strong>Status</strong></div>
@@ -838,7 +945,7 @@ This is an automatically generated report.
                     <div className="col-3">
                       <div><strong>Duration</strong></div>
                       <div style={{ color: '#2c5aa0', fontWeight: 'bold' }}>
-                        {calculateDuration(selectedProblem.createdAt)}
+                        {calculateDuration(selectedProblem.created_at)}
                       </div>
                     </div>
                   </div>
@@ -899,14 +1006,12 @@ This is an automatically generated report.
                     <tbody>
                       <tr>
                         <td style={{ width: '40%', fontWeight: 'bold', padding: '2px 0' }}>Reported By:</td>
-                        {/* ✅ Show name in printable report */}
-                        <td>{getUserNameByUsername(selectedProblem.createdBy)}</td>
+                        <td>{getUserNameFromCreatedBy(selectedProblem.created_by)}</td>
                       </tr>
                       <tr>
                         <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Assigned To:</td>
-                        {/* ✅ Show name in printable report */}
                         <td>
-                          {getUserNameById(selectedProblem.assignedTo) || 'Unassigned'}
+                          {getUserNameFromAssignedTo(selectedProblem.assigned_to) || 'Unassigned'}
                         </td>
                       </tr>
                       <tr>
@@ -945,11 +1050,11 @@ This is an automatically generated report.
                     <tbody>
                       <tr>
                         <td style={{ width: '45%', fontWeight: 'bold', padding: '2px 0' }}>Created Date:</td>
-                        <td>{new Date(selectedProblem.createdAt).toLocaleDateString()}</td>
+                        <td>{new Date(selectedProblem.created_at).toLocaleDateString()}</td>
                       </tr>
                       <tr>
                         <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Created Time:</td>
-                        <td>{new Date(selectedProblem.createdAt).toLocaleTimeString()}</td>
+                        <td>{new Date(selectedProblem.created_at).toLocaleTimeString()}</td>
                       </tr>
                       <tr>
                         <td style={{ fontWeight: 'bold', padding: '2px 0' }}>Resolution Date:</td>
@@ -966,47 +1071,6 @@ This is an automatically generated report.
                 </div>
               </div>
             </div>
-
-            {/* Action History - Compact */}
-            {selectedProblem.actionHistory && selectedProblem.actionHistory.length > 0 && (
-              <div className="row mb-3">
-                <div className="col-12">
-                  <div style={{ 
-                    border: '1px solid #ddd', 
-                    borderRadius: '3px', 
-                    padding: '10px'
-                  }}>
-                    <h4 style={{ 
-                      color: '#2c5aa0', 
-                      fontSize: '11pt',
-                      marginBottom: '8px',
-                      borderBottom: '1px solid #2c5aa0',
-                      paddingBottom: '3px'
-                    }}>
-                      Recent Actions
-                    </h4>
-                    <div style={{ fontSize: '8pt', maxHeight: '80px', overflow: 'hidden' }}>
-                      {selectedProblem.actionHistory.slice(-3).map((action, index) => (
-                        <div key={index} style={{ 
-                          padding: '4px 0',
-                          borderBottom: index < Math.min(selectedProblem.actionHistory.length - 1, 2) ? '1px dashed #eee' : 'none'
-                        }}>
-                          <strong>{action.action}</strong> by {action.by} 
-                          <span style={{ color: '#666', marginLeft: '8px' }}>
-                            {new Date(action.timestamp).toLocaleDateString()}
-                          </span>
-                          {action.comment && (
-                            <div style={{ color: '#666', fontSize: '7pt' }}>
-                              {action.comment}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Footer */}
             <div className="row mt-3 pt-2" style={{ borderTop: '1px solid #ddd' }}>

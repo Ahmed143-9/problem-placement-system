@@ -365,19 +365,42 @@ export default function EmployeeDashboard() {
 
   // Get assigned user name
   const getAssignedToName = (problem) => {
-    return problem.assigned_to_name || 
-           problem.assignedToName || 
-           problem.assigned_user_name || 
-           'Unassigned';
-  };
+  // Check multiple possible structures
+  if (problem.assigned_to && problem.assigned_to.name) {
+    return problem.assigned_to.name;
+  }
+  if (problem.assigned_to_name) {
+    return problem.assigned_to_name;
+  }
+  if (problem.assignedTo) {
+    return problem.assignedTo;
+  }
+  if (problem.assigned_user_name) {
+    return problem.assigned_user_name;
+  }
+  return 'Unassigned';
+};
 
   // Get created by name
   const getCreatedByName = (problem) => {
-    return problem.created_by_name || 
-           problem.createdByName || 
-           problem.user_name || 
-           'Unknown';
-  };
+  // Check multiple possible structures
+  if (problem.created_by && problem.created_by.name) {
+    return problem.created_by.name;
+  }
+  if (problem.created_by_name) {
+    return problem.created_by_name;
+  }
+  if (problem.createdBy) {
+    return problem.createdBy;
+  }
+  if (problem.user_name) {
+    return problem.user_name;
+  }
+  if (problem.created_by) {
+    return problem.created_by; // In case it's just an ID or string
+  }
+  return 'Unknown';
+};
 
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
@@ -833,7 +856,7 @@ export default function EmployeeDashboard() {
                 <div className="card-body p-0">
                   {highPriorityIssues.length > 0 ? (
                     <div className="table-responsive">
-                      <table className="table table-hover mb-0">
+                      <table className="table mb-0">
                         <thead>
                           <tr>
                             <th style={{ width: '10%', fontSize: '0.85rem' }}>ID</th>
@@ -1086,7 +1109,7 @@ export default function EmployeeDashboard() {
               <div className="modal-header bg-primary text-white py-2">
                 <h6 className="modal-title mb-0 fw-semibold">
                   <FaExclamationTriangle className="me-2" />
-                  Problem Details - ID: #{selectedProblem.id || selectedProblem.problem_id || 'N/A'}
+                  Problem Details - ID:{selectedProblem.id || selectedProblem.problem_id || 'N/A'}
                 </h6>
                 <button 
                   type="button" 
@@ -1160,28 +1183,28 @@ export default function EmployeeDashboard() {
       )}
 
       <style jsx>{`
-        .spinning {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
+        // .spinning {
+        //   animation: spin 1s linear infinite;
+        // }
+        // @keyframes spin {
+        //   from { transform: rotate(0deg); }
+        //   to { transform: rotate(360deg); }
+        // }
         
-        .card {
-          transition: transform 0.2s ease-in-out;
-        }
+        // .card {
+        //   transition: transform 0.2s ease-in-out;
+        // }
         
-        .card:hover {
-          transform: translateY(-2px);
-        }
+        // .card:hover {
+        //   transform: translateY(-2px);
+        // }
         
-        .progress-bar {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          padding: 0 5px;
-        }
+        // .progress-bar {
+        //   white-space: nowrap;
+        //   overflow: hidden;
+        //   text-overflow: ellipsis;
+        //   padding: 0 5px;
+        // }
       `}</style>
     </div>
   );
