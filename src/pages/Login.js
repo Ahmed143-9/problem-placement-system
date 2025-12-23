@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { toast } from 'react-toastify';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
@@ -10,6 +11,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login, user, isAuthenticated, permissions, roles } = useAuth();
+  const { addNotification } = useNotifications();
   const navigate = useNavigate();
 
   // Debug logs
@@ -99,7 +101,16 @@ export default function Login() {
       console.log('📊 Login result:', result);
 
       if (result.success) {
-        toast.success(result.message || 'Login successful!');
+        // Add notification instead of toast
+        addNotification({
+          type: 'login_success',
+          title: '✅ Login Successful',
+          message: result.message || 'You have successfully logged in',
+          priority: 'INFO', // This will auto-dismiss after a while
+          icon: '✅',
+          color: 'success',
+          timestamp: new Date().toISOString()
+        });
         
         // Check if password needs to be changed
         if (result.force_password) {

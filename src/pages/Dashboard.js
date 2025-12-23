@@ -483,7 +483,7 @@ export default function EmployeeDashboard() {
               <li className="nav-item mb-2">
                 <Link 
                   to="/dashboard" 
-                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
+                  className="nav-link text-white  rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="Dashboard"
                 >

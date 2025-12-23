@@ -1,10 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import './disable-hover.css';
+import './no-hover.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import './typography.css';
-
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

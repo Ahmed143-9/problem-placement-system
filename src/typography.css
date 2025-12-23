@@ -353,7 +353,12 @@ p {
   transform: translateX(5px);
 }
 
-.sidebar-nav-link:hover::before,
+/* Remove hover effect from sidebar nav links */
+.sidebar-nav-link.active {
+  background: rgba(102, 126, 234, 0.15);
+  color: white;
+}
+
 .sidebar-nav-link.active::before {
   opacity: 1;
 }

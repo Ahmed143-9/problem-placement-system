@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -17,7 +17,15 @@ import {
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications } = useNotifications();
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    clearNotifications,
+    loadNotifications,
+    removeNotification
+  } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -27,7 +35,19 @@ export default function Navbar() {
   };
 
   const handleNotificationClick = (notification) => {
+    // Mark as read immediately
     markAsRead(notification.id);
+    
+    // Close the dropdown
+    const dropdownElement = document.querySelector('#notificationDropdown');
+    if (dropdownElement) {
+      const bsDropdown = window.bootstrap?.Dropdown?.getInstance(dropdownElement);
+      if (bsDropdown) {
+        bsDropdown.hide();
+      }
+    }
+    
+    // Navigate if needed
     if (notification.problemId) {
       navigate(`/problem/${notification.problemId}`);
     }
@@ -39,7 +59,18 @@ export default function Navbar() {
       assignment: '📌',
       status_change: '🔄',
       transfer: '⇄',
-      completion: '✅'
+      completion: '✅',
+      domain_status_change: '🌐',
+      new_domain: '🌐',
+      critical_domain: '🚨',
+      manual_domain_check: '🔍',
+      multiple_domains_down: '⚠️',
+      low_uptime: '📉',
+      discussion_comment: '💬',
+      solution_comment: '✅',
+      system_maintenance: '🔧',
+      system_error: '❌',
+      backup_completed: '💾'
     };
     return icons[type] || '🔔';
   };
@@ -71,6 +102,31 @@ export default function Navbar() {
     if (user?.role === 'team_leader') return 'bg-warning text-dark';
     return 'bg-info';
   };
+
+  // Auto-dismiss notifications after a certain time
+  useEffect(() => {
+    const timers = [];
+    
+    notifications.forEach(notification => {
+      // Only auto-dismiss if it hasn't been read yet and has autoDismiss enabled
+      if (!notification.read && notification.autoDismiss !== false) {
+        const timer = setTimeout(() => {
+          removeNotification(notification.id);
+        }, 15000); // 15 seconds to give users more time to see the notification
+        timers.push(timer);
+      }
+    });
+    
+    // Cleanup function to clear all timers when component unmounts or notifications change
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [notifications, removeNotification]);
+
+  // Force refresh notifications when component mounts
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   return (
     <>
@@ -194,32 +250,6 @@ export default function Navbar() {
                 </li>
               )}
 
-              {/* Show My Issues only for Regular Users (NOT Admin/Team Leader) */}
-              {/* {isRegularUser && (
-                <li className="nav-item">
-                  <Link 
-                    className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
-                    to="/my-issues"
-                    style={{
-                      transition: 'all 0.3s ease',
-                      fontWeight: '500',
-                      fontSize: '0.95rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <FaTasks className="me-2" />
-                    My Issues
-                  </Link>
-                </li>
-              )} */}
-
               {/* Show All Problems only for Admin/Team Leader */}
               {isAdminOrLeader && (
                 <li className="nav-item">
@@ -251,12 +281,12 @@ export default function Navbar() {
             <ul className="navbar-nav align-items-lg-center">
               {/* Notification Bell - Enhanced */}
               <li className="nav-item dropdown me-2">
-                <a
-                  className="nav-link position-relative d-flex align-items-center justify-content-center rounded-circle"
-                  href="#"
+                <button
+                  className="nav-link position-relative d-flex align-items-center justify-content-center rounded-circle border-0"
                   id="notificationDropdown"
-                  role="button"
+                  type="button"
                   data-bs-toggle="dropdown"
+                  onClick={() => loadNotifications()} // Refresh on click
                   style={{ 
                     width: '45px',
                     height: '45px',
@@ -288,11 +318,12 @@ export default function Navbar() {
                         boxShadow: '0 2px 8px rgba(220, 53, 69, 0.5)',
                         animation: 'pulse 2s infinite'
                       }}
+                      key={`badge-${unreadCount}`}
                     >
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
-                </a>
+                </button>
 
                 {/* Notification Dropdown - Enhanced */}
                 <ul 
@@ -357,90 +388,117 @@ export default function Navbar() {
                     sortedNotifications.slice(0, 10).map((notification, index) => (
                       <React.Fragment key={notification.id}>
                         <li>
-                          <button
-                            className={`dropdown-item ${!notification.read ? 'bg-light' : ''} position-relative`}
-                            onClick={() => handleNotificationClick(notification)}
-                            style={{ 
-                              padding: '0.75rem 1rem',
-                              borderLeft: !notification.read ? '3px solid #667eea' : '3px solid transparent',
-                              transition: 'all 0.2s',
-                              background: !notification.read ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' : 'transparent'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.08)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = !notification.read 
-                                ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' 
-                                : 'transparent';
-                            }}
-                          >
-                            <div className="d-flex align-items-start">
-                              <div 
-                                className="d-flex align-items-center justify-content-center flex-shrink-0"
-                                style={{ 
-                                  fontSize: '1.2rem', 
-                                  marginRight: '10px',
-                                  minWidth: '32px',
-                                  height: '32px',
-                                  background: 'rgba(102, 126, 234, 0.1)',
-                                  borderRadius: '8px'
-                                }}
-                              >
-                                {notification.icon || getNotificationIcon(notification.type)}
-                              </div>
-                              <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                                <div className="d-flex justify-content-between align-items-start mb-1">
-                                  <strong 
-                                    className="d-block text-truncate" 
-                                    style={{ 
-                                      fontSize: '0.85rem', 
-                                      lineHeight: '1.3',
-                                      fontFamily: 'Poppins, sans-serif',
-                                      color: '#1a202c',
-                                      maxWidth: '85%'
-                                    }}
-                                  >
-                                    {notification.title}
-                                  </strong>
-                                  {!notification.read && (
-                                    <span 
-                                      className="badge rounded-circle flex-shrink-0" 
-                                      style={{ 
-                                        width: '8px', 
-                                        height: '8px', 
-                                        padding: '0',
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)'
-                                      }}
-                                      title="Unread"
-                                    />
-                                  )}
-                                </div>
-                                <small 
-                                  className="d-block text-muted mb-1" 
+                          <div className="position-relative">
+                            <button
+                              className={`dropdown-item ${!notification.read ? 'bg-light' : ''} position-relative`}
+                              onClick={() => handleNotificationClick(notification)}
+                              style={{ 
+                                padding: '0.75rem 1rem',
+                                borderLeft: !notification.read ? '3px solid #667eea' : '3px solid transparent',
+                                transition: 'all 0.2s',
+                                background: !notification.read ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' : 'transparent',
+                                border: 'none',
+                                width: '100%',
+                                textAlign: 'left',
+                                paddingRight: '2.5rem' // Make space for dismiss button
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(102, 126, 234, 0.08)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = !notification.read 
+                                  ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' 
+                                  : 'transparent';
+                              }}
+                            >
+                              <div className="d-flex align-items-start">
+                                <div 
+                                  className="d-flex align-items-center justify-content-center flex-shrink-0"
                                   style={{ 
-                                    fontSize: '0.8rem', 
-                                    lineHeight: '1.4',
-                                    color: '#4a5568',
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: '2',
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden'
+                                    fontSize: '1.2rem', 
+                                    marginRight: '10px',
+                                    minWidth: '32px',
+                                    height: '32px',
+                                    background: 'rgba(102, 126, 234, 0.1)',
+                                    borderRadius: '8px'
                                   }}
                                 >
-                                  {notification.message}
-                                </small>
-                                <small 
-                                  className="text-muted d-flex align-items-center" 
-                                  style={{ fontSize: '0.7rem', color: '#718096' }}
-                                >
-                                  <span className="me-1" style={{ fontSize: '0.8rem' }}>🕐</span>
-                                  {getTimeAgo(notification.timestamp)}
-                                </small>
+                                  {notification.icon || getNotificationIcon(notification.type)}
+                                </div>
+                                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                                  <div className="d-flex justify-content-between align-items-start mb-1">
+                                    <strong 
+                                      className="d-block text-truncate" 
+                                      style={{ 
+                                        fontSize: '0.85rem', 
+                                        lineHeight: '1.3',
+                                        fontFamily: 'Poppins, sans-serif',
+                                        color: '#1a202c',
+                                        maxWidth: '85%'
+                                      }}
+                                    >
+                                      {notification.title}
+                                    </strong>
+                                    {!notification.read && (
+                                      <span 
+                                        className="badge rounded-circle flex-shrink-0" 
+                                        style={{ 
+                                          width: '8px', 
+                                          height: '8px', 
+                                          padding: '0',
+                                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                          boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)'
+                                        }}
+                                        title="Unread"
+                                      />
+                                    )}
+                                  </div>
+                                  <small 
+                                    className="d-block text-muted mb-1" 
+                                    style={{ 
+                                      fontSize: '0.8rem', 
+                                      lineHeight: '1.4',
+                                      color: '#4a5568',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: '2',
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden'
+                                    }}
+                                  >
+                                    {notification.message}
+                                  </small>
+                                  <small 
+                                    className="text-muted d-flex align-items-center" 
+                                    style={{ fontSize: '0.7rem', color: '#718096' }}
+                                  >
+                                    <span className="me-1" style={{ fontSize: '0.8rem' }}>🕐</span>
+                                    {getTimeAgo(notification.timestamp)}
+                                  </small>
+                                </div>
                               </div>
-                            </div>
-                          </button>
+                            </button>
+                            {/* Dismiss button */}
+                            <button 
+                              className="position-absolute top-0 end-0 mt-2 me-2 btn btn-sm btn-light"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent triggering the notification click
+                                removeNotification(notification.id);
+                              }}
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.2rem 0.4rem',
+                                lineHeight: '1',
+                                opacity: '0.6',
+                                zIndex: '1',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#6c757d'
+                              }}
+                              title="Dismiss notification"
+                            >
+                              ×
+                            </button>
+                          </div>
                         </li>
                         {index < sortedNotifications.slice(0, 10).length - 1 && (
                           <li><hr className="dropdown-divider my-0" style={{ opacity: '0.08' }} /></li>
@@ -463,11 +521,10 @@ export default function Navbar() {
 
               {/* User Profile Dropdown - Enhanced */}
               <li className="nav-item dropdown">
-                <a
-                  className="nav-link d-flex align-items-center px-3 py-2 rounded-3"
-                  href="#"
+                <button
+                  className="nav-link d-flex align-items-center px-3 py-2 rounded-3 border-0"
                   id="userDropdown"
-                  role="button"
+                  type="button"
                   data-bs-toggle="dropdown"
                   style={{
                     background: 'rgba(255,255,255,0.15)',
@@ -505,7 +562,7 @@ export default function Navbar() {
                       {getRoleDisplay()}
                     </div>
                   </div>
-                </a>
+                </button>
 
                 <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2" 
                     style={{ 

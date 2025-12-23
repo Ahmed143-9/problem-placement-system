@@ -1,13 +1,46 @@
-/* 🚫 Disable hover, zoom & animation only for table */
+/* 🚫 Disable ALL hover, zoom & animation effects for table */
 .table,
-.table * {
+.table *,
+.table-hover,
+.table-hover *,
+.table-hover tbody tr,
+.table-hover tbody tr td,
+.table-hover tbody tr th {
   transition: none !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+/* 🚫 Completely disable hover highlight */
+.table-hover tbody tr:hover,
+.table-hover thead th:hover,
+.table-hover tbody td:hover {
+  background-color: inherit !important;
+  cursor: default !important;
   transform: none !important;
 }
 
-/* 🚫 Disable hover highlight */
-.table-hover tbody tr:hover {
+/* 🚫 Disable all hover effects on table elements */
+.table-hover tbody tr:hover td,
+.table-hover tbody tr:hover th,
+.table-hover thead th:hover,
+.table-hover tbody td:hover {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: inherit !important;
+  cursor: default !important;
+  transform: none !important;
+}
+
+/* 🚫 Disable Bootstrap table hover effects */
+.table > :not(caption) > * > *:hover {
   background-color: inherit !important;
   cursor: default !important;
+  transform: none !important;
 }
-    
+
+/* 🚫 Disable any remaining hover effects */
+*:hover {
+  transition: none !important;
+  transform: none !important;
+}

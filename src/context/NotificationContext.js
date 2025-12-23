@@ -1,26 +1,39 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
+
+// Add auto-remove delay constant
+const AUTO_REMOVE_DELAY = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const AUTO_DISMISS_DELAY = 5000; // 5 seconds for auto-dismiss after being read
 
 export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
-  useEffect(() => {
-    if (user) {
-      loadNotifications();
+  // Load notifications with cleanup
+  const loadNotifications = useCallback(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
     }
-  }, [user]);
 
-  const loadNotifications = () => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
       
-      // Filter notifications based on user role
-      const userNotifications = allNotifications.filter(n => {
-        // Admin and Team Leader see all notifications
+      // Filter and clean old notifications
+      const now = new Date();
+      const filteredNotifications = allNotifications.filter(n => {
+        // Remove notifications older than 7 days
+        const notificationTime = new Date(n.timestamp);
+        if (now - notificationTime > AUTO_REMOVE_DELAY) {
+          return false;
+        }
+        
+        // Filter based on user role
         if (user?.role === 'admin' || user?.role === 'team_leader') {
           return n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name;
         }
@@ -28,44 +41,102 @@ export const NotificationProvider = ({ children }) => {
         // Regular users only see notifications specifically for them
         return n.userId === user?.id || n.targetUsername === user?.name;
       });
+
+      // Save filtered notifications back to localStorage
+      if (filteredNotifications.length !== allNotifications.length) {
+        localStorage.setItem('notifications', JSON.stringify(filteredNotifications));
+      }
+
+      setNotifications(filteredNotifications);
+      setUnreadCount(filteredNotifications.filter(n => !n.read).length);
+      setLastUpdate(Date.now()); // Trigger re-render
       
-      setNotifications(userNotifications);
-      setUnreadCount(userNotifications.filter(n => !n.read).length);
     } catch (error) {
       console.error('Failed to load notifications:', error);
     }
-  };
+  }, [user]);
 
+  // Load notifications on mount and when user changes
+  useEffect(() => {
+    loadNotifications();
+    
+    // Set up interval to periodically check for new notifications
+    const intervalId = setInterval(loadNotifications, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [loadNotifications]);
+
+  // Add notification with auto-dismiss timer
   const addNotification = (notification) => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
       const newNotification = {
-        id: Date.now(),
+        id: Date.now() + Math.random(), // Ensure unique ID
         timestamp: new Date().toISOString(),
         read: false,
+        autoDismiss: notification.priority !== 'URGENT', // Only auto-dismiss non-urgent notifications
         ...notification
       };
+      
       allNotifications.push(newNotification);
       localStorage.setItem('notifications', JSON.stringify(allNotifications));
+      
+      // Reload notifications
       loadNotifications();
+      
+      // Auto-dismiss after delay (for non-critical notifications)
+      // Only set the timeout if the notification should auto-dismiss
+      if (newNotification.autoDismiss) {
+        setTimeout(() => {
+          // Check if notification still exists before removing
+          const currentNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+          const notificationExists = currentNotifications.some(n => n.id === newNotification.id);
+          if (notificationExists) {
+            removeNotification(newNotification.id);
+          }
+        }, AUTO_DISMISS_DELAY);
+      }
+      
+      // Log for debugging
+      console.log('Notification added:', newNotification.title || 'Untitled', 'Auto-dismiss:', newNotification.autoDismiss);
+      
     } catch (error) {
       console.error('Failed to add notification:', error);
     }
   };
 
+  // Mark as read with immediate UI update
   const markAsRead = (notificationId) => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const updatedNotifications = allNotifications.map(n =>
-        n.id === notificationId ? { ...n, read: true } : n
-      );
-      localStorage.setItem('notifications', JSON.stringify(updatedNotifications));
-      loadNotifications();
+      const notificationIndex = allNotifications.findIndex(n => n.id === notificationId);
+      
+      if (notificationIndex !== -1) {
+        allNotifications[notificationIndex] = {
+          ...allNotifications[notificationIndex],
+          read: true,
+          readAt: new Date().toISOString()
+        };
+        
+        localStorage.setItem('notifications', JSON.stringify(allNotifications));
+        
+        // Update state immediately
+        setNotifications(prev => prev.map(n => 
+          n.id === notificationId ? { ...n, read: true, readAt: new Date().toISOString() } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setLastUpdate(Date.now());
+        
+        // Log for debugging
+        const notification = allNotifications[notificationIndex];
+        console.log('Notification marked as read:', notification.title || 'Untitled', 'ID:', notificationId);
+      }
     } catch (error) {
       console.error('Failed to mark as read:', error);
     }
   };
 
+  // Mark all as read
   const markAllAsRead = () => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
@@ -73,20 +144,27 @@ export const NotificationProvider = ({ children }) => {
         // Only mark as read if it's for current user
         if (user?.role === 'admin' || user?.role === 'team_leader') {
           if (n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name) {
-            return { ...n, read: true };
+            return { ...n, read: true, readAt: new Date().toISOString() };
           }
         } else if (n.userId === user?.id || n.targetUsername === user?.name) {
-          return { ...n, read: true };
+          return { ...n, read: true, readAt: new Date().toISOString() };
         }
         return n;
       });
+      
       localStorage.setItem('notifications', JSON.stringify(updatedNotifications));
-      loadNotifications();
+      
+      // Update state immediately
+      setNotifications(prev => prev.map(n => ({ ...n, read: true, readAt: new Date().toISOString() })));
+      setUnreadCount(0);
+      setLastUpdate(Date.now());
+      
     } catch (error) {
       console.error('Failed to mark all as read:', error);
     }
   };
 
+  // Clear notifications with immediate UI update
   const clearNotifications = () => {
     try {
       const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
@@ -96,11 +174,46 @@ export const NotificationProvider = ({ children }) => {
         }
         return !(n.userId === user?.id || n.targetUsername === user?.name);
       });
+      
       localStorage.setItem('notifications', JSON.stringify(otherUserNotifications));
+      
+      // Update state immediately
       setNotifications([]);
       setUnreadCount(0);
+      setLastUpdate(Date.now());
+      
     } catch (error) {
       console.error('Failed to clear notifications:', error);
+    }
+  };
+
+  // Remove a specific notification
+  const removeNotification = (notificationId) => {
+    try {
+      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const notificationToRemove = allNotifications.find(n => n.id === notificationId);
+      
+      if (!notificationToRemove) {
+        console.log('Notification not found for removal:', notificationId);
+        return; // Notification already removed
+      }
+      
+      const filteredNotifications = allNotifications.filter(n => n.id !== notificationId);
+      
+      localStorage.setItem('notifications', JSON.stringify(filteredNotifications));
+      
+      // Update state immediately
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setUnreadCount(prev => {
+        return notificationToRemove && !notificationToRemove.read ? Math.max(0, prev - 1) : prev;
+      });
+      setLastUpdate(Date.now());
+      
+      // Log for debugging
+      console.log('Notification removed:', notificationToRemove.title || 'Untitled', 'ID:', notificationId);
+      
+    } catch (error) {
+      console.error('Failed to remove notification:', error);
     }
   };
 
@@ -535,11 +648,13 @@ export const NotificationProvider = ({ children }) => {
         // Core notification functions
         notifications,
         unreadCount,
+        lastUpdate,
         addNotification,
         markAsRead,
         markAllAsRead,
         clearNotifications,
         loadNotifications,
+        removeNotification,
 
         // Helper functions
         getUserIdByUsername,

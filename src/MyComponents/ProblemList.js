@@ -382,9 +382,6 @@ export default function ProblemList() {
                 <Link 
                   to={getDashboardPath()}
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Dashboard"
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -396,9 +393,6 @@ export default function ProblemList() {
                 <Link 
                   to="/problem/create" 
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Create Problem"
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -421,9 +415,6 @@ export default function ProblemList() {
                 <Link 
                   to="/reports" 
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Reports"
                 >
                   <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -436,9 +427,6 @@ export default function ProblemList() {
                   <Link 
                     to="/admin" 
                     className="nav-link text-white rounded d-flex align-items-center"
-                    style={{ transition: 'all 0.2s ease' }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     title="Admin Panel"
                   >
                     <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 

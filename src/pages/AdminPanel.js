@@ -6,7 +6,7 @@ import {
   FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, 
   FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, 
   FaChevronLeft, FaChevronRight, FaSpinner, FaInfoCircle, FaSync, 
-  FaBell, FaShieldAlt, FaUserCheck 
+  FaBell, FaShieldAlt, FaUserCheck, FaGlobe
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
@@ -1000,8 +1000,22 @@ const handleToggleStatus = async (userId) => {
                   </Link>
                 </li>
               )}
-            </ul>
-          </div>
+              
+              {/* Add Domain Status option for Admin and Team Leader */}
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <li className="nav-item mb-2">
+                  <Link 
+                    to="/domain-status" 
+                    className="nav-link text-white rounded d-flex align-items-center"
+                    style={sidebarLinkStyle}
+                    title="Domain Status"
+                  >
+                    <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+                  </Link>
+                </li>
+              )}
+            </ul>          </div>
         </div>
 
         {/* Main Content */}

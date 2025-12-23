@@ -1,0 +1,61 @@
+/* Disable all hover effects globally */
+* {
+  transition: none !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+*:hover {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: inherit !important;
+  cursor: default !important;
+  transform: none !important;
+}
+
+/* Specific overrides for sidebar and notification elements */
+.nav-link:hover,
+.dropdown-item:hover,
+.btn:hover,
+.navbar-nav .nav-link:hover {
+  background-color: inherit !important;
+  color: inherit !important;
+  border-color: inherit !important;
+  transform: none !important;
+}
+
+/* Disable specific Bootstrap hover effects */
+.table-hover tbody tr:hover,
+.table-hover tbody tr td:hover,
+.table-hover tbody tr th:hover {
+  background-color: inherit !important;
+}
+
+/* Notification dropdown */
+.dropdown-menu {
+  transform: none !important;
+}
+
+/* Sidebar specific overrides */
+.sidebar-nav-link:hover,
+.bg-dark .nav-link:hover,
+.sidebar .nav-link:hover,
+.nav-link.text-white:hover {
+  background-color: inherit !important;
+  color: inherit !important;
+  transform: none !important;
+}
+
+/* Ensure sidebar maintains its background and text colors */
+.bg-dark {
+  background-color: #212529 !important;
+}
+
+.bg-dark .nav-link.text-white {
+  color: #ffffff !important;
+}
+
+/* Override any hover effects on text-white classes */
+.text-white:hover {
+  color: #ffffff !important;
+}

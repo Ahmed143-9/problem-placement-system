@@ -48,6 +48,12 @@ export default function ProblemDetails() {
     }
   }, [id, showTransferModal]);
 
+  // Force re-fetch when id changes to handle React Router v6 component reuse
+  useEffect(() => {
+    setProblem(null);
+    setLoading(true);
+    fetchProblemDetails();
+  }, [id]);
   // Load available users when assign modal opens
   useEffect(() => {
     if (showAssignModal) {
@@ -832,7 +838,6 @@ const toggleSidebar = () => {
                 <Link 
                   to="/dashboard" 
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
                   title="Dashboard"
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -843,7 +848,6 @@ const toggleSidebar = () => {
                 <Link 
                   to="/problem/create" 
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
                   title="Create Problem"
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -854,7 +858,6 @@ const toggleSidebar = () => {
                 <Link 
                   to="/problems" 
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
                   title="All Problems"
                 >
                   <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -865,14 +868,12 @@ const toggleSidebar = () => {
                 <Link 
                   to="/reports" 
                   className="nav-link text-white rounded d-flex align-items-center"
-                  style={{ transition: 'all 0.2s ease' }}
                   title="Reports"
                 >
                   <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
-              </li>
-              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+              </li>              {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <>
                   <li className="nav-item mb-2">
                     <Link 
