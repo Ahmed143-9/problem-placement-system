@@ -5,6 +5,34 @@
   animation: none !important;
 }
 
+/* Allow toast notifications to have transitions and animations */
+.Toastify__toast,
+.Toastify__toast-container {
+  transition: all 0.3s ease !important;
+}
+
+/* Allow toast enter/exit animations */
+.Toastify__bounce-enter--top-right,
+.Toastify__bounce-exit--top-right {
+  animation-duration: 0.7s !important;
+}
+
+.Toastify__slide-enter,
+.Toastify__slide-exit {
+  animation-duration: 0.3s !important;
+}
+
+/* Allow toast close button to work */
+.Toastify__close-button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Allow toast to be dismissible */
+.Toastify__toast--dismissible {
+  pointer-events: auto !important;
+}
+
 *:hover {
   background-color: inherit !important;
   color: inherit !important;

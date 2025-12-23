@@ -23,6 +23,7 @@ export default function Navbar() {
     markAsRead, 
     markAllAsRead, 
     clearNotifications,
+    clearAllNotifications,
     loadNotifications,
     removeNotification
   } = useNotifications();
@@ -30,6 +31,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     logout();
+    clearAllNotifications(); // Clear all notifications on logout
     toast.success('Logged out successfully!');
     navigate('/login');
   };
@@ -50,6 +52,14 @@ export default function Navbar() {
     // Navigate if needed
     if (notification.problemId) {
       navigate(`/problem/${notification.problemId}`);
+    }
+    
+    // If notification has autoDismiss enabled, remove it after a short delay
+    // to allow the user to see that it was marked as read
+    if (notification.autoDismiss !== false) {
+      setTimeout(() => {
+        removeNotification(notification.id);
+      }, 2000); // 2 seconds delay before removal
     }
   };
 
@@ -111,7 +121,13 @@ export default function Navbar() {
       // Only auto-dismiss if it hasn't been read yet and has autoDismiss enabled
       if (!notification.read && notification.autoDismiss !== false) {
         const timer = setTimeout(() => {
-          removeNotification(notification.id);
+          // Check if the notification still exists before removing
+          const currentNotifications = notifications;
+          const notificationStillExists = currentNotifications.some(n => n.id === notification.id);
+          
+          if (notificationStillExists) {
+            removeNotification(notification.id);
+          }
         }, 15000); // 15 seconds to give users more time to see the notification
         timers.push(timer);
       }
@@ -126,6 +142,11 @@ export default function Navbar() {
   // Force refresh notifications when component mounts
   useEffect(() => {
     loadNotifications();
+    
+    // Set up interval to periodically refresh notifications
+    const intervalId = setInterval(loadNotifications, 10000); // Refresh every 10 seconds
+    
+    return () => clearInterval(intervalId);
   }, [loadNotifications]);
 
   return (

@@ -15,9 +15,33 @@ export const NotificationProvider = ({ children }) => {
 
   // Load notifications with cleanup
   const loadNotifications = useCallback(() => {
+    // If no user, just load general notifications that don't require user context
     if (!user) {
-      setNotifications([]);
-      setUnreadCount(0);
+      try {
+        const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+        
+        // Filter and clean old notifications
+        const now = new Date();
+        const filteredNotifications = allNotifications.filter(n => {
+          // Remove notifications older than 7 days
+          const notificationTime = new Date(n.timestamp);
+          if (now - notificationTime > AUTO_REMOVE_DELAY) {
+            return false;
+          }
+          
+          // For non-logged in users, only show general notifications
+          return !n.userId && !n.targetUsername && !n.forAdminOrLeader; // General notifications
+        });
+
+        setNotifications(filteredNotifications);
+        setUnreadCount(filteredNotifications.filter(n => !n.read).length);
+        setLastUpdate(Date.now()); // Trigger re-render
+        
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+        setNotifications([]);
+        setUnreadCount(0);
+      }
       return;
     }
 
@@ -35,11 +59,11 @@ export const NotificationProvider = ({ children }) => {
         
         // Filter based on user role
         if (user?.role === 'admin' || user?.role === 'team_leader') {
-          return n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name;
+          return n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name || (!n.userId && !n.targetUsername && !n.forAdminOrLeader); // Include general notifications
         }
-        
-        // Regular users only see notifications specifically for them
-        return n.userId === user?.id || n.targetUsername === user?.name;
+              
+        // Regular users see their specific notifications and general ones
+        return (n.userId === user?.id || n.targetUsername === user?.name) || (!n.userId && !n.targetUsername && !n.forAdminOrLeader); // Include general notifications
       });
 
       // Save filtered notifications back to localStorage
@@ -184,6 +208,21 @@ export const NotificationProvider = ({ children }) => {
       
     } catch (error) {
       console.error('Failed to clear notifications:', error);
+    }
+  };
+  
+  // Clear all notifications (for logout)
+  const clearAllNotifications = () => {
+    try {
+      localStorage.setItem('notifications', JSON.stringify([]));
+      
+      // Update state immediately
+      setNotifications([]);
+      setUnreadCount(0);
+      setLastUpdate(Date.now());
+      
+    } catch (error) {
+      console.error('Failed to clear all notifications:', error);
     }
   };
 
@@ -653,6 +692,7 @@ export const NotificationProvider = ({ children }) => {
         markAsRead,
         markAllAsRead,
         clearNotifications,
+        clearAllNotifications,
         loadNotifications,
         removeNotification,
 

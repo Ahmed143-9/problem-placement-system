@@ -101,16 +101,8 @@ export default function Login() {
       console.log('📊 Login result:', result);
 
       if (result.success) {
-        // Add notification instead of toast
-        addNotification({
-          type: 'login_success',
-          title: '✅ Login Successful',
-          message: result.message || 'You have successfully logged in',
-          priority: 'INFO', // This will auto-dismiss after a while
-          icon: '✅',
-          color: 'success',
-          timestamp: new Date().toISOString()
-        });
+        // Show toast notification for login success
+        toast.success('You have successfully logged in');
         
         // Check if password needs to be changed
         if (result.force_password) {
