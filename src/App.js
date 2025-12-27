@@ -14,6 +14,7 @@ import ProblemList from "./MyComponents/ProblemList";
 import MyIssues from "./pages/MyIssues";
 import ProblemDetails from "./MyComponents/ProblemDetails";
 import Reports from "./pages/Reports";
+import RoleManagement from "./pages/RoleManagement";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
@@ -125,6 +126,16 @@ function App() {
                 <ProtectedRoute>
                   <DomainStatus />
                 </ProtectedRoute>
+              }
+            />
+
+            {/* Role Management Route */}
+            <Route
+              path="/roles"
+              element={
+                <AdminRoute>
+                  <RoleManagement />
+                </AdminRoute>
               }
             />
 

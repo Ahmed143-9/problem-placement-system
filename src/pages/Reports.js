@@ -5,9 +5,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
-import { 
-  FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, 
-  FaUsersCog, FaChevronLeft, FaChevronRight, FaDownload, 
+import {
+  FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt,
+  FaUsersCog, FaChevronLeft, FaChevronRight, FaDownload,
   FaPrint, FaFilter, FaCalendarAlt, FaFilePdf, FaSpinner, FaGlobe
 } from 'react-icons/fa';
 
@@ -22,8 +22,8 @@ export default function Reports() {
 
   // Add the getDashboardPath function
   const getDashboardPath = () => {
-    return user?.role === 'admin' || user?.role === 'team_leader' 
-      ? '/dashboard' 
+    return user?.role === 'admin' || user?.role === 'team_leader'
+      ? '/dashboard'
       : '/employee-dashboard';
   };
 
@@ -57,17 +57,17 @@ export default function Reports() {
       }
 
       const data = await response.json();
-      
+
       if (data.status === 'success') {
         let filteredData = data.data;
-        
+
         // Filter based on user role
         if (!(user?.role === 'admin' || user?.role === 'team_leader')) {
-          filteredData = filteredData.filter(p => 
+          filteredData = filteredData.filter(p =>
             p.created_by?.id === user?.id || p.assigned_to?.id === user?.id
           );
         }
-        
+
         setProblems(filteredData);
         setFilteredProblems(filteredData);
       } else {
@@ -115,7 +115,7 @@ export default function Reports() {
   const extractUsersFromProblems = () => {
     const userSet = new Set();
     const userList = [];
-    
+
     problems.forEach(problem => {
       // Add created_by user
       if (problem.created_by?.id && problem.created_by?.name) {
@@ -129,7 +129,7 @@ export default function Reports() {
           });
         }
       }
-      
+
       // Add assigned_to user
       if (problem.assigned_to?.id && problem.assigned_to?.name) {
         const userKey = `assignee_${problem.assigned_to.id}`;
@@ -143,7 +143,7 @@ export default function Reports() {
         }
       }
     });
-    
+
     setUsers(userList);
     console.log('Extracted users from problems data:', userList.length);
   };
@@ -181,13 +181,13 @@ export default function Reports() {
     const now = new Date();
     const diffTime = Math.abs(now - created);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) return '1 day';
     if (diffDays < 30) return `${diffDays} days`;
-    
+
     const diffMonths = Math.floor(diffDays / 30);
     const remainingDays = diffDays % 30;
-    
+
     if (remainingDays === 0) return `${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
     return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ${remainingDays} day${remainingDays > 1 ? 's' : ''}`;
   };
@@ -214,45 +214,45 @@ export default function Reports() {
   // Apply filters to problems
   const applyFilters = () => {
     let result = [...problems];
-    
+
     // Apply department filter
     if (filters.department) {
       result = result.filter(p => p.department === filters.department);
     }
-    
+
     // Apply priority filter
     if (filters.priority) {
       result = result.filter(p => p.priority === filters.priority);
     }
-    
+
     // Apply status filter
     if (filters.status) {
       result = result.filter(p => p.status === filters.status);
     }
-    
+
     // Apply created by filter
     if (filters.createdBy) {
       result = result.filter(p => p.created_by?.id?.toString() === filters.createdBy);
     }
-    
+
     // Apply assigned to filter
     if (filters.assignedTo) {
       result = result.filter(p => p.assigned_to?.id?.toString() === filters.assignedTo);
     }
-    
+
     // Apply date range filters
     if (filters.startDate) {
       const startDate = new Date(filters.startDate);
       result = result.filter(p => new Date(p.created_at) >= startDate);
     }
-    
+
     if (filters.endDate) {
       const endDate = new Date(filters.endDate);
       // Set end time to end of day
       endDate.setHours(23, 59, 59, 999);
       result = result.filter(p => new Date(p.created_at) <= endDate);
     }
-    
+
     setFilteredProblems(result);
   };
 
@@ -272,7 +272,7 @@ export default function Reports() {
         p.resolved_at || 'N/A'
       ])
     ].map(row => row.join(',')).join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -325,12 +325,12 @@ export default function Reports() {
   return (
     <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: '#f8f9fa' }}>
       <Navbar />
-      
+
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <div 
+        <div
           className="bg-dark text-white position-relative"
-          style={{ 
+          style={{
             width: sidebarMinimized ? '70px' : '250px',
             minHeight: '100%',
             transition: 'width 0.3s ease'
@@ -353,8 +353,8 @@ export default function Reports() {
               cursor: 'pointer',
             }}
           >
-            {sidebarMinimized 
-              ? <FaChevronRight size={14} color="#333" /> 
+            {sidebarMinimized
+              ? <FaChevronRight size={14} color="#333" />
               : <FaChevronLeft size={14} color="#333" />
             }
           </button>
@@ -367,67 +367,81 @@ export default function Reports() {
             )}
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
-                <Link 
-                  to={getDashboardPath()} 
+                <Link
+                  to={getDashboardPath()}
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Dashboard"
                 >
-                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link 
-                  to="/problem/create" 
+                <Link
+                  to="/problem/create"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="Create Problem"
                 >
-                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link 
-                  to="/problems" 
+                <Link
+                  to="/problems"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   title="All Problems"
                 >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link 
-                  to="/reports" 
+                <Link
+                  to="/reports"
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
                   title="Reports"
                 >
-                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
-              
+
               {/* Add Domain Status option for Admin and Team Leader */}
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <li className="nav-item mb-2">
-                  <Link 
-                    to="/domain-status" 
+                  <Link
+                    to="/domain-status"
                     className="nav-link text-white rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
                     title="Domain Status"
                   >
-                    <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+                  </Link>
+                </li>
+              )}
+
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <li className="nav-item mb-2">
+                  <Link
+                    to="/roles"
+                    className="nav-link text-white rounded d-flex align-items-center"
+                    style={sidebarLinkStyle}
+                    title="Role Management"
+                  >
+                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
                   </Link>
                 </li>
               )}
@@ -452,7 +466,7 @@ export default function Reports() {
                 </button>
               </div>
             </div>
-            
+
             <div className="card-body">
               {/* Filters Section */}
               <div className="card mb-4">
@@ -471,10 +485,10 @@ export default function Reports() {
                   <div className="row g-3">
                     <div className="col-md-3">
                       <label className="form-label">Department</label>
-                      <select 
+                      <select
                         className="form-control"
                         value={filters.department}
-                        onChange={(e) => setFilters({...filters, department: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, department: e.target.value })}
                       >
                         <option value="">All Departments</option>
                         {getUniqueDepartments().map(dept => (
@@ -482,13 +496,13 @@ export default function Reports() {
                         ))}
                       </select>
                     </div>
-                    
+
                     <div className="col-md-3">
                       <label className="form-label">Priority</label>
-                      <select 
+                      <select
                         className="form-control"
                         value={filters.priority}
-                        onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
                       >
                         <option value="">All Priorities</option>
                         {getUniquePriorities().map(priority => (
@@ -496,13 +510,13 @@ export default function Reports() {
                         ))}
                       </select>
                     </div>
-                    
+
                     <div className="col-md-3">
                       <label className="form-label">Status</label>
-                      <select 
+                      <select
                         className="form-control"
                         value={filters.status}
-                        onChange={(e) => setFilters({...filters, status: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                       >
                         <option value="">All Statuses</option>
                         {getUniqueStatuses().map(status => (
@@ -510,13 +524,13 @@ export default function Reports() {
                         ))}
                       </select>
                     </div>
-                    
+
                     <div className="col-md-3">
                       <label className="form-label">Created By</label>
-                      <select 
+                      <select
                         className="form-control"
                         value={filters.createdBy}
-                        onChange={(e) => setFilters({...filters, createdBy: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, createdBy: e.target.value })}
                       >
                         <option value="">All Users</option>
                         {users.map(user => (
@@ -524,13 +538,13 @@ export default function Reports() {
                         ))}
                       </select>
                     </div>
-                    
+
                     <div className="col-md-3">
                       <label className="form-label">Assigned To</label>
-                      <select 
+                      <select
                         className="form-control"
                         value={filters.assignedTo}
-                        onChange={(e) => setFilters({...filters, assignedTo: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value })}
                       >
                         <option value="">All Users</option>
                         {users.map(user => (
@@ -538,30 +552,30 @@ export default function Reports() {
                         ))}
                       </select>
                     </div>
-                    
+
                     <div className="col-md-3">
                       <label className="form-label">Start Date</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         className="form-control"
                         value={filters.startDate}
-                        onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                       />
                     </div>
-                    
+
                     <div className="col-md-3">
                       <label className="form-label">End Date</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         className="form-control"
                         value={filters.endDate}
-                        onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                        onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
                       />
                     </div>
                   </div>
                 </div>
               </div>
-              
+
               {/* Report Summary */}
               <div className="row g-3 mb-4">
                 <div className="col-md-3">
@@ -603,7 +617,7 @@ export default function Reports() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Problems Table */}
               {loading ? (
                 <div className="text-center py-5">
@@ -645,20 +659,18 @@ export default function Reports() {
                             </td>
                             <td>{problem.department}</td>
                             <td>
-                              <span className={`badge ${
-                                problem.priority === 'high' ? 'bg-danger' :
-                                problem.priority === 'medium' ? 'bg-warning' :
-                                'bg-info'
-                              }`}>
+                              <span className={`badge ${problem.priority === 'high' ? 'bg-danger' :
+                                  problem.priority === 'medium' ? 'bg-warning' :
+                                    'bg-info'
+                                }`}>
                                 {problem.priority}
                               </span>
                             </td>
                             <td>
-                              <span className={`badge ${
-                                problem.status === 'pending' ? 'bg-warning' :
-                                problem.status === 'in_progress' ? 'bg-primary' :
-                                'bg-success'
-                              }`}>
+                              <span className={`badge ${problem.status === 'pending' ? 'bg-warning' :
+                                  problem.status === 'in_progress' ? 'bg-primary' :
+                                    'bg-success'
+                                }`}>
                                 {problem.status.replace('_', ' ')}
                               </span>
                             </td>
@@ -666,7 +678,7 @@ export default function Reports() {
                             <td>{getUserNameFromAssignedTo(problem.assigned_to)}</td>
                             <td>{new Date(problem.created_at).toLocaleDateString()}</td>
                             <td>
-                              {problem.resolved_at 
+                              {problem.resolved_at
                                 ? new Date(problem.resolved_at).toLocaleDateString()
                                 : 'N/A'
                               }
