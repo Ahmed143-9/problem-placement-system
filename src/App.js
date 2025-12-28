@@ -33,7 +33,7 @@ function App() {
     <AuthProvider>
       <NotificationProvider>
         <Router>
-          <ToastContainer position="top-right" autoClose={3000} />
+          <ToastContainer position="top-right" autoClose={3000} pauseOnHover={false} closeOnClick={true} draggable={false} newestOnTop closeButton={true} hideProgressBar={true} limit={5} />
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<Login />} />

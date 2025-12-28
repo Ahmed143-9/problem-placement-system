@@ -2,6 +2,11 @@
 * {
   transition: none !important;
   transform: none !important;
+  /* Don't override animations for toast notifications */
+}
+
+/* Specifically disable animations for all elements except toasts */
+*:not(.Toastify__toast):not(.Toastify__toast-container):not(.Toastify__bounce-enter--top-right):not(.Toastify__bounce-exit--top-right):not(.Toastify__slide-enter):not(.Toastify__slide-exit):not(.Toastify__close-button):not(.Toastify__bounce-appear):not(.Toastify__bounce-in):not(.Toastify__bounce-out) {
   animation: none !important;
 }
 
@@ -9,27 +14,120 @@
 .Toastify__toast,
 .Toastify__toast-container {
   transition: all 0.3s ease !important;
+  animation: all 0.3s ease !important;
+  /* Ensure timeout functionality works */
+  animation-play-state: running !important;
 }
 
 /* Allow toast enter/exit animations */
-.Toastify__bounce-enter--top-right,
-.Toastify__bounce-exit--top-right {
+.Toastify__bounce-enter--top-right {
   animation-duration: 0.7s !important;
+  animation-fill-mode: both !important;
+}
+
+.Toastify__bounce-exit--top-right {
+  animation-duration: 0.2s !important;
+  animation-fill-mode: both !important;
 }
 
 .Toastify__slide-enter,
 .Toastify__slide-exit {
   animation-duration: 0.3s !important;
+  animation-fill-mode: both !important;
 }
 
 /* Allow toast close button to work */
 .Toastify__close-button {
   pointer-events: auto !important;
   cursor: pointer !important;
+  z-index: 9999 !important;
+  transition: all 0.1s ease !important;
+}
+
+/* Make close button immediate */
+.Toastify__close-button:active {
+  transform: scale(0.9) !important;
+  transition: all 0.1s ease !important;
+}
+
+/* Ensure toast dismisses immediately when closed */
+.Toastify__toast--removed {
+  animation: fadeOut 0.2s ease-in-out forwards !important;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
 }
 
 /* Allow toast to be dismissible */
 .Toastify__toast--dismissible {
+  pointer-events: auto !important;
+}
+
+/* Prevent hover effects on toasts but preserve exit animations */
+.Toastify__toast:hover {
+  transform: none !important;
+  transition: none !important;
+  /* Don't override animations for exit transitions */
+}
+
+/* Ensure toast animations work properly */
+@keyframes Toastify__bounceInRight {
+  from, 60%, 75%, 90%, to {
+    animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  from {
+    opacity: 0;
+    transform: translate3d(3000px, 0, 0);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(-25px, 0, 0);
+  }
+  75% {
+    transform: translate3d(10px, 0, 0);
+  }
+  90% {
+    transform: translate3d(-5px, 0, 0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes Toastify__bounceOutRight {
+  20% {
+    opacity: 1;
+    transform: translate3d(-20px, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(2000px, 0, 0);
+  }
+}
+
+.Toastify__bounce-enter--top-right {
+  animation-name: Toastify__bounceInRight !important;
+}
+
+.Toastify__bounce-exit--top-right {
+  animation-name: Toastify__bounceOutRight !important;
+}
+
+/* Ensure toasts auto-dismiss without pause on hover */
+.Toastify__toast-container *:not(.Toastify__close-button):not(.Toastify__progress-bar):not(.Toastify__toast-body) {
+  pointer-events: none !important;
+}
+
+/* Ensure auto-dismiss timer continues to work */
+.Toastify__progress-bar {
+  pointer-events: none !important;
+  animation-play-state: running !important;
+}
+
+/* Allow click events only on close button */
+.Toastify__close-button {
   pointer-events: auto !important;
 }
 
