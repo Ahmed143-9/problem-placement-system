@@ -1,7 +1,8 @@
 // src/pages/ProblemList.js - COMPLETE BACKEND API VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import { 
@@ -406,7 +407,6 @@ export default function ProblemList() {
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   title="All Problems"
                 >
-                  {/* <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />  */}
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
@@ -446,7 +446,6 @@ export default function ProblemList() {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <h4 className="mb-1 fw-semibold">
-                    {/* <FaExclamationTriangle className="me-2" /> */}
                     All Problems
                   </h4>
                   <small className="opacity-75">Manage and track all reported problems</small>
@@ -525,101 +524,6 @@ export default function ProblemList() {
               </div>
             </div>
 
-            {/* Filters and Actions */}
-            {/* <div className="p-3 border-bottom">
-              <div className="row g-3">
-                <div className="col-md-4">
-                  <form onSubmit={handleSearch} className="input-group">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Search problems..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <button 
-                      className="btn btn-outline-primary"
-                      type="submit"
-                    >
-                      <FaSearch />
-                    </button>
-                    {searchTerm && (
-                      <button 
-                        className="btn btn-outline-secondary"
-                        type="button"
-                        onClick={() => {
-                          setSearchTerm('');
-                          setCurrentPage(1);
-                          loadProblems();
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </form>
-                </div>
-                <div className="col-md-3">
-                  <select
-                    className="form-select"
-                    value={filter}
-                    onChange={(e) => {
-                      setFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="all">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="pending_approval">Pending Approval</option>
-                    <option value="done">Resolved</option>
-                  </select>
-                </div>
-                <div className="col-md-3">
-                  <select
-                    className="form-select"
-                    value={sortField}
-                    onChange={(e) => {
-                      setSortField(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="created_at">Sort by: Date Created</option>
-                    <option value="priority">Sort by: Priority</option>
-                    <option value="status">Sort by: Status</option>
-                    <option value="department">Sort by: Department</option>
-                    <option value="assigned_to">Sort by: Assigned To</option>
-                  </select>
-                </div>
-                <div className="col-md-2">
-                  <div className="d-flex gap-2">
-                    <button 
-                      className="btn btn-outline-primary btn-sm"
-                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                      title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-                    >
-                      {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
-                    </button>
-                    {selectedProblems.length > 0 && (
-                      <button 
-                        className="btn btn-outline-success btn-sm"
-                        onClick={handleExportProblems}
-                        disabled={loadingExport}
-                      >
-                        {loadingExport ? (
-                          <FaSpinner className="fa-spin" />
-                        ) : (
-                          <>
-                            <FaDownload className="me-1" />
-                            Export ({selectedProblems.length})
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div> */}
-
             {/* Problems Table */}
             <div className="card-body p-0">
               {loading ? (
@@ -694,7 +598,6 @@ export default function ProblemList() {
                               className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
                               onClick={() => handleSort('department')}
                             >
-                              {/* <FaBuilding className="me-1" /> */}
                               Department
                               {sortField === 'department' && (
                                 <span className="ms-1">
@@ -721,13 +624,7 @@ export default function ProblemList() {
                               className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
                               onClick={() => handleSort('assigned_to')}
                             >
-                              {/* <FaUser className="me-1" /> */}
                               Assigned To
-                              {/* {sortField === 'assigned_to' && (
-                                <span className="ms-1">
-                                  {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
-                                </span>
-                              )} */}
                             </button>
                           </th>
                           <th style={{ width: '120px' }}>
@@ -748,13 +645,7 @@ export default function ProblemList() {
                               className="btn btn-link p-0 text-decoration-none text-dark fw-semibold"
                               onClick={() => handleSort('created_at')}
                             >
-                              {/* <FaCalendar className="me-1" /> */}
                               Created
-                              {/* {sortField === 'created_at' && (
-                                <span className="ms-1">
-                                  {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
-                                </span>
-                              )} */}
                             </button>
                           </th>
                           <th style={{ width: '100px' }} className="text-center">Actions</th>
@@ -959,7 +850,6 @@ export default function ProblemList() {
           <div className="card shadow-sm border-0 mt-4">
             <div className="card-header bg-white">
               <h6 className="mb-0">
-                {/* <FaInfoCircle className="me-2" /> */}
                 Quick Tips
               </h6>
             </div>
@@ -1009,6 +899,18 @@ export default function ProblemList() {
           </div>
         </div>
       </div>
+      <ToastContainer 
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

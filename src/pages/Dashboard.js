@@ -584,7 +584,7 @@ export default function EmployeeDashboard() {
             <div className="d-flex align-items-center gap-2">
               {lastUpdated && (
                 <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                  Updated: {lastUpdated.toLocaleTimeString()}
+                  
                 </small>
               )}
               {/* <button 

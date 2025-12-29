@@ -204,17 +204,8 @@ export default function Navbar() {
                   className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
                   to={isAdminOrLeader ? "/dashboard" : "/employee-dashboard"}
                   style={{
-                    transition: 'all 0.3s ease',
                     fontWeight: '500',
                     fontSize: '0.95rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
                   <FaHome className="me-2" />
@@ -227,17 +218,8 @@ export default function Navbar() {
                   className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
                   to="/problem/create"
                   style={{
-                    transition: 'all 0.3s ease',
                     fontWeight: '500',
                     fontSize: '0.95rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
                   <FaPlusCircle className="me-2" />
@@ -252,17 +234,8 @@ export default function Navbar() {
                     className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
                     to="/reports"
                     style={{
-                      transition: 'all 0.3s ease',
                       fontWeight: '500',
                       fontSize: '0.95rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
                     <FaFileAlt className="me-2" />
@@ -278,17 +251,8 @@ export default function Navbar() {
                     className="nav-link d-flex align-items-center px-3 py-2 rounded-3 mx-1" 
                     to="/problems"
                     style={{
-                      transition: 'all 0.3s ease',
                       fontWeight: '500',
                       fontSize: '0.95rem'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
                     <FaExclamationCircle className="me-2" />
@@ -313,18 +277,7 @@ export default function Navbar() {
                     height: '45px',
                     background: 'rgba(255,255,255,0.15)',
                     backdropFilter: 'blur(10px)',
-                    transition: 'all 0.3s ease',
                     border: '2px solid transparent'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.borderColor = 'transparent';
                   }}
                 >
                   <FaBell style={{ fontSize: '1.1rem' }} />
@@ -336,8 +289,7 @@ export default function Navbar() {
                         right: '0',
                         fontSize: '0.65rem',
                         padding: '0.3em 0.5em',
-                        boxShadow: '0 2px 8px rgba(220, 53, 69, 0.5)',
-                        animation: 'pulse 2s infinite'
+                        boxShadow: '0 2px 8px rgba(220, 53, 69, 0.5)'
                       }}
                       key={`badge-${unreadCount}`}
                     >
@@ -416,20 +368,11 @@ export default function Navbar() {
                               style={{ 
                                 padding: '0.75rem 1rem',
                                 borderLeft: !notification.read ? '3px solid #667eea' : '3px solid transparent',
-                                transition: 'all 0.2s',
                                 background: !notification.read ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' : 'transparent',
                                 border: 'none',
                                 width: '100%',
                                 textAlign: 'left',
                                 paddingRight: '2.5rem' // Make space for dismiss button
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'rgba(102, 126, 234, 0.08)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = !notification.read 
-                                  ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' 
-                                  : 'transparent';
                               }}
                             >
                               <div className="d-flex align-items-start">
@@ -550,17 +493,8 @@ export default function Navbar() {
                   style={{
                     background: 'rgba(255,255,255,0.15)',
                     backdropFilter: 'blur(10px)',
-                    transition: 'all 0.3s ease',
                     border: '2px solid transparent',
                     fontWeight: '500'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                    e.currentTarget.style.borderColor = 'transparent';
                   }}
                 >
                   <div 
@@ -640,25 +574,22 @@ export default function Navbar() {
 
                   {/* Logout Button */}
                   <li className="p-2">
-                    <button 
-                      className="dropdown-item d-flex align-items-center justify-content-center text-danger rounded-3 py-2"
-                      onClick={handleLogout}
-                      style={{
-                        fontWeight: '600',
-                        transition: 'all 0.2s',
-                        fontSize: '0.95rem'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(220, 53, 69, 0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <FaSignOutAlt className="me-2" />
-                      Logout
-                    </button>
-                  </li>
+  <button 
+    className="dropdown-item d-flex align-items-center justify-content-center text-danger rounded-3 py-2"
+    onClick={handleLogout}
+    style={{
+      fontWeight: '600',
+      fontSize: '0.95rem',
+      backgroundColor: 'transparent',
+      border: 'none',
+      width: '100%',
+      textAlign: 'left'
+    }}
+  >
+    <FaSignOutAlt className="me-2" />
+    Logout
+  </button>
+</li>
                 </ul>
               </li>
             </ul>
@@ -669,17 +600,6 @@ export default function Navbar() {
       {/* Add Custom Styles */}
       <style>
         {`
-          @keyframes pulse {
-            0%, 100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-            50% {
-              transform: scale(1.1);
-              opacity: 0.8;
-            }
-          }
-
           /* Smooth scrollbar for notifications */
           .dropdown-menu::-webkit-scrollbar {
             width: 5px;
@@ -718,7 +638,7 @@ export default function Navbar() {
           @media (max-width: 991px) {
             .navbar-collapse {
               background: rgba(102, 126, 234, 0.95);
-              backdrop-filter: blur(20px);
+              backdropFilter: blur(20px);
               padding: 1rem;
               border-radius: 15px;
               margin-top: 1rem;

@@ -371,7 +371,7 @@ export default function DomainStatus() {
             transition: 'margin-left 0.3s ease'
           }}
         >
-          <div className="d-flex justify-content-between align-items-center mb-4">
+          {/* <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h1 className="h3 mb-0" style={{ color: '#333' }}>Domain Status Monitor</h1>
             </div>
@@ -385,7 +385,7 @@ export default function DomainStatus() {
                 Refresh Status
               </button>
             </div>
-          </div>
+          </div> */}
 
           {error && (
             <div className="alert alert-danger d-flex justify-content-between align-items-center">

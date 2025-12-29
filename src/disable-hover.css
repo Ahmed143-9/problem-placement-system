@@ -85,6 +85,3 @@
 }
 
 /* Disable any remaining animations */
-@keyframes * {
-  0%, 100% { transform: none !important; }
-}

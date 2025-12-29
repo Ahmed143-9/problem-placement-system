@@ -61,14 +61,14 @@
 }
 
 /* Hover effects */
-.hover-card {
+/* .hover-card {
   transition: all 0.3s ease;
 }
 
 .hover-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-}
+} */
 
 /* Stat cards animation */
 .stat-card {
@@ -77,10 +77,10 @@
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.stat-card:hover {
+/* .stat-card:hover {
   transform: scale(1.03);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
-}
+} */
 
 .dashboard-bg {
   background-color: #f8f9fc;
@@ -90,18 +90,18 @@
   border-radius: 10px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
-.stat-card:hover {
+/* .stat-card:hover {
   transform: scale(1.02);
   box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-}
+} */
 
-.hover-card {
+/* .hover-card {
   transition: all 0.3s ease;
-}
-.hover-card:hover {
+} */
+/* .hover-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-}
+} */
 
 /* Gradient backgrounds */
 .bg-gradient-primary { background: linear-gradient(135deg, #4e73df, #224abe); }

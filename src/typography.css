@@ -185,10 +185,10 @@ p {
   overflow: hidden;
 }
 
-.card:hover {
+/* .card:hover {
   box-shadow: var(--shadow-lg);
   transform: translateY(-4px);
-}
+} */
 
 .card-header {
   background: var(--primary-gradient);
@@ -228,14 +228,14 @@ p {
   transition: opacity var(--transition-normal);
 }
 
-.stat-card:hover::before {
+/* .stat-card:hover::before {
   opacity: 1;
-}
+} */
 
-.stat-card:hover {
+/* .stat-card:hover {
   transform: translateY(-8px) scale(1.02);
   box-shadow: 0 12px 35px rgba(0,0,0,0.15);
-}
+} */
 
 .stat-card-icon {
   font-size: 3rem;
@@ -244,9 +244,9 @@ p {
   transition: all var(--transition-normal);
 }
 
-.stat-card:hover .stat-card-icon {
+/* .stat-card:hover .stat-card-icon {
   transform: scale(1.1) rotate(5deg);
-}
+} */
 
 /* Gradient Stat Cards */
 .stat-card-primary {
@@ -346,18 +346,18 @@ p {
   transition: opacity var(--transition-normal);
 }
 
-.sidebar-nav-link:hover,
+/* .sidebar-nav-link:hover,
 .sidebar-nav-link.active {
   background: rgba(102, 126, 234, 0.15);
   color: white;
   transform: translateX(5px);
-}
+} */
 
 /* Remove hover effect from sidebar nav links */
-.sidebar-nav-link.active {
+/* .sidebar-nav-link.active {
   background: rgba(102, 126, 234, 0.15);
   color: white;
-}
+} */
 
 .sidebar-nav-link.active::before {
   opacity: 1;
@@ -451,10 +451,10 @@ p {
   transition: width 0.6s, height 0.6s;
 }
 
-.btn:hover::before {
+/* .btn:hover::before {
   width: 300px;
   height: 300px;
-}
+} */
 
 .btn-primary {
   background: var(--primary-gradient);
@@ -462,10 +462,10 @@ p {
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
-.btn-primary:hover {
+/* .btn-primary:hover {
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
   transform: translateY(-2px);
-}
+} */
 
 .btn-success {
   background: var(--success-gradient);
@@ -528,10 +528,10 @@ p {
   transition: all var(--transition-fast);
 }
 
-.table tbody tr:hover {
+/* .table tbody tr:hover {
   background: rgba(102, 126, 234, 0.05);
   transform: scale(1.01);
-}
+} */
 
 /* ============================================
    MODERN BADGES
@@ -701,16 +701,16 @@ p {
   transition: opacity var(--transition-normal);
 }
 
-[data-tooltip]:hover::after {
+/* [data-tooltip]:hover::after {
   opacity: 1;
-}
+} */
 
 /* ============================================
    ANIMATIONS
    ============================================ */
-.fade-in {
+/* .fade-in {
   animation: fadeIn 0.6s ease;
-}
+} */
 
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -786,9 +786,9 @@ p {
   border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+/* ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--secondary-color), var(--primary-color));
-}
+} */
 
 /* ============================================
    UTILITY CLASSES
@@ -810,13 +810,13 @@ p {
   background-clip: text;
 }
 
-.hover-lift {
+/* .hover-lift {
   transition: transform var(--transition-normal);
 }
 
 .hover-lift:hover {
   transform: translateY(-4px);
-}
+} */
 
 /* ============================================
    PRINT STYLES

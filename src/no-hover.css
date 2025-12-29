@@ -5,35 +5,51 @@
   /* Don't override animations for toast notifications */
 }
 
+/* Ensure toast elements can transform and transition */
+.Toastify__toast,
+.Toastify__toast-container,
+.custom-toast {
+  transition: all 0.3s ease !important;
+}
+
 /* Specifically disable animations for all elements except toasts */
-*:not(.Toastify__toast):not(.Toastify__toast-container):not(.Toastify__bounce-enter--top-right):not(.Toastify__bounce-exit--top-right):not(.Toastify__slide-enter):not(.Toastify__slide-exit):not(.Toastify__close-button):not(.Toastify__bounce-appear):not(.Toastify__bounce-in):not(.Toastify__bounce-out) {
+*:not(.Toastify__toast):not(.Toastify__toast-container):not(.Toastify__bounce-enter--top-right):not(.Toastify__bounce-exit--top-right):not(.Toastify__slide-enter):not(.Toastify__slide-exit):not(.Toastify__close-button):not(.Toastify__bounce-appear):not(.Toastify__bounce-in):not(.Toastify__bounce-out):not(.Toastify__progress-bar):not(.Toastify__toast-body) {
   animation: none !important;
 }
 
 /* Allow toast notifications to have transitions and animations */
 .Toastify__toast,
-.Toastify__toast-container {
+.Toastify__toast-container,
+.custom-toast {
   transition: all 0.3s ease !important;
   animation: all 0.3s ease !important;
   /* Ensure timeout functionality works */
   animation-play-state: running !important;
+  /* Allow toasts to transform for animations */
+  transform: translate3d(0, 0, 0) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
 }
 
 /* Allow toast enter/exit animations */
 .Toastify__bounce-enter--top-right {
   animation-duration: 0.7s !important;
   animation-fill-mode: both !important;
+  animation-play-state: running !important;
 }
 
 .Toastify__bounce-exit--top-right {
   animation-duration: 0.2s !important;
   animation-fill-mode: both !important;
+  animation-play-state: running !important;
 }
 
 .Toastify__slide-enter,
 .Toastify__slide-exit {
   animation-duration: 0.3s !important;
   animation-fill-mode: both !important;
+  animation-play-state: running !important;
 }
 
 /* Allow toast close button to work */
@@ -116,7 +132,7 @@
 }
 
 /* Ensure toasts auto-dismiss without pause on hover */
-.Toastify__toast-container *:not(.Toastify__close-button):not(.Toastify__progress-bar):not(.Toastify__toast-body) {
+.Toastify__toast-container *:not(.Toastify__close-button):not(.Toastify__progress-bar):not(.Toastify__toast-body):not(.Toastify__toast) {
   pointer-events: none !important;
 }
 
@@ -124,6 +140,38 @@
 .Toastify__progress-bar {
   pointer-events: none !important;
   animation-play-state: running !important;
+  animation: all 0.3s ease !important;
+}
+
+/* Ensure toast timer functionality */
+.Toastify__toast {
+  animation-play-state: running !important;
+}
+
+/* Ensure toast timeout functionality works */
+.Toastify__toast-theme--dark,
+.Toastify__toast-theme--light,
+.Toastify__toast-theme--colored,
+.Toastify__toast-body {
+  animation-play-state: running !important;
+}
+
+/* Ensure toast container can function */
+.Toastify__toast-container {
+  pointer-events: auto !important;
+  visibility: visible !important;
+  animation-play-state: running !important;
+}
+
+/* Preserve internal toast functionality */
+.Toastify__toast-body {
+  pointer-events: auto !important;
+}
+
+/* Ensure progress bar animation works */
+.custom-progress {
+  animation-play-state: running !important;
+  transition: none !important;
 }
 
 /* Allow click events only on close button */
@@ -131,13 +179,13 @@
   pointer-events: auto !important;
 }
 
-*:hover {
+/* *:hover {
   background-color: inherit !important;
   color: inherit !important;
   border-color: inherit !important;
   cursor: default !important;
   transform: none !important;
-}
+} */
 
 /* Specific overrides for sidebar and notification elements */
 .nav-link:hover,
@@ -157,9 +205,23 @@
   background-color: inherit !important;
 }
 
-/* Notification dropdown */
+/* Notification dropdown - preserve Bootstrap dropdown functionality */
 .dropdown-menu {
   transform: none !important;
+  transition: opacity 0.15s linear !important;
+  animation: none !important;
+}
+
+/* Preserve dropdown show/hide functionality */
+.dropdown-menu.show {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Preserve dropdown toggle states */
+.dropdown-toggle:after {
+  transition: none !important;
 }
 
 /* Sidebar specific overrides */

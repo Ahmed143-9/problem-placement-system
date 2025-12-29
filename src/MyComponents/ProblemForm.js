@@ -1,7 +1,8 @@
 // src/pages/ProblemForm.js - FIXED VERSION WITH CONSISTENT SIDEBAR
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import { 
@@ -499,9 +500,6 @@ export default function ProblemForm() {
       <Link 
         to={getDashboardPath()}
         className="nav-link text-white rounded d-flex align-items-center"
-        style={{ transition: 'all 0.2s ease' }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
         title="Dashboard"
       >
         <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -526,9 +524,6 @@ export default function ProblemForm() {
         <Link 
           to="/problems" 
           className="nav-link text-white rounded d-flex align-items-center"
-          style={{ transition: 'all 0.2s ease' }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
           title="All Problems"
         >
           <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -541,9 +536,6 @@ export default function ProblemForm() {
       <Link 
         to="/reports" 
         className="nav-link text-white rounded d-flex align-items-center"
-        style={{ transition: 'all 0.2s ease' }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
         title="Reports"
       >
         <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -557,9 +549,6 @@ export default function ProblemForm() {
         <Link 
           to="/admin" 
           className="nav-link text-white rounded d-flex align-items-center"
-          style={{ transition: 'all 0.2s ease' }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
           title="Admin Panel"
         >
           <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
@@ -586,7 +575,6 @@ export default function ProblemForm() {
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
                       <h4 className="mb-1 fw-semibold">
-                        {/* <FaExclamationTriangle className="me-2" /> */}
                         Submit Problem Ticket
                       </h4>
                       <small className="opacity-75">Please provide detailed information about the issue</small>
@@ -609,7 +597,6 @@ export default function ProblemForm() {
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          {/* <FaBuilding className="me-2" /> */}
                           Department <span className="text-danger">*</span>
                         </label>
                         <div className="position-relative">
@@ -633,7 +620,6 @@ export default function ProblemForm() {
 
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          {/* <FaTag className="me-2" /> */}
                           Service <span className="text-muted"></span>
                         </label>
                         <div className="position-relative">
@@ -652,7 +638,6 @@ export default function ProblemForm() {
                             <FaChevronDown />
                           </span>
                         </div>
-                        {/* <small className="text-muted">Helps categorize the problem</small> */}
                       </div>
                     </div>
 
@@ -660,7 +645,6 @@ export default function ProblemForm() {
                     <div className="row g-3 mt-3">
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          {/* <FaClock className="me-2" /> */}
                           Priority <span className="text-danger">*</span>
                         </label>
                         <div className="position-relative">
@@ -679,16 +663,10 @@ export default function ProblemForm() {
                             <FaChevronDown />
                           </span>
                         </div>
-                        {/* <small className="text-muted">
-                          {formData.priority === 'High' && '🚨 Will be prioritized immediately'}
-                          {formData.priority === 'Medium' && '⚠️ Important but not urgent'}
-                          {formData.priority === 'Low' && '📅 Can be addressed when available'}
-                        </small> */}
                       </div>
 
                       <div className="col-md-6">
                         <label className="form-label fw-semibold">
-                          {/* <FaUserTie className="me-2" /> */}
                           Client <span className="text-muted"></span>
                         </label>
                         <input
@@ -699,75 +677,12 @@ export default function ProblemForm() {
                           onChange={handleChange}
                           placeholder="Enter client name or company..."
                         />
-                        {/* <small className="text-muted">Helpful for tracking client-related issues</small> */}
                       </div>
                     </div>
-
-                    {/* Manual Assignment Section */}
-                    {/* <div className="mt-4">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <label className="form-label fw-semibold mb-0">
-                          <FaUserPlus className="me-2" />
-                          Assign To <span className="text-muted">(Optional)</span>
-                        </label>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => setShowManualAssignment(!showManualAssignment)}
-                          disabled={uploadingImages}
-                        >
-                          {showManualAssignment ? 'Hide Assignment' : 'Assign Manually'}
-                        </button>
-                      </div>
-                      
-                      {showManualAssignment && (
-                        <div>
-                          {loadingUsers ? (
-                            <div className="text-center py-3">
-                              <FaSpinner className="fa-spin text-primary me-2" />
-                              Loading team members...
-                            </div>
-                          ) : (
-                            <>
-                              <select
-                                className="form-control"
-                                name="assigned_to"
-                                value={formData.assigned_to}
-                                onChange={handleChange}
-                                disabled={uploadingImages}
-                              >
-                                <option value="">-- Select Team Member --</option>
-                                {teamMembers.map(member => (
-                                  <option key={member.id} value={member.id}>
-                                    {member.name} 
-                                    {member.department && ` (${member.department})`}
-                                    {member.role && ` - ${member.role}`}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="alert alert-info mt-2 py-2">
-                                <small>
-                                  <FaBan className="me-1" />
-                                  <strong>Note:</strong> You cannot assign problems to yourself. 
-                                  The system will automatically exclude you from assignment.
-                                </small>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      <small className="text-muted">
-                        {showManualAssignment 
-                          ? 'Manual assignment will override First Face auto-assignment' 
-                          : 'Leave empty for First Face auto-assignment (excluding yourself)'
-                        }
-                      </small>
-                    </div> */}
 
                     {/* Problem Statement */}
                     <div className="mt-4">
                       <label className="form-label fw-semibold">
-                        {/* <FaExclamationTriangle className="me-2" /> */}
                         Problem Statement <span className="text-danger">*</span>
                       </label>
                       <textarea
@@ -784,28 +699,9 @@ export default function ProblemForm() {
                       <small className="text-muted">Be clear and concise about the issue</small>
                     </div>
 
-                    {/* Additional Description */}
-                    {/* <div className="mt-3">
-                      <label className="form-label fw-semibold">
-                        <FaInfoCircle className="me-2" />
-                        Additional Description <span className="text-muted">(Optional)</span>
-                      </label>
-                      <textarea
-                        className="form-control"
-                        name="description"
-                        rows="2"
-                        value={formData.description}
-                        onChange={handleChange}
-                        placeholder="Add any additional details, error messages, or context..."
-                        style={{ resize: 'vertical' }}
-                        disabled={uploadingImages}
-                      ></textarea>
-                    </div> */}
-
                     {/* Image Upload Section */}
                     <div className="mt-4">
                       <label className="form-label fw-semibold">
-                        {/* <FaImage className="me-2" /> */}
                         Attach Screenshots <span className="text-muted">(Optional)</span>
                       </label>
                       
@@ -899,39 +795,6 @@ export default function ProblemForm() {
                       )}
                     </div>
 
-                    {/* Submission Summary */}
-                    {/* <div className="alert alert-light border mt-4">
-                      <h6 className="mb-2">
-                        <FaCheckCircle className="me-2 text-success" />
-                        Submission Summary
-                      </h6>
-                      <div className="row small">
-                        <div className="col-md-4">
-                          <strong>Department:</strong> {formData.department || 'Not selected'}
-                        </div>
-                        <div className="col-md-4">
-                          <strong>Priority:</strong> 
-                          <span className={`ms-1 badge ${
-                            formData.priority === 'High' ? 'bg-danger' :
-                            formData.priority === 'Medium' ? 'bg-warning text-dark' : 'bg-success'
-                          }`}>
-                            {formData.priority || 'Not selected'}
-                          </span>
-                        </div>
-                        <div className="col-md-4">
-                          <strong>Assignment:</strong> 
-                          {formData.assigned_to 
-                            ? `Manual (${teamMembers.find(m => m.id == formData.assigned_to)?.name || 'User'})`
-                            : showManualAssignment ? 'None selected' : 'Auto (First Face)'
-                          }
-                        </div>
-                        <div className="col-md-12 mt-2">
-                          <strong>Images:</strong> {previewImages.length} uploaded
-                          {uploadingImages && ' (Uploading...)'}
-                        </div>
-                      </div>
-                    </div> */}
-
                     {/* Submit Buttons */}
                     <div className="d-flex gap-2 mt-4 pt-3 border-top">
                       <button 
@@ -990,30 +853,22 @@ export default function ProblemForm() {
                   </form>
                 </div>
               </div>
-              
-              {/* Help Card */}
-              {/* <div className="card shadow-sm border-0 mt-4">
-                <div className="card-header bg-white">
-                  <h6 className="mb-0">
-                    <FaInfoCircle className="me-2" />
-                    Tips for Better Problem Submission
-                  </h6>
-                </div>
-                <div className="card-body">
-                  <ul className="mb-0 small">
-                    <li>✅ Images are uploaded to server immediately when selected</li>
-                    <li>✅ Maximum 5 images allowed (5MB each)</li>
-                    <li>✅ You can remove images before submission</li>
-                    <li>✅ Wait for all images to finish uploading before submitting</li>
-                    <li>✅ Problem statement is required for submission</li>
-                    <li>✅ First Face assignment excludes you automatically</li>
-                  </ul>
-                </div>
-              </div> */}
             </div>
           </div>
         </div>
       </div>
+      <ToastContainer 
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

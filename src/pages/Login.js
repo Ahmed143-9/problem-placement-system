@@ -74,71 +74,59 @@ export default function Login() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    console.log('📤 Login form submitted');
+  e.preventDefault();
+  setLoading(true);
+  console.log('📤 Login form submitted');
 
-    if (!username || !password) {
-      toast.error('Please fill in all fields');
-      setLoading(false);
-      return;
-    }
+  if (!username || !password) {
+    toast.error('Please fill in all fields');
+    setLoading(false);
+    return;
+  }
 
-    // For super admin, skip password validation
-    if (username !== 'superadmin@system.com') {
-      // Password validation regex
-      const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=\[\]{};:'",.<>?/\\|`~]).{8,}$/;
+  try {
+    const result = await login(username, password);
+    console.log('📊 Login result:', result);
 
-      if (!passwordRegex.test(password)) {
-        toast.error('Password must be at least 8 characters, include 1 uppercase letter, 1 number, and 1 special character');
-        setLoading(false);
+    if (result.success) {
+      // Show toast notification for login success
+      toast.success('You have successfully logged in');
+      
+      // Check if password needs to be changed
+      if (result.force_password) {
+        toast.info('Please change your password');
+        navigate('/change-password');
         return;
       }
+
+      // Show user info
+      console.log('👤 User logged in:', result.user);
+      console.log('🔑 Permissions:', permissions);
+      console.log('👥 Roles:', roles);
+
+      // The useEffect above will handle redirection based on authentication state
+    } else {
+      // Handle login failure with proper error display
+      console.error('❌ Login failed:', result.error);
+      displayErrors(result.error || 'Login failed. Please try again.');
     }
-
-    try {
-      const result = await login(username, password);
-      console.log('📊 Login result:', result);
-
-      if (result.success) {
-        // Show toast notification for login success
-        toast.success('You have successfully logged in');
-        
-        // Check if password needs to be changed
-        if (result.force_password) {
-          toast.info('Please change your password');
-          navigate('/change-password');
-          return;
-        }
-
-        // Show user info
-        console.log('👤 User logged in:', result.user);
-        console.log('🔑 Permissions:', permissions);
-        console.log('👥 Roles:', roles);
-
-        // The useEffect above will handle redirection based on authentication state
-      } else {
-        // Handle login failure with proper error display
-        console.error('❌ Login failed:', result.error);
-        displayErrors(result.error || 'Login failed. Please try again.');
-      }
-    } catch (error) {
-      console.error('❌ Login error:', error);
-      
-      // Handle different error formats
-      if (error.response?.data?.error) {
-        displayErrors(error.response.data.error);
-      } else if (error.response?.data?.errors) {
-        displayErrors(error.response.data.errors);
-      } else if (error.message) {
-        toast.error(error.message);
-      } else {
-        toast.error('An error occurred during login. Please try again.');
-      }
-    } finally {
-      setLoading(false);
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    
+    // Handle different error formats
+    if (error.response?.data?.error) {
+      displayErrors(error.response.data.error);
+    } else if (error.response?.data?.errors) {
+      displayErrors(error.response.data.errors);
+    } else if (error.message) {
+      toast.error(error.message);
+    } else {
+      toast.error('An error occurred during login. Please try again.');
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div 
