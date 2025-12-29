@@ -371,8 +371,7 @@ export default function Reports() {
                   to={getDashboardPath()}
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="Dashboard"
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
@@ -384,8 +383,7 @@ export default function Reports() {
                   to="/problem/create"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="Create Problem"
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
@@ -397,8 +395,7 @@ export default function Reports() {
                   to="/problems"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="All Problems"
                 >
                   <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
@@ -660,16 +657,16 @@ export default function Reports() {
                             <td>{problem.department}</td>
                             <td>
                               <span className={`badge ${problem.priority === 'high' ? 'bg-danger' :
-                                  problem.priority === 'medium' ? 'bg-warning' :
-                                    'bg-info'
+                                problem.priority === 'medium' ? 'bg-warning' :
+                                  'bg-info'
                                 }`}>
                                 {problem.priority}
                               </span>
                             </td>
                             <td>
                               <span className={`badge ${problem.status === 'pending' ? 'bg-warning' :
-                                  problem.status === 'in_progress' ? 'bg-primary' :
-                                    'bg-success'
+                                problem.status === 'in_progress' ? 'bg-primary' :
+                                  'bg-success'
                                 }`}>
                                 {problem.status.replace('_', ' ')}
                               </span>

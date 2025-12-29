@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -79,6 +78,7 @@ export default function RoleManagement() {
 
             if (ok) {
                 setRoles(Array.isArray(roleList) ? roleList : []);
+                console.log('Roles fetched successfully:', roleList);
             } else {
                 setError(data?.message || 'Failed to fetch roles');
             }

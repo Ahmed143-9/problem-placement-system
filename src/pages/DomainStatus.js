@@ -271,8 +271,7 @@ export default function DomainStatus() {
                   to="/dashboard"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="Dashboard"
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
@@ -284,8 +283,7 @@ export default function DomainStatus() {
                   to="/problem/create"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="Create Problem"
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
@@ -297,8 +295,7 @@ export default function DomainStatus() {
                   to="/problems"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="All Problems"
                 >
                   <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
@@ -321,8 +318,7 @@ export default function DomainStatus() {
                   to="/reports"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  style={sidebarLinkStyle}
                   title="Reports"
                 >
                   <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
@@ -336,8 +332,7 @@ export default function DomainStatus() {
                       to="/admin"
                       className="nav-link text-white rounded d-flex align-items-center"
                       style={sidebarLinkStyle}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      style={sidebarLinkStyle}
                       title="Admin Panel"
                     >
                       <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
@@ -349,8 +344,7 @@ export default function DomainStatus() {
                       to="/roles"
                       className="nav-link text-white rounded d-flex align-items-center"
                       style={sidebarLinkStyle}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      style={sidebarLinkStyle}
                       title="Role Management"
                     >
                       <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />

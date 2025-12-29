@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { 
-  FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash, 
-  FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog, 
-  FaChevronLeft, FaChevronRight, FaSpinner, FaInfoCircle, FaSync, 
+import {
+  FaUserPlus, FaUsers, FaEdit, FaTrash, FaKey, FaEye, FaEyeSlash,
+  FaHome, FaPlusCircle, FaExclamationTriangle, FaFileAlt, FaUsersCog,
+  FaChevronLeft, FaChevronRight, FaSpinner, FaInfoCircle, FaSync,
   FaBell, FaShieldAlt, FaUserCheck, FaGlobe
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +28,7 @@ export default function AdminPanel() {
   });
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Add missing state variables
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -44,7 +44,7 @@ export default function AdminPanel() {
   const [savingFirstFace, setSavingFirstFace] = useState(false);
   const [activeUsers, setActiveUsers] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
-  
+
   // Only regular admin role check
   const isAdmin = user?.role === 'admin';
 
@@ -65,11 +65,13 @@ export default function AdminPanel() {
     'Technical and Networking Department'
   ];
 
-  // Load all roles from API
+  // Load all roles from API - UPDATED VERSION
   const loadRoles = async () => {
     try {
       setLoadingRoles(true);
       const token = localStorage.getItem('token');
+
+      console.log('🔄 Loading roles...');
       
       const response = await fetch('https://ticketapi.wineds.com/api/v1/role/getAllRoles', {
         method: 'POST',
@@ -80,21 +82,71 @@ export default function AdminPanel() {
         },
       });
 
+      console.log('📊 Roles API Status:', response.status);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('📦 Roles API Raw Response:', data);
+
+      // Debug: Check different possible response structures
+      if (data.data?.rolelist) {
+        console.log('✅ Found roles in: data.data.rolelist');
+      } else if (data.rolelist) {
+        console.log('✅ Found roles in: data.rolelist');
+      } else if (Array.isArray(data.data)) {
+        console.log('✅ Found roles in: data.data (array)');
+      } else if (Array.isArray(data)) {
+        console.log('✅ Found roles in: data (array)');
+      }
+
+      // Extract role list from response
+      let roleList = [];
       
-      if (data.status === 'success' && data.data?.rolelist) {
-        setRoles(data.data.rolelist);
-        console.log('✅ Roles loaded successfully:', data.data.rolelist);
+      if (data.status === 'success' || data.code === 200) {
+        if (data.data?.rolelist) {
+          roleList = data.data.rolelist;
+        } else if (data.rolelist) {
+          roleList = data.rolelist;
+        } else if (Array.isArray(data.data)) {
+          roleList = data.data;
+        } else if (data.data) {
+          roleList = [data.data];
+        }
+      } else if (Array.isArray(data)) {
+        roleList = data;
+      }
+      
+      console.log('📋 Extracted role list:', roleList);
+
+      // Filter and clean roles
+      if (Array.isArray(roleList)) {
+        const validRoles = roleList
+          .filter(role => role && role.id && role.name)
+          .map(role => ({
+            id: Number(role.id),
+            name: String(role.name).trim(),
+            guard_name: role.guard_name || 'web',
+            created_at: role.created_at,
+            updated_at: role.updated_at
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        
+        console.log('✅ Final valid roles:', validRoles);
+        setRoles(validRoles);
+        
+        if (validRoles.length === 0) {
+          toast.warning('No roles found. Please create roles in Role Management first.');
+        }
       } else {
-        toast.error('Failed to load roles');
+        console.error('❌ Invalid roles data structure:', typeof roleList, roleList);
+        toast.error('Failed to load roles - invalid data format');
       }
     } catch (error) {
-      console.error('Failed to load roles:', error);
-      toast.error('Error loading roles');
+      console.error('❌ Failed to load roles:', error);
+      toast.error(`Error loading roles: ${error.message}`);
     } finally {
       setLoadingRoles(false);
     }
@@ -117,7 +169,7 @@ export default function AdminPanel() {
     try {
       setLoadingUsers(true);
       const token = localStorage.getItem('token');
-      
+
       const response = await fetch('https://ticketapi.wineds.com/api/v1/getAllUsers', {
         method: 'POST',
         headers: {
@@ -153,8 +205,8 @@ export default function AdminPanel() {
                 if (userDetailData.status === 'success') {
                   return {
                     ...user,
-                    role: userDetailData.data.roles && userDetailData.data.roles.length > 0 
-                      ? userDetailData.data.roles[0] 
+                    role: userDetailData.data.roles && userDetailData.data.roles.length > 0
+                      ? userDetailData.data.roles[0]
                       : 'user',
                     username: userDetailData.data.username || user.email.split('@')[0],
                     status: userDetailData.data.status === 1 ? 'active' : 'inactive',
@@ -185,11 +237,11 @@ export default function AdminPanel() {
         // REMOVED: Filter out hidden users (no Super Admin filtering)
         setUsers(detailedUsers);
         console.log('✅ Users loaded successfully:', detailedUsers.length);
-        
+
         // Also set active users for First Face assignment
         const activeUsersList = detailedUsers.filter(u => u.status === 'active');
         setActiveUsers(activeUsersList);
-        
+
       } else {
         toast.error(data.message || 'Failed to load users');
       }
@@ -203,25 +255,29 @@ export default function AdminPanel() {
 
   // Handle input changes for form fields
   const handleInputChange = (e) => {
-  const { name, value, type } = e.target;
-  
-  if (name === 'status') {
-    // Convert status to number
-    setFormData(prev => ({
-      ...prev,
-      [name]: parseInt(value, 10)
-    }));
-  } else {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }
-};
+    const { name, value, type } = e.target;
+
+    if (name === 'status') {
+      // Convert status to number
+      setFormData(prev => ({
+        ...prev,
+        [name]: parseInt(value, 10)
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
 
   // Handle role selection (multi-select to array)
   const handleRoleChange = (e) => {
     const selectedRoleId = parseInt(e.target.value);
+    console.log('Selected role ID:', selectedRoleId);
+    console.log('Available roles:', roles);
+    console.log('Selected role:', roles.find(r => r.id === selectedRoleId));
+    
     setFormData(prev => ({
       ...prev,
       role_ids: [selectedRoleId]
@@ -304,7 +360,7 @@ export default function AdminPanel() {
       });
 
       console.log('📊 Response status:', response.status);
-      
+
       const data = await response.json();
       console.log('🟢 Response data:', data);
 
@@ -330,10 +386,10 @@ export default function AdminPanel() {
         setShowModal(false);
         setEditingUser(null);
         setShowPassword(false);
-        
+
         // Reload users
         loadUsers();
-        
+
       } else {
         console.error('❌ API Error:', data);
         toast.error(data.message || data.errors || 'Failed to save user');
@@ -348,7 +404,7 @@ export default function AdminPanel() {
   const sendUserCreationNotification = async (newUserData) => {
     try {
       const token = localStorage.getItem('token');
-      
+
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -370,7 +426,7 @@ export default function AdminPanel() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         console.log('🔔 User creation notification sent');
       } else {
@@ -385,7 +441,7 @@ export default function AdminPanel() {
   const sendUserUpdateNotification = async (oldUserData, newUserData) => {
     try {
       const token = localStorage.getItem('token');
-      
+
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -407,7 +463,7 @@ export default function AdminPanel() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         console.log('🔔 User update notification sent');
       } else {
@@ -422,7 +478,7 @@ export default function AdminPanel() {
   const sendUserDeletionNotification = async (deletedUserData) => {
     try {
       const token = localStorage.getItem('token');
-      
+
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -444,7 +500,7 @@ export default function AdminPanel() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         console.log('🔔 User deletion notification sent');
       } else {
@@ -459,7 +515,7 @@ export default function AdminPanel() {
   const sendUserStatusNotification = async (userData, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      
+
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -481,7 +537,7 @@ export default function AdminPanel() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         console.log('🔔 User status notification sent');
       } else {
@@ -513,7 +569,7 @@ export default function AdminPanel() {
   const openEditModal = async (userToEdit) => {
     try {
       const token = localStorage.getItem('token');
-      
+
       // Fetch detailed user info
       const response = await fetch('https://ticketapi.wineds.com/api/v1/getUser', {
         method: 'POST',
@@ -534,8 +590,8 @@ export default function AdminPanel() {
             name: userData.name,
             email: userData.email,
             password: '',
-            role_ids: userData.roles && userData.roles.length > 0 
-              ? [roles.find(r => r.name === userData.roles[0])?.id || 2] 
+            role_ids: userData.roles && userData.roles.length > 0
+              ? [roles.find(r => r.name === userData.roles[0])?.id || 2]
               : [2],
             status: userData.status,
             department: userData.department || ''
@@ -564,30 +620,30 @@ export default function AdminPanel() {
       console.log('❌ Password too short or empty');
       return false;
     }
-    
+
     if (!/[A-Z]/.test(password)) {
       console.log('❌ No uppercase letter found');
       return false;
     }
-    
+
     if (!/\d/.test(password)) {
       console.log('❌ No number found');
       return false;
     }
-    
+
     if (!/[@$!%*?&.]/.test(password)) {
       console.log('❌ No special character found');
       return false;
     }
-    
+
     console.log('✅ Frontend password validation passed');
     return true;
   };
 
   const getRoleBadge = role => {
-    const badges = { 
+    const badges = {
       admin: 'bg-danger',
-      team_leader: 'bg-primary',  
+      team_leader: 'bg-primary',
       user: 'bg-info'
     };
     return badges[role] || 'bg-secondary';
@@ -726,63 +782,62 @@ export default function AdminPanel() {
   };
 
   // Toggle user status
-  // Toggle user status - FIXED VERSION
-const handleToggleStatus = async (userId) => {
-  if (!isAdmin) {
-    toast.error('Only Admin can change user status!');
-    return;
-  }
-  
-  try {
-    const userToUpdate = users.find(u => u.id === userId);
-    const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
-    
-    const token = localStorage.getItem('token');
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : '',
-    };
-
-    const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        id: userId,
-        status: newStatus === 'active' ? 1 : 0
-      }),
-    });
-
-    const data = await response.json();
-
-    if (data.status === 'success') {
-      sendUserStatusNotification(userToUpdate, newStatus);
-      toast.success('User status updated!');
-      
-      // Update local state immediately
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === userId 
-            ? { ...user, status: newStatus } 
-            : user
-        )
-      );
-      
-      // Also update activeUsers if needed
-      if (newStatus === 'active') {
-        setActiveUsers(prev => [...prev, { ...userToUpdate, status: newStatus }]);
-      } else {
-        setActiveUsers(prev => prev.filter(u => u.id !== userId));
-      }
-      
-    } else {
-      toast.error(data.message || 'Failed to update status');
+  const handleToggleStatus = async (userId) => {
+    if (!isAdmin) {
+      toast.error('Only Admin can change user status!');
+      return;
     }
-  } catch (error) {
-    toast.error('Failed to update status');
-    console.error(error);
-  }
-};
+
+    try {
+      const userToUpdate = users.find(u => u.id === userId);
+      const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
+
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      };
+
+      const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          id: userId,
+          status: newStatus === 'active' ? 1 : 0
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        sendUserStatusNotification(userToUpdate, newStatus);
+        toast.success('User status updated!');
+
+        // Update local state immediately
+        setUsers(prevUsers =>
+          prevUsers.map(user =>
+            user.id === userId
+              ? { ...user, status: newStatus }
+              : user
+          )
+        );
+
+        // Also update activeUsers if needed
+        if (newStatus === 'active') {
+          setActiveUsers(prev => [...prev, { ...userToUpdate, status: newStatus }]);
+        } else {
+          setActiveUsers(prev => prev.filter(u => u.id !== userId));
+        }
+
+      } else {
+        toast.error(data.message || 'Failed to update status');
+      }
+    } catch (error) {
+      toast.error('Failed to update status');
+      console.error(error);
+    }
+  };
 
   // Reset user password
   const handleResetPassword = async (userId, userName) => {
@@ -790,15 +845,15 @@ const handleToggleStatus = async (userId) => {
       toast.error('Only Admin can reset passwords!');
       return;
     }
-    
+
     const newPassword = prompt(`Enter new password for ${userName}:`);
     if (!newPassword) return;
-    
+
     if (newPassword.length < 8) {
       toast.error('Password must be at least 8 characters');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('token');
       const headers = {
@@ -837,7 +892,7 @@ const handleToggleStatus = async (userId) => {
       toast.error('Only Admin can delete users!');
       return;
     }
-    
+
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
     try {
@@ -894,12 +949,12 @@ const handleToggleStatus = async (userId) => {
   return (
     <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: '#f8f9fa' }}>
       <Navbar />
-      
+
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <div 
+        <div
           className="bg-dark text-white position-relative"
-          style={{ 
+          style={{
             width: sidebarMinimized ? '70px' : '250px',
             minHeight: '100%',
             transition: 'width 0.3s ease'
@@ -922,8 +977,8 @@ const handleToggleStatus = async (userId) => {
               cursor: 'pointer',
             }}
           >
-            {sidebarMinimized 
-              ? <FaChevronRight size={14} color="#333" /> 
+            {sidebarMinimized
+              ? <FaChevronRight size={14} color="#333" />
               : <FaChevronLeft size={14} color="#333" />
             }
           </button>
@@ -936,92 +991,93 @@ const handleToggleStatus = async (userId) => {
             )}
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
-                <Link 
-                  to="/dashboard" 
+                <Link
+                  to="/dashboard"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={() => { }}
+                  onMouseLeave={() => { }}
                   title="Dashboard"
                 >
-                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link 
-                  to="/problem/create" 
+                <Link
+                  to="/problem/create"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={() => { }}
+                  onMouseLeave={() => { }}
                   title="Create Problem"
                 >
-                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link 
-                  to="/problems" 
+                <Link
+                  to="/problems"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={() => { }}
+                  onMouseLeave={() => { }}
                   title="All Problems"
                 >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link 
-                  to="/reports" 
+                <Link
+                  to="/reports"
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={sidebarLinkStyle}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(108, 117, 125, 0.2)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={() => { }}
+                  onMouseLeave={() => { }}
                   title="Reports"
                 >
-                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
               {isAdmin && (
                 <li className="nav-item mb-2">
-                  <Link 
-                    to="/admin" 
+                  <Link
+                    to="/admin"
                     className="nav-link text-white bg-primary rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
                     title="Admin Panel"
                   >
-                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                   </Link>
                 </li>
               )}
-              
+
               {/* Add Domain Status option for Admin and Team Leader */}
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <li className="nav-item mb-2">
-                  <Link 
-                    to="/domain-status" 
+                  <Link
+                    to="/domain-status"
                     className="nav-link text-white rounded d-flex align-items-center"
                     style={sidebarLinkStyle}
                     title="Domain Status"
                   >
-                    <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                    <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
                   </Link>
                 </li>
               )}
-            </ul>          </div>
+            </ul>
+          </div>
         </div>
 
         {/* Main Content */}
-        <div 
-          className="flex-grow-1 p-3" 
-          style={{ 
+        <div
+          className="flex-grow-1 p-3"
+          style={{
             overflowY: 'auto',
             transition: 'margin-left 0.3s ease'
           }}
@@ -1032,7 +1088,7 @@ const handleToggleStatus = async (userId) => {
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
                 <div className="flex-grow-1">
                   <h4 className="mb-1 fw-semibold text-truncate">
-                    <FaUsers className="me-2" /> 
+                    <FaUsers className="me-2" />
                     User Management Panel
                   </h4>
                   <small className="opacity-75">
@@ -1061,7 +1117,7 @@ const handleToggleStatus = async (userId) => {
                         </>
                       )}
                     </button>
-                    
+
                     <button
                       className="btn btn-light btn-sm"
                       onClick={() => {
@@ -1103,7 +1159,7 @@ const handleToggleStatus = async (userId) => {
                             <FaSpinner className="fa-spin ms-2" />
                           )}
                         </h6>
-                        <button 
+                        <button
                           className="btn btn-sm btn-outline-dark"
                           onClick={loadFirstFaceAssignments}
                           disabled={loadingFirstFace}
@@ -1210,14 +1266,14 @@ const handleToggleStatus = async (userId) => {
                               <FaUsers className="fs-1 text-muted mb-3 d-block mx-auto" />
                               <p className="text-muted mb-3">No users found.</p>
                               {isAdmin && (
-                                <button 
-                                  className="btn btn-primary" 
+                                <button
+                                  className="btn btn-primary"
                                   onClick={() => {
                                     resetForm();
                                     setShowModal(true);
                                   }}
                                 >
-                                  <FaUserPlus className="me-2" /> 
+                                  <FaUserPlus className="me-2" />
                                   Add User
                                 </button>
                               )}
@@ -1251,9 +1307,9 @@ const handleToggleStatus = async (userId) => {
                               </td>
                               <td>
                                 <span className={`badge ${getRoleBadge(u.role)}`}>
-                                  {u.role === 'admin' ? ' Admin' : 
-                                  u.role === 'team_leader' ? ' Team Leader' : 
-                                  ' User'}
+                                  {u.role === 'admin' ? ' Admin' :
+                                    u.role === 'team_leader' ? ' Team Leader' :
+                                      ' User'}
                                 </span>
                               </td>
                               <td>{u.department}</td>
@@ -1265,9 +1321,9 @@ const handleToggleStatus = async (userId) => {
                               <td>
                                 {isAdmin ? (
                                   <div className="d-flex gap-1 justify-content-center">
-                                    <button 
-                                      className="btn btn-sm btn-outline-primary" 
-                                      onClick={() => handleEditUser(u.id)} 
+                                    <button
+                                      className="btn btn-sm btn-outline-primary"
+                                      onClick={() => handleEditUser(u.id)}
                                       title="Edit"
                                       style={{ padding: '6px 10px' }}
                                     >
@@ -1325,8 +1381,8 @@ const handleToggleStatus = async (userId) => {
                   <FaEye className="me-2" />
                   Email Address
                 </h6>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="btn-close btn-close-white btn-sm"
                   onClick={() => setShowEmailModal(false)}
                 ></button>
@@ -1338,7 +1394,7 @@ const handleToggleStatus = async (userId) => {
                   </p>
                 </div>
                 <div className="text-center mt-3">
-                  <button 
+                  <button
                     className="btn btn-info btn-sm"
                     onClick={() => setShowEmailModal(false)}
                   >
@@ -1361,9 +1417,9 @@ const handleToggleStatus = async (userId) => {
                   <FaUserCheck className="me-2" />
                   First Face Assignment
                 </h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
+                <button
+                  type="button"
+                  className="btn-close"
                   onClick={() => {
                     setShowFirstFaceModal(false);
                     setSelectedFirstFace('');
@@ -1392,9 +1448,9 @@ const handleToggleStatus = async (userId) => {
                         {activeUsers.length > 0 ? (
                           activeUsers.map(user => (
                             <option key={user.id} value={user.id.toString()}>
-                              {user.name} 
-                              {user.role === 'team_leader' && ' (Team Leader)'} 
-                              {user.role === 'admin' && ' (Admin)'} 
+                              {user.name}
+                              {user.role === 'team_leader' && ' (Team Leader)'}
+                              {user.role === 'admin' && ' (Admin)'}
                               - {user.department}
                             </option>
                           ))
@@ -1402,9 +1458,6 @@ const handleToggleStatus = async (userId) => {
                           <option value="" disabled>No active users available</option>
                         )}
                       </select>
-                      {/* <small className="text-muted">
-                        You can select any active user (Admin, Team Leader or Regular User)
-                      </small> */}
                     </>
                   )}
                 </div>
@@ -1429,8 +1482,8 @@ const handleToggleStatus = async (userId) => {
                     <option value="Technical and Networking Department">Technical and Networking Department</option>
                   </select>
                   <small className="text-muted">
-                    {!selectedDepartment 
-                      ? 'Please select a department' 
+                    {!selectedDepartment
+                      ? 'Please select a department'
                       : selectedDepartment === 'all'
                         ? 'Will receive problems from ALL departments'
                         : `Will receive only ${selectedDepartment} department problems`
@@ -1439,7 +1492,7 @@ const handleToggleStatus = async (userId) => {
                 </div>
 
                 <div className="d-flex gap-2 mt-4">
-                  <button 
+                  <button
                     className="btn btn-warning flex-grow-1"
                     onClick={handleFirstFaceAssignment}
                     disabled={!selectedFirstFace || activeUsers.length === 0 || savingFirstFace}
@@ -1456,7 +1509,7 @@ const handleToggleStatus = async (userId) => {
                       </>
                     )}
                   </button>
-                  <button 
+                  <button
                     className="btn btn-secondary"
                     onClick={() => {
                       setShowFirstFaceModal(false);
@@ -1468,21 +1521,6 @@ const handleToggleStatus = async (userId) => {
                     Cancel
                   </button>
                 </div>
-
-                {/* Process Explanation */}
-                {/* <div className="mt-4 p-3 bg-light rounded">
-                  <h6 className="text-warning mb-2">
-                    <FaInfoCircle className="me-2" />
-                    How First Face Works:
-                  </h6>
-                  <ol className="small mb-0">
-                    <li>Select a user and department above</li>
-                    <li>Click "Set as First Face" to save the assignment</li>
-                    <li>New problems in selected department will auto-assign to this user</li>
-                    <li>First Face users get priority for new problem assignments</li>
-                    <li>You can have different First Face users for different departments</li>
-                  </ol>
-                </div> */}
               </div>
             </div>
           </div>
@@ -1496,15 +1534,15 @@ const handleToggleStatus = async (userId) => {
             <div className="modal-content">
               <div className="modal-header bg-primary text-white">
                 <h5 className="modal-title">
-                  <FaUserPlus className="me-2" /> 
+                  <FaUserPlus className="me-2" />
                   {editingUser ? 'Edit User' : 'Add New User'}
                 </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={() => { 
-                    setShowModal(false); 
-                    setEditingUser(null); 
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingUser(null);
                     setShowPassword(false);
                     resetForm();
                   }}
@@ -1514,16 +1552,16 @@ const handleToggleStatus = async (userId) => {
                 <div className="row g-3">
                   <div className="col-md-6">
                     <label className="form-label fw-semibold">Full Name *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      name="name" 
-                      value={formData.name} 
-                      onChange={handleInputChange} 
-                      placeholder="John Doe" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="John Doe"
                     />
                   </div>
-                  
+
                   <div className="col-md-6">
                     <label className="form-label fw-semibold">Email *</label>
                     <input
@@ -1540,31 +1578,31 @@ const handleToggleStatus = async (userId) => {
                   {/* Password Field */}
                   <div className="col-md-6 position-relative">
                     <label className="form-label fw-semibold">
-                      <FaKey className="me-1" /> 
-                      Password 
+                      <FaKey className="me-1" />
+                      Password
                       {editingUser ? (
                         <small className="text-muted"> (Leave blank to keep current password)</small>
                       ) : (
                         <span className="text-danger"> *</span>
                       )}
                     </label>
-                    
+
                     <div className="input-group">
-                      <input 
-                        type={showPassword ? "text" : "password"} 
-                        className="form-control" 
-                        name="password" 
-                        value={formData.password} 
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className="form-control"
+                        name="password"
+                        value={formData.password}
                         onChange={handleInputChange}
                         onFocus={() => setShowPasswordRequirements(true)}
                         onBlur={() => setShowPasswordRequirements(false)}
                         placeholder={
-                          editingUser 
-                            ? "Leave blank to keep current password" 
+                          editingUser
+                            ? "Leave blank to keep current password"
                             : "8+ chars, 1 uppercase, 1 number, 1 special char"
-                        } 
+                        }
                       />
-                      <button 
+                      <button
                         className="btn btn-outline-secondary"
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -1573,14 +1611,14 @@ const handleToggleStatus = async (userId) => {
                         {showPassword ? <FaEyeSlash /> : <FaEye />}
                       </button>
                     </div>
-                    
+
                     {editingUser && formData.password && (
                       <div className="form-text text-warning">
                         <FaInfoCircle className="me-1" />
                         New password will replace the current one
                       </div>
                     )}
-                    
+
                     {showPasswordRequirements && !editingUser && (
                       <div className="form-text">
                         Password must contain:
@@ -1595,37 +1633,68 @@ const handleToggleStatus = async (userId) => {
                     )}
                   </div>
 
+                  {/* Role Dropdown - UPDATED VERSION */}
                   <div className="col-md-6">
-                    <label className="form-label fw-semibold">Role *</label>
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <label className="form-label fw-semibold mb-0">
+                        Role <span className="text-danger">*</span>
+                      </label>
+                      <button 
+                        type="button" 
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={loadRoles}
+                        disabled={loadingRoles}
+                        title="Refresh roles list"
+                      >
+                        <FaSync size={12} className={loadingRoles ? 'fa-spin' : ''} />
+                      </button>
+                    </div>
+                    
                     {loadingRoles ? (
-                      <div className="text-center py-2">
+                      <div className="alert alert-info py-2 mb-0">
                         <FaSpinner className="fa-spin me-2" />
                         Loading roles...
                       </div>
+                    ) : roles.length === 0 ? (
+                      <div className="alert alert-warning py-2 mb-0">
+                        <FaInfoCircle className="me-2" />
+                        No roles available. 
+                        <Link to="/roles" className="alert-link ms-1" target="_blank">
+                          Create roles first
+                        </Link>
+                      </div>
                     ) : (
-                      <select 
-                        className="form-control" 
-                        name="role_ids" 
-                        value={formData.role_ids[0] || ''} 
+                      <select
+                        className="form-control"
+                        name="role_ids"
+                        value={formData.role_ids[0] || ''}
                         onChange={handleRoleChange}
+                        required
                       >
-                        <option value="">Select Role</option>
+                        <option value="">-- Select Role --</option>
                         {roles.map(role => (
                           <option key={role.id} value={role.id}>
-                            {role.name === 'admin' ? 'Admin' : 
-                             role.name === 'team_leader' ? 'Team Leader' : 
-                             'User'}
+                            {role.name}
+                            {role.name === 'admin' && ' (Admin)'}
+                            {role.name === 'team_leader' && ' (Team Leader)'}
+                            {role.name === 'user' && ' (User)'}
                           </option>
                         ))}
                       </select>
+                    )}
+                    
+                    {roles.length > 0 && (
+                      <small className="text-muted">
+                        {roles.length} roles available. Default: "user"
+                      </small>
                     )}
                   </div>
 
                   <div className="col-md-6">
                     <label className="form-label fw-semibold">Status</label>
-                    <select 
-                      className="form-control" 
-                      name="status" 
+                    <select
+                      className="form-control"
+                      name="status"
                       value={formData.status.toString()}  // Convert to string for select comparison
                       onChange={handleInputChange}
                     >
@@ -1633,7 +1702,7 @@ const handleToggleStatus = async (userId) => {
                       <option value="0">Inactive</option>
                     </select>
                   </div>
-               <div className="col-md-6">
+                  <div className="col-md-6">
                     <label className="form-label fw-semibold">Department</label>
                     <select
                       className="form-control"
@@ -1653,17 +1722,17 @@ const handleToggleStatus = async (userId) => {
                 </div>
 
                 <div className="d-flex gap-2 mt-4 pt-3 border-top">
-                  <button 
-                    className="btn btn-primary flex-grow-1" 
+                  <button
+                    className="btn btn-primary flex-grow-1"
                     onClick={handleSaveUser}
                   >
                     {editingUser ? 'Update User' : 'Add User'}
                   </button>
-                  <button 
-                    className="btn btn-secondary" 
-                    onClick={() => { 
-                      setShowModal(false); 
-                      setEditingUser(null); 
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingUser(null);
                       setShowPassword(false);
                       resetForm();
                     }}

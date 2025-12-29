@@ -675,3 +675,4 @@ function getTimeAgo(timestamp) {
     return time.toLocaleDateString();
   }
 }
+

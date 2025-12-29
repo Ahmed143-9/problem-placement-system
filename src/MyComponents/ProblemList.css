@@ -33,7 +33,7 @@
 }
 
 /* 🚫 Disable Bootstrap table hover effects */
-.table > :not(caption) > * > *:hover {
+.table> :not(caption)>*>*:hover {
   background-color: inherit !important;
   cursor: default !important;
   transform: none !important;
@@ -43,4 +43,6 @@
 *:hover {
   transition: none !important;
   transform: none !important;
+  background-color: inherit !important;
+  color: inherit !important;
 }
