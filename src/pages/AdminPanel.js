@@ -9,6 +9,7 @@ import {
   FaBell, FaShieldAlt, FaUserCheck, FaGlobe
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import Navbar from '../components/Navbar';
 
 export default function AdminPanel() {
@@ -67,90 +68,120 @@ export default function AdminPanel() {
 
   // Load all roles from API - UPDATED VERSION
   const loadRoles = async () => {
-    try {
-      setLoadingRoles(true);
-      const token = localStorage.getItem('token');
+  try {
+    setLoadingRoles(true);
+    
+    console.log('🔄 Loading roles...');
+    
+    // Use the api service to ensure proper headers and auth
+    const response = await api.post('/v1/role/getAllRoles', {});
+    
+    console.log('📊 Roles API Response:', response.data);
 
-      console.log('🔄 Loading roles...');
-      
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/role/getAllRoles', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-      });
-
-      console.log('📊 Roles API Status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('📦 Roles API Raw Response:', data);
-
-      // Debug: Check different possible response structures
-      if (data.data?.rolelist) {
-        console.log('✅ Found roles in: data.data.rolelist');
-      } else if (data.rolelist) {
-        console.log('✅ Found roles in: data.rolelist');
-      } else if (Array.isArray(data.data)) {
-        console.log('✅ Found roles in: data.data (array)');
-      } else if (Array.isArray(data)) {
-        console.log('✅ Found roles in: data (array)');
-      }
-
-      // Extract role list from response
-      let roleList = [];
-      
-      if (data.status === 'success' || data.code === 200) {
-        if (data.data?.rolelist) {
-          roleList = data.data.rolelist;
-        } else if (data.rolelist) {
-          roleList = data.rolelist;
-        } else if (Array.isArray(data.data)) {
-          roleList = data.data;
-        } else if (data.data) {
-          roleList = [data.data];
-        }
-      } else if (Array.isArray(data)) {
-        roleList = data;
-      }
-      
-      console.log('📋 Extracted role list:', roleList);
-
-      // Filter and clean roles
-      if (Array.isArray(roleList)) {
-        const validRoles = roleList
-          .filter(role => role && role.id && role.name)
-          .map(role => ({
-            id: Number(role.id),
-            name: String(role.name).trim(),
-            guard_name: role.guard_name || 'web',
-            created_at: role.created_at,
-            updated_at: role.updated_at
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        
-        console.log('✅ Final valid roles:', validRoles);
-        setRoles(validRoles);
-        
-        if (validRoles.length === 0) {
-          toast.warning('No roles found. Please create roles in Role Management first.');
-        }
-      } else {
-        console.error('❌ Invalid roles data structure:', typeof roleList, roleList);
-        toast.error('Failed to load roles - invalid data format');
-      }
-    } catch (error) {
-      console.error('❌ Failed to load roles:', error);
-      toast.error(`Error loading roles: ${error.message}`);
-    } finally {
-      setLoadingRoles(false);
+    const data = response.data;
+    
+    // Handle different response structures
+    let roleList = [];
+    
+    // Case 1: Standard success response with data.rolelist
+    if (data.status === 'success' && data.data?.rolelist) {
+      roleList = data.data.rolelist;
+      console.log('✅ Found roles in: data.data.rolelist');
     }
-  };
+    // Case 2: Direct rolelist in data
+    else if (data.status === 'success' && Array.isArray(data.rolelist)) {
+      roleList = data.rolelist;
+      console.log('✅ Found roles in: data.rolelist');
+    }
+    // Case 3: Rolelist at root level
+    else if (Array.isArray(data.rolelist)) {
+      roleList = data.rolelist;
+      console.log('✅ Found roles in: root.rolelist');
+    }
+    // Case 4: Data is directly the array
+    else if (Array.isArray(data.data)) {
+      roleList = data.data;
+      console.log('✅ Found roles in: data.data (array)');
+    }
+    // Case 5: Response is directly an array
+    else if (Array.isArray(data)) {
+      roleList = data;
+      console.log('✅ Found roles in: root (array)');
+    }
+    // Case 6: Check for common Laravel Sanctum/Spatie structures
+    else if (data.data && typeof data.data === 'object') {
+      // Try to extract array from object
+      const possibleArray = Object.values(data.data);
+      if (Array.isArray(possibleArray[0])) {
+        roleList = possibleArray[0];
+        console.log('✅ Found roles in: data.data object values');
+      }
+    }
+    
+    console.log('📋 Extracted role list:', roleList);
+
+    // Filter and clean roles
+    if (Array.isArray(roleList) && roleList.length > 0) {
+      const validRoles = roleList
+        .filter(role => role && (role.id || role.role_id) && (role.name || role.role_name))
+        .map(role => ({
+          id: Number(role.id || role.role_id),
+          name: String(role.name || role.role_name || '').trim(),
+          guard_name: role.guard_name || 'web',
+          created_at: role.created_at,
+          updated_at: role.updated_at
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      console.log('✅ Final valid roles:', validRoles);
+      setRoles(validRoles);
+      
+      if (validRoles.length === 0) {
+        toast.warning('No roles found. Please create roles in Role Management first.');
+      }
+    } else {
+      console.error('❌ Invalid or empty roles data:', roleList);
+      
+      // Try alternative API endpoint as fallback
+      console.log('🔄 Trying alternative role endpoint...');
+      try {
+        const altResponse = await api.get('/v1/roles');
+        
+        console.log('📦 Alternative endpoint response:', altResponse.data);
+        
+        if (altResponse.data?.data && Array.isArray(altResponse.data.data)) {
+          const altRoles = altResponse.data.data.map(r => ({
+            id: Number(r.id),
+            name: String(r.name).trim(),
+            guard_name: r.guard_name || 'web'
+          }));
+          setRoles(altRoles);
+          toast.info('Roles loaded from alternative endpoint');
+        }
+      } catch (altError) {
+        console.error('Alternative endpoint failed:', altError);
+      }
+      
+      if (roles.length === 0) {
+        toast.error('Failed to load roles. Please check Role Management page first.');
+      }
+    }
+  } catch (error) {
+    console.error('❌ Failed to load roles:', error);
+    toast.error(`Error loading roles: ${error.message}`);
+    
+    // Fallback: Use default roles if API fails
+    const defaultRoles = [
+      { id: 1, name: 'admin', guard_name: 'web' },
+      { id: 2, name: 'team_leader', guard_name: 'web' },
+      { id: 3, name: 'user', guard_name: 'web' }
+    ];
+    setRoles(defaultRoles);
+    toast.info('Using default roles due to API error');
+  } finally {
+    setLoadingRoles(false);
+  }
+};
 
   // Load First Face assignments from localStorage
   const loadFirstFaceAssignmentsFromStorage = () => {
@@ -168,51 +199,29 @@ export default function AdminPanel() {
   const loadUsers = async () => {
     try {
       setLoadingUsers(true);
-      const token = localStorage.getItem('token');
 
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/getAllUsers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-      });
+      const response = await api.post('/v1/getAllUsers', {});
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = response.data;
 
       if (data.status === 'success' && data.data) {
         // Fetch detailed user info for each user to get their role
         const detailedUsers = await Promise.all(
           data.data.map(async (user) => {
             try {
-              const userDetailResponse = await fetch('https://ticketapi.wineds.com/api/v1/getUser', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                  'Authorization': token ? `Bearer ${token}` : '',
-                },
-                body: JSON.stringify({ id: user.id }),
-              });
+              const userDetailResponse = await api.post('/v1/getUser', { id: user.id });
 
-              if (userDetailResponse.ok) {
-                const userDetailData = await userDetailResponse.json();
-                if (userDetailData.status === 'success') {
-                  return {
-                    ...user,
-                    role: userDetailData.data.roles && userDetailData.data.roles.length > 0
-                      ? userDetailData.data.roles[0]
-                      : 'user',
-                    username: userDetailData.data.username || user.email.split('@')[0],
-                    status: userDetailData.data.status === 1 ? 'active' : 'inactive',
-                    department: userDetailData.data.department || 'Not Assigned'
-                  };
-                }
+              if (userDetailResponse.data.status === 'success') {
+                const userDetailData = userDetailResponse.data;
+                return {
+                  ...user,
+                  role: userDetailData.data.roles && userDetailData.data.roles.length > 0
+                    ? userDetailData.data.roles[0]
+                    : 'user',
+                  username: userDetailData.data.username || user.email.split('@')[0],
+                  status: userDetailData.data.status === 1 ? 'active' : 'inactive',
+                  department: userDetailData.data.department || 'Not Assigned'
+                };
               }
               return {
                 ...user,
@@ -309,19 +318,11 @@ export default function AdminPanel() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
-      let url, method, requestBody;
+      let endpoint, requestBody;
 
       if (editingUser) {
         // Update user
-        url = 'https://ticketapi.wineds.com/api/v1/updateUser';
-        method = 'POST';
+        endpoint = '/v1/updateUser';
         requestBody = {
           id: editingUser.id,
           name: formData.name,
@@ -333,8 +334,7 @@ export default function AdminPanel() {
         };
       } else {
         // Create user
-        url = 'https://ticketapi.wineds.com/api/v1/createUser';
-        method = 'POST';
+        endpoint = '/v1/createUser';
         requestBody = {
           name: formData.name,
           email: formData.email,
@@ -350,21 +350,14 @@ export default function AdminPanel() {
         delete requestBody.password;
       }
 
-      console.log('📡 Sending request to:', url);
+      console.log('📡 Sending request to:', endpoint);
       console.log('📦 Request body:', requestBody);
 
-      const response = await fetch(url, {
-        method: method,
-        headers: headers,
-        body: JSON.stringify(requestBody),
-      });
+      const response = await api.post(endpoint, requestBody);
 
-      console.log('📊 Response status:', response.status);
+      console.log('🟢 Response data:', response.data);
 
-      const data = await response.json();
-      console.log('🟢 Response data:', data);
-
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         // Send notification
         if (editingUser) {
           sendUserUpdateNotification(editingUser, formData);
@@ -391,8 +384,8 @@ export default function AdminPanel() {
         loadUsers();
 
       } else {
-        console.error('❌ API Error:', data);
-        toast.error(data.message || data.errors || 'Failed to save user');
+        console.error('❌ API Error:', response.data);
+        toast.error(response.data.message || response.data.errors || 'Failed to save user');
       }
     } catch (error) {
       console.error('❌ Save user error:', error);
@@ -403,14 +396,6 @@ export default function AdminPanel() {
   // Send Notification for User Creation
   const sendUserCreationNotification = async (newUserData) => {
     try {
-      const token = localStorage.getItem('token');
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
       const notificationPayload = {
         type: 'user_created',
         title: 'New User Created',
@@ -419,18 +404,12 @@ export default function AdminPanel() {
         sender_id: user?.id,
       };
 
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(notificationPayload),
-      });
+      const response = await api.post('/v1/notifications', notificationPayload);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.success) {
         console.log('🔔 User creation notification sent');
       } else {
-        console.error('❌ Failed to send user creation notification:', data.error);
+        console.error('❌ Failed to send user creation notification:', response.data.error);
       }
     } catch (error) {
       console.error('❌ Failed to send user creation notification:', error);
@@ -440,14 +419,6 @@ export default function AdminPanel() {
   // Send Notification for User Update
   const sendUserUpdateNotification = async (oldUserData, newUserData) => {
     try {
-      const token = localStorage.getItem('token');
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
       const notificationPayload = {
         type: 'user_updated',
         title: 'User Updated',
@@ -456,18 +427,12 @@ export default function AdminPanel() {
         sender_id: user?.id,
       };
 
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(notificationPayload),
-      });
+      const response = await api.post('/v1/notifications', notificationPayload);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.success) {
         console.log('🔔 User update notification sent');
       } else {
-        console.error('❌ Failed to send user update notification:', data.error);
+        console.error('❌ Failed to send user update notification:', response.data.error);
       }
     } catch (error) {
       console.error('❌ Failed to send user update notification:', error);
@@ -477,14 +442,6 @@ export default function AdminPanel() {
   // Send Notification for User Deletion
   const sendUserDeletionNotification = async (deletedUserData) => {
     try {
-      const token = localStorage.getItem('token');
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
       const notificationPayload = {
         type: 'user_deleted',
         title: 'User Deleted',
@@ -493,18 +450,12 @@ export default function AdminPanel() {
         sender_id: user?.id,
       };
 
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(notificationPayload),
-      });
+      const response = await api.post('/v1/notifications', notificationPayload);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.success) {
         console.log('🔔 User deletion notification sent');
       } else {
-        console.error('❌ Failed to send user deletion notification:', data.error);
+        console.error('❌ Failed to send user deletion notification:', response.data.error);
       }
     } catch (error) {
       console.error('❌ Failed to send user deletion notification:', error);
@@ -514,14 +465,6 @@ export default function AdminPanel() {
   // Send Notification for User Status Change
   const sendUserStatusNotification = async (userData, newStatus) => {
     try {
-      const token = localStorage.getItem('token');
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
       const notificationPayload = {
         type: 'user_status_changed',
         title: 'User Status Changed',
@@ -530,18 +473,12 @@ export default function AdminPanel() {
         sender_id: user?.id,
       };
 
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/notifications', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(notificationPayload),
-      });
+      const response = await api.post('/v1/notifications', notificationPayload);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.success) {
         console.log('🔔 User status notification sent');
       } else {
-        console.error('❌ Failed to send user status notification:', data.error);
+        console.error('❌ Failed to send user status notification:', response.data.error);
       }
     } catch (error) {
       console.error('❌ Failed to send user status notification:', error);
@@ -568,37 +505,24 @@ export default function AdminPanel() {
 
   const openEditModal = async (userToEdit) => {
     try {
-      const token = localStorage.getItem('token');
-
       // Fetch detailed user info
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/getUser', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify({ id: userToEdit.id }),
-      });
+      const response = await api.post('/v1/getUser', { id: userToEdit.id });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'success') {
-          const userData = data.data;
-          setEditingUser(userData);
-          setFormData({
-            name: userData.name,
-            email: userData.email,
-            password: '',
-            role_ids: userData.roles && userData.roles.length > 0
-              ? [roles.find(r => r.name === userData.roles[0])?.id || 2]
-              : [2],
-            status: userData.status,
-            department: userData.department || ''
-          });
-          setShowModal(true);
-          setShowPassword(false);
-        }
+      if (response.data.status === 'success') {
+        const userData = response.data.data;
+        setEditingUser(userData);
+        setFormData({
+          name: userData.name,
+          email: userData.email,
+          password: '',
+          role_ids: userData.roles && userData.roles.length > 0
+            ? [roles.find(r => r.name === userData.roles[0])?.id || 2]
+            : [2],
+          status: userData.status,
+          department: userData.department || ''
+        });
+        setShowModal(true);
+        setShowPassword(false);
       }
     } catch (error) {
       console.error('Error loading user details:', error);
@@ -660,22 +584,11 @@ export default function AdminPanel() {
   const loadFirstFaceAssignments = async () => {
     setLoadingFirstFace(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://ticketapi.wineds.com/api/first-face-assignments/getAll', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-      });
+      const response = await api.post('/first-face-assignments/getAll', {});
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'success') {
-          setFirstFaceAssignments(data.data);
-          console.log('✅ First Face assignments loaded from backend:', data.data.length);
-        }
+      if (response.data.status === 'success') {
+        setFirstFaceAssignments(response.data.data);
+        console.log('✅ First Face assignments loaded from backend:', response.data.data.length);
       }
     } catch (error) {
       console.error('❌ Error loading First Face assignments:', error);
@@ -694,31 +607,20 @@ export default function AdminPanel() {
 
     setSavingFirstFace(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://ticketapi.wineds.com/api/first-face-assignments/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify({
-          user_id: parseInt(selectedFirstFace),
-          department: selectedDepartment === 'all' ? null : selectedDepartment,
-          is_active: true,
-        }),
+      const response = await api.post('/first-face-assignments/create', {
+        user_id: parseInt(selectedFirstFace),
+        department: selectedDepartment === 'all' ? null : selectedDepartment,
+        is_active: true,
       });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         setSelectedFirstFace('');
         setSelectedDepartment('');
         setShowFirstFaceModal(false);
         loadFirstFaceAssignments();
-        toast.success(data.messages[0]);
+        toast.success(response.data.messages[0]);
       } else {
-        toast.error(data.messages?.[0] || 'Failed to create First Face assignment');
+        toast.error(response.data.messages?.[0] || 'Failed to create First Face assignment');
       }
     } catch (error) {
       console.error('❌ Error creating First Face assignment:', error);
@@ -731,24 +633,13 @@ export default function AdminPanel() {
   // Remove First Face assignment via backend
   const handleRemoveFirstFace = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://ticketapi.wineds.com/api/first-face-assignments/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify({ id }),
-      });
+      const response = await api.post('/first-face-assignments/delete', { id });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         loadFirstFaceAssignments();
         toast.success('First Face assignment removed!');
       } else {
-        toast.error(data.messages[0] || 'Failed to remove First Face assignment');
+        toast.error(response.data.messages[0] || 'Failed to remove First Face assignment');
       }
     } catch (error) {
       console.error('❌ Error removing First Face assignment:', error);
@@ -792,25 +683,12 @@ export default function AdminPanel() {
       const userToUpdate = users.find(u => u.id === userId);
       const newStatus = userToUpdate.status === 'active' ? 'inactive' : 'active';
 
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          id: userId,
-          status: newStatus === 'active' ? 1 : 0
-        }),
+      const response = await api.post('/v1/updateUser', {
+        id: userId,
+        status: newStatus === 'active' ? 1 : 0
       });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         sendUserStatusNotification(userToUpdate, newStatus);
         toast.success('User status updated!');
 
@@ -831,7 +709,7 @@ export default function AdminPanel() {
         }
 
       } else {
-        toast.error(data.message || 'Failed to update status');
+        toast.error(response.data.message || 'Failed to update status');
       }
     } catch (error) {
       toast.error('Failed to update status');
@@ -855,30 +733,17 @@ export default function AdminPanel() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
-
       // Reset password endpoint
-      const response = await fetch('https://ticketapi.wineds.com/api/v1/updateUser', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          id: userId,
-          password: newPassword
-        }),
+      const response = await api.post('/v1/updateUser', {
+        id: userId,
+        password: newPassword
       });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         toast.success(`Password reset successfully for ${userName}!`);
         loadUsers();
       } else {
-        toast.error(data.message || 'Failed to reset password');
+        toast.error(response.data.message || 'Failed to reset password');
       }
     } catch (error) {
       toast.error('Failed to reset password');
@@ -897,27 +762,16 @@ export default function AdminPanel() {
 
     try {
       const userToDelete = users.find(u => u.id === userId);
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
-      };
 
-      // Delete user endpoint - Fixed to use correct API endpoint
-      const response = await fetch(`https://ticketapi.wineds.com/api/v1/users/${userId}`, {
-        method: 'DELETE',
-        headers: headers
-      });
+      // Delete user endpoint - Using POST since DELETE might not be supported
+      const response = await api.post('/v1/deleteUser', { id: userId });
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.status === 'success') {
         sendUserDeletionNotification(userToDelete);
         toast.success('User deleted successfully!');
         loadUsers();
       } else {
-        toast.error(data.error || 'Failed to delete user');
+        toast.error(response.data.message || 'Failed to delete user');
       }
     } catch (error) {
       toast.error('Failed to delete user');
@@ -952,127 +806,143 @@ export default function AdminPanel() {
 
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <div
-          className="bg-dark text-white position-relative"
-          style={{
-            width: sidebarMinimized ? '70px' : '250px',
-            minHeight: '100%',
-            transition: 'width 0.3s ease'
-          }}
+       {/* Sidebar */}
+<div
+  className="bg-dark text-white position-relative"
+  style={{
+    width: sidebarMinimized ? '70px' : '250px',
+    minHeight: '100%',
+    transition: 'width 0.3s ease'
+  }}
+>
+  {/* Toggle Button */}
+  <button
+    onClick={toggleSidebar}
+    className="position-absolute d-flex align-items-center justify-content-center"
+    style={{
+      top: '10px',
+      right: '-12px',
+      borderRadius: '50%',
+      width: '28px',
+      height: '28px',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+      zIndex: 1000,
+      cursor: 'pointer',
+    }}
+  >
+    {sidebarMinimized
+      ? <FaChevronRight size={14} color="#333" />
+      : <FaChevronLeft size={14} color="#333" />
+    }
+  </button>
+
+  <div className="p-3">
+    {!sidebarMinimized && (
+      <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+        Navigation
+      </h5>
+    )}
+    <ul className="nav flex-column">
+      <li className="nav-item mb-2">
+        <Link
+          to="/dashboard"
+          className="nav-link text-white rounded d-flex align-items-center"
+          style={sidebarLinkStyle}
+          onMouseEnter={() => { }}
+          onMouseLeave={() => { }}
+          title="Dashboard"
         >
-          {/* Toggle Button */}
-          <button
-            onClick={toggleSidebar}
-            className="position-absolute d-flex align-items-center justify-content-center"
-            style={{
-              top: '10px',
-              right: '-12px',
-              borderRadius: '50%',
-              width: '28px',
-              height: '28px',
-              backgroundColor: '#fff',
-              border: '1px solid #ccc',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-              zIndex: 1000,
-              cursor: 'pointer',
-            }}
+          <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+        </Link>
+      </li>
+      <li className="nav-item mb-2">
+        <Link
+          to="/problem/create"
+          className="nav-link text-white rounded d-flex align-items-center"
+          style={sidebarLinkStyle}
+          onMouseEnter={() => { }}
+          onMouseLeave={() => { }}
+          title="Create Problem"
+        >
+          <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+        </Link>
+      </li>
+      <li className="nav-item mb-2">
+        <Link
+          to="/problems"
+          className="nav-link text-white rounded d-flex align-items-center"
+          style={sidebarLinkStyle}
+          onMouseEnter={() => { }}
+          onMouseLeave={() => { }}
+          title="All Problems"
+        >
+          <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+        </Link>
+      </li>
+      <li className="nav-item mb-2">
+        <Link
+          to="/reports"
+          className="nav-link text-white rounded d-flex align-items-center"
+          style={sidebarLinkStyle}
+          onMouseEnter={() => { }}
+          onMouseLeave={() => { }}
+          title="Reports"
+        >
+          <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+        </Link>
+      </li>
+      {isAdmin && (
+        <li className="nav-item mb-2">
+          <Link
+            to="/admin"
+            className="nav-link text-white bg-primary rounded d-flex align-items-center"
+            style={sidebarLinkStyle}
+            title="Admin Panel"
           >
-            {sidebarMinimized
-              ? <FaChevronRight size={14} color="#333" />
-              : <FaChevronLeft size={14} color="#333" />
-            }
-          </button>
+            <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+            {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+          </Link>
+        </li>
+      )}
 
-          <div className="p-3">
-            {!sidebarMinimized && (
-              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
-                Navigation
-              </h5>
-            )}
-            <ul className="nav flex-column">
-              <li className="nav-item mb-2">
-                <Link
-                  to="/dashboard"
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
-                  onMouseEnter={() => { }}
-                  onMouseLeave={() => { }}
-                  title="Dashboard"
-                >
-                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
-                </Link>
-              </li>
-              <li className="nav-item mb-2">
-                <Link
-                  to="/problem/create"
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
-                  onMouseEnter={() => { }}
-                  onMouseLeave={() => { }}
-                  title="Create Problem"
-                >
-                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
-                </Link>
-              </li>
-              <li className="nav-item mb-2">
-                <Link
-                  to="/problems"
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
-                  onMouseEnter={() => { }}
-                  onMouseLeave={() => { }}
-                  title="All Problems"
-                >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-                </Link>
-              </li>
-              <li className="nav-item mb-2">
-                <Link
-                  to="/reports"
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  style={sidebarLinkStyle}
-                  onMouseEnter={() => { }}
-                  onMouseLeave={() => { }}
-                  title="Reports"
-                >
-                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
-                </Link>
-              </li>
-              {isAdmin && (
-                <li className="nav-item mb-2">
-                  <Link
-                    to="/admin"
-                    className="nav-link text-white bg-primary rounded d-flex align-items-center"
-                    style={sidebarLinkStyle}
-                    title="Admin Panel"
-                  >
-                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
-                  </Link>
-                </li>
-              )}
-
-              {/* Add Domain Status option for Admin and Team Leader */}
-              {(user?.role === 'admin' || user?.role === 'team_leader') && (
-                <li className="nav-item mb-2">
-                  <Link
-                    to="/domain-status"
-                    className="nav-link text-white rounded d-flex align-items-center"
-                    style={sidebarLinkStyle}
-                    title="Domain Status"
-                  >
-                    <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
-                  </Link>
-                </li>
-              )}
-            </ul>
-          </div>
-        </div>
+      {/* Add Domain Status option for Admin and Team Leader */}
+      {(user?.role === 'admin' || user?.role === 'team_leader') && (
+        <li className="nav-item mb-2">
+          <Link
+            to="/domain-status"
+            className="nav-link text-white rounded d-flex align-items-center"
+            style={sidebarLinkStyle}
+            title="Domain Status"
+          >
+            <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+            {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+          </Link>
+        </li>
+      )}
+      
+      {/* Add Role Management option for Admin and Team Leader */}
+      {(user?.role === 'admin' || user?.role === 'team_leader') && (
+        <li className="nav-item mb-2">
+          <Link
+            to="/roles"
+            className="nav-link text-white rounded d-flex align-items-center"
+            style={sidebarLinkStyle}
+            title="Role Management"
+          >
+            <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
+            {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem', color: 'white' }}>Role Management</span>}
+          </Link>
+        </li>
+      )}
+    </ul>
+  </div>
+</div>
 
         {/* Main Content */}
         <div

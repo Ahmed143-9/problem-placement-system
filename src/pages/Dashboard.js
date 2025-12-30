@@ -4,18 +4,18 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
-import {
-  FaTasks,
-  FaClipboardList,
-  FaCheckCircle,
-  FaSpinner,
-  FaPlusCircle,
-  FaUsersCog,
-  FaHome,
-  FaExclamationTriangle,
-  FaFileAlt,
-  FaChartLine,
-  FaChevronLeft,
+import { 
+  FaTasks, 
+  FaClipboardList, 
+  FaCheckCircle, 
+  FaSpinner, 
+  FaPlusCircle, 
+  FaUsersCog, 
+  FaHome, 
+  FaExclamationTriangle, 
+  FaFileAlt, 
+  FaChartLine, 
+  FaChevronLeft, 
   FaChevronRight,
   FaGlobe,
   FaTimesCircle,
@@ -32,7 +32,7 @@ export default function EmployeeDashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
-
+  
   // Domain status state
   const [domains, setDomains] = useState({});
   const [domainLoading, setDomainLoading] = useState(true);
@@ -49,7 +49,7 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     fetchAllProblems();
     fetchDomainStatus();
-
+    
     // Listen for domain status updates from DomainStatus.js
     const handleDomainStatusUpdate = (e) => {
       try {
@@ -61,7 +61,7 @@ export default function EmployeeDashboard() {
         console.error('Error handling domain status update:', err);
       }
     };
-
+    
     // Also listen for storage changes (fallback)
     const handleStorageChange = (e) => {
       if (e.key === 'domainStatusData') {
@@ -75,13 +75,13 @@ export default function EmployeeDashboard() {
         }
       }
     };
-
+    
     window.addEventListener('domainStatusUpdated', handleDomainStatusUpdate);
     window.addEventListener('storage', handleStorageChange);
-
+    
     // Remove automatic refresh intervals as requested
     // Only manual refresh will be used
-
+    
     return () => {
       window.removeEventListener('domainStatusUpdated', handleDomainStatusUpdate);
       window.removeEventListener('storage', handleStorageChange);
@@ -94,31 +94,31 @@ export default function EmployeeDashboard() {
     try {
       setLoading(true);
       console.log('📡 Fetching problems from API...');
-
+      
       const response = await api.post('/problems/getAll');
       console.log('✅ API Response:', response.data);
-
+      
       if (response.data.status === 'success' || response.data.success) {
         const allProblems = response.data.data || [];
         console.log(`📊 Total problems fetched: ${allProblems.length}`);
-
+        
         setProblems(allProblems);
-
+        
         // Calculate stats based on current user
         calculateStats(allProblems);
         calculateAnalytics(allProblems);
-
+        
         // Calculate high priority issues
         const highPriority = allProblems
           .filter(problem => {
             // Check if priority is High (case-insensitive)
-            const isHighPriority = problem.priority &&
+            const isHighPriority = problem.priority && 
               problem.priority.toString().toLowerCase() === 'high';
-
+            
             // Check if status is not done or pending_approval
-            const isNotResolved = problem.status &&
+            const isNotResolved = problem.status && 
               !['done', 'pending_approval', 'resolved'].includes(problem.status.toLowerCase());
-
+            
             return isHighPriority && isNotResolved;
           })
           .sort((a, b) => {
@@ -128,10 +128,10 @@ export default function EmployeeDashboard() {
             return dateB - dateA;
           })
           .slice(0, 5); // Show latest 5 high priority issues
-
+        
         console.log(`⚠️ High priority issues found: ${highPriority.length}`);
         setHighPriorityIssues(highPriority);
-
+        
         if (allProblems.length > 0) {
           // toast.success(`Loaded ${allProblems.length} problems`, {
           //   position: "top-right",
@@ -161,40 +161,40 @@ export default function EmployeeDashboard() {
       });
       return;
     }
-
+    
     console.log('👤 Current user for stats:', user);
-
+    
     // Adjust field names based on your API response structure
-    const userProblems = allProblems.filter(p =>
-      p.created_by === user.id ||
-      p.createdBy === user.id ||
+    const userProblems = allProblems.filter(p => 
+      p.created_by === user.id || 
+      p.createdBy === user.id || 
       p.created_by_id === user.id ||
       p.user_id === user.id
     );
-
-    const assignedProblems = allProblems.filter(p =>
-      p.assigned_to === user.id ||
-      p.assignedTo === user.id ||
+    
+    const assignedProblems = allProblems.filter(p => 
+      p.assigned_to === user.id || 
+      p.assignedTo === user.id || 
       p.assigned_to_id === user.id
     );
-
+    
     const inProgressProblems = allProblems.filter(p => {
       const status = (p.status || '').toLowerCase();
       return status.includes('progress') || status === 'in_progress';
     });
-
+    
     const completedProblems = allProblems.filter(p => {
       const status = (p.status || '').toLowerCase();
       return status === 'done' || status === 'completed' || status === 'resolved';
     });
-
+    
     const calculatedStats = {
       my_problems: userProblems.length,
       assigned_to_me: assignedProblems.length,
       in_progress: inProgressProblems.length,
       completed: completedProblems.length
     };
-
+    
     console.log('📈 Calculated stats:', calculatedStats);
     setStats(calculatedStats);
   };
@@ -212,7 +212,7 @@ export default function EmployeeDashboard() {
       });
       return;
     }
-
+    
     const analyticsData = {
       total: allProblems.length,
       pending: allProblems.filter(p => {
@@ -228,19 +228,19 @@ export default function EmployeeDashboard() {
         return status === 'done' || status === 'completed' || status === 'resolved';
       }).length,
       by_department: {
-        Engineering: allProblems.filter(p =>
-          p.department === 'IT & Innovation' ||
-          p.department === 'Engineering' ||
+        Engineering: allProblems.filter(p => 
+          p.department === 'IT & Innovation' || 
+          p.department === 'Engineering' || 
           p.department === 'IT'
         ).length,
-        Business: allProblems.filter(p =>
-          p.department === 'Business' ||
-          p.department === 'Sales' ||
+        Business: allProblems.filter(p => 
+          p.department === 'Business' || 
+          p.department === 'Sales' || 
           p.department === 'Marketing'
         ).length,
-        Accounts: allProblems.filter(p =>
-          p.department === 'Accounts' ||
-          p.department === 'Finance' ||
+        Accounts: allProblems.filter(p => 
+          p.department === 'Accounts' || 
+          p.department === 'Finance' || 
           p.department === 'Accounting'
         ).length
       },
@@ -259,67 +259,67 @@ export default function EmployeeDashboard() {
         }).length
       }
     };
-
+    
     console.log('📊 Analytics data:', analyticsData);
     setAnalytics(analyticsData);
   };
 
   // Domain status fetch function with error handling
   const fetchDomainStatus = async () => {
-    try {
-      setDomainLoading(true);
-      console.log('🌐 Fetching domain status...');
-
-      // Try to get data from localStorage first (shared with DomainStatus.js)
-      const storedDomainData = localStorage.getItem('domainStatusData');
-      if (storedDomainData) {
-        const parsedData = JSON.parse(storedDomainData);
-        // Check if data is recent (less than 5 minutes old)
-        if (Date.now() - parsedData.timestamp < 5 * 60 * 1000) {
-          setDomains(parsedData.domains);
-          setLastUpdated(new Date(parsedData.lastUpdated));
-          setDomainLoading(false);
-          return;
-        }
+  try {
+    setDomainLoading(true);
+    console.log('🌐 Fetching domain status...');
+    
+    // Try to get data from localStorage first (shared with DomainStatus.js)
+    const storedDomainData = localStorage.getItem('domainStatusData');
+    if (storedDomainData) {
+      const parsedData = JSON.parse(storedDomainData);
+      // Check if data is recent (less than 5 minutes old)
+      if (Date.now() - parsedData.timestamp < 5 * 60 * 1000) {
+        setDomains(parsedData.domains);
+        setLastUpdated(new Date(parsedData.lastUpdated));
+        setDomainLoading(false);
+        return;
       }
-
-      // If no recent data in localStorage, fetch from API
-      const response = await api.get('/domains/status');
-
-      // Process the API response based on its structure
-      const data = response.data;
-
-      // Save to localStorage for sharing
-      const domainData = {
-        domains: data,
-        lastUpdated: new Date().toISOString(),
-        timestamp: Date.now()
-      };
-      localStorage.setItem('domainStatusData', JSON.stringify(domainData));
-
-      // Dispatch a custom event to notify other components
-      window.dispatchEvent(new CustomEvent('domainStatusUpdated', { detail: domainData }));
-
-      setDomains(data);
-      setLastUpdated(new Date());
-
-      console.log('✅ Domain status updated:', {
-        total: Object.keys(data).length,
-        up: Object.values(data).filter(d => d.is_up).length,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (err) {
-      console.error('❌ Domain status fetch error:', err);
-      // Set fallback domain data
-      setDomains({
-        'example.com': { is_up: true, response_time: 150 },
-        'test.com': { is_up: false, response_time: 0 }
-      });
-    } finally {
-      setDomainLoading(false);
     }
-  };
+    
+    // If no recent data in localStorage, fetch from API
+    const response = await api.get('/domains/status');
+    
+    // Process the API response based on its structure
+    const data = response.data;
+    
+    // Save to localStorage for sharing
+    const domainData = {
+      domains: data,
+      lastUpdated: new Date().toISOString(),
+      timestamp: Date.now()
+    };
+    localStorage.setItem('domainStatusData', JSON.stringify(domainData));
+    
+    // Dispatch a custom event to notify other components
+    window.dispatchEvent(new CustomEvent('domainStatusUpdated', { detail: domainData }));
+    
+    setDomains(data);
+    setLastUpdated(new Date());
+    
+    console.log('✅ Domain status updated:', {
+      total: Object.keys(data).length,
+      up: Object.values(data).filter(d => d.is_up).length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (err) {
+    console.error('❌ Domain status fetch error:', err);
+    // Set fallback domain data
+    setDomains({
+      'example.com': { is_up: true, response_time: 150 },
+      'test.com': { is_up: false, response_time: 0 }
+    });
+  } finally {
+    setDomainLoading(false);
+  }
+};
 
   // Domain status calculations
   const totalDomains = Object.keys(domains).length;
@@ -330,7 +330,7 @@ export default function EmployeeDashboard() {
   // Get status badge class
   const getStatusBadge = (status) => {
     if (!status) return 'bg-secondary text-white';
-
+    
     const statusLower = status.toLowerCase();
     const badges = {
       pending: 'bg-warning text-dark',
@@ -344,7 +344,7 @@ export default function EmployeeDashboard() {
       pending_approval: 'bg-secondary text-white',
       closed: 'bg-dark text-white'
     };
-
+    
     return badges[statusLower] || 'bg-secondary text-white';
   };
 
@@ -365,42 +365,42 @@ export default function EmployeeDashboard() {
 
   // Get assigned user name
   const getAssignedToName = (problem) => {
-    // Check multiple possible structures
-    if (problem.assigned_to && problem.assigned_to.name) {
-      return problem.assigned_to.name;
-    }
-    if (problem.assigned_to_name) {
-      return problem.assigned_to_name;
-    }
-    if (problem.assignedTo) {
-      return problem.assignedTo;
-    }
-    if (problem.assigned_user_name) {
-      return problem.assigned_user_name;
-    }
-    return 'Unassigned';
-  };
+  // Check multiple possible structures
+  if (problem.assigned_to && problem.assigned_to.name) {
+    return problem.assigned_to.name;
+  }
+  if (problem.assigned_to_name) {
+    return problem.assigned_to_name;
+  }
+  if (problem.assignedTo) {
+    return problem.assignedTo;
+  }
+  if (problem.assigned_user_name) {
+    return problem.assigned_user_name;
+  }
+  return 'Unassigned';
+};
 
   // Get created by name
   const getCreatedByName = (problem) => {
-    // Check multiple possible structures
-    if (problem.created_by && problem.created_by.name) {
-      return problem.created_by.name;
-    }
-    if (problem.created_by_name) {
-      return problem.created_by_name;
-    }
-    if (problem.createdBy) {
-      return problem.createdBy;
-    }
-    if (problem.user_name) {
-      return problem.user_name;
-    }
-    if (problem.created_by) {
-      return problem.created_by; // In case it's just an ID or string
-    }
-    return 'Unknown';
-  };
+  // Check multiple possible structures
+  if (problem.created_by && problem.created_by.name) {
+    return problem.created_by.name;
+  }
+  if (problem.created_by_name) {
+    return problem.created_by_name;
+  }
+  if (problem.createdBy) {
+    return problem.createdBy;
+  }
+  if (problem.user_name) {
+    return problem.user_name;
+  }
+  if (problem.created_by) {
+    return problem.created_by; // In case it's just an ID or string
+  }
+  return 'Unknown';
+};
 
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
@@ -440,12 +440,12 @@ export default function EmployeeDashboard() {
   return (
     <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: '#f8f9fa' }}>
       <Navbar />
-
+      
       <div className="d-flex flex-grow-1">
         {/* Sidebar */}
-        <div
+        <div 
           className="bg-dark text-white position-relative"
-          style={{
+          style={{ 
             width: sidebarMinimized ? '70px' : '250px',
             minHeight: '100%',
             transition: 'width 0.3s ease'
@@ -467,8 +467,8 @@ export default function EmployeeDashboard() {
               cursor: 'pointer',
             }}
           >
-            {sidebarMinimized
-              ? <FaChevronRight size={14} color="#333" />
+            {sidebarMinimized 
+              ? <FaChevronRight size={14} color="#333" /> 
               : <FaChevronLeft size={14} color="#333" />
             }
           </button>
@@ -481,84 +481,85 @@ export default function EmployeeDashboard() {
             )}
             <ul className="nav flex-column">
               <li className="nav-item mb-2">
-                <Link
-                  to="/dashboard"
+                <Link 
+                  to="/dashboard" 
                   className="nav-link text-white  rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="Dashboard"
                 >
-                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link
-                  to="/problem/create"
+                <Link 
+                  to="/problem/create" 
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="Create Problem"
                 >
-                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link
-                  to="/problems"
+                <Link 
+                  to="/problems" 
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="All Problems"
                 >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
               <li className="nav-item mb-2">
-                <Link
-                  to="/reports"
+                <Link 
+                  to="/reports" 
                   className="nav-link text-white rounded d-flex align-items-center"
                   style={{ transition: 'all 0.2s ease' }}
                   title="Reports"
                 >
-                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                 </Link>
               </li>
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
                 <>
                   <li className="nav-item mb-2">
-                    <Link
-                      to="/admin"
+                    <Link 
+                      to="/admin" 
                       className="nav-link text-white rounded d-flex align-items-center"
                       style={{ transition: 'all 0.2s ease' }}
                       title="Admin Panel"
                     >
-                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                       {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                     </Link>
                   </li>
                   <li className="nav-item mb-2">
-                    <Link
-                      to="/domain-status"
+                    <Link 
+                      to="/domain-status" 
                       className="nav-link text-white rounded d-flex align-items-center"
                       style={{ transition: 'all 0.2s ease' }}
                       title="Domain Status"
                     >
-                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} />
+                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                       {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
                     </Link>
                   </li>
                   <li className="nav-item mb-2">
-                    <Link
-                      to="/roles"
-                      className="nav-link text-white rounded d-flex align-items-center"
-                      style={{ transition: 'all 0.2s ease' }}
-                      title="Role Management"
-                    >
-                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
-                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
-                    </Link>
-                  </li>
+                  <Link
+                    to="/roles"
+                    className="nav-link text-white rounded d-flex align-items-center"
+                    
+                    
+                    title="Role Management"
+                  >
+                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px', color: 'white' }} />
+                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem', color: 'white' }}>Role Management</span>}
+                  </Link>
+                </li>
                 </>
               )}
             </ul>
@@ -566,9 +567,9 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* Main Content */}
-        <div
-          className="flex-grow-1 p-4"
-          style={{
+        <div 
+          className="flex-grow-1 p-4" 
+          style={{ 
             overflowY: 'auto',
             transition: 'margin-left 0.3s ease'
           }}
@@ -584,7 +585,7 @@ export default function EmployeeDashboard() {
             <div className="d-flex align-items-center gap-2">
               {lastUpdated && (
                 <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                  
+                  Updated: {lastUpdated.toLocaleTimeString()}
                 </small>
               )}
               {/* <button 
@@ -593,9 +594,10 @@ export default function EmployeeDashboard() {
                 disabled={domainLoading}
                 style={{ fontSize: '0.8rem', padding: '4px 8px' }}
                 title="Refresh domain status data only"
-              >
-                <FaSyncAlt className={domainLoading ? 'spinning' : ''} style={{ marginRight: '4px' }} />
-                {domainLoading ? 'Refreshing...' : 'Refresh Domains'}
+                       <small className="text-muted" style={{ fontSize: '0.75rem' }}>
+                  
+                </small>
+efresh Domains'}
               </button> */}
             </div>
           </div>
@@ -618,9 +620,9 @@ export default function EmployeeDashboard() {
                       <FaGlobe size={20} color="white" />
                     </div>
                   </div>
-                  <h2 className="mb-1" style={{
-                    fontSize: '2rem',
-                    fontWeight: '700',
+                  <h2 className="mb-1" style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700', 
                     color: '#2c3e50'
                   }}>
                     {domainLoading ? (
@@ -654,9 +656,9 @@ export default function EmployeeDashboard() {
                       <FaCheckCircle size={20} color="white" />
                     </div>
                   </div>
-                  <h2 className="mb-1" style={{
-                    fontSize: '2rem',
-                    fontWeight: '700',
+                  <h2 className="mb-1" style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700', 
                     color: '#2c3e50'
                   }}>
                     {domainLoading ? (
@@ -695,9 +697,9 @@ export default function EmployeeDashboard() {
                       <FaTimesCircle size={20} color="white" />
                     </div>
                   </div>
-                  <h2 className="mb-1" style={{
-                    fontSize: '2rem',
-                    fontWeight: '700',
+                  <h2 className="mb-1" style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700', 
                     color: '#2c3e50'
                   }}>
                     {domainLoading ? (
@@ -736,9 +738,9 @@ export default function EmployeeDashboard() {
                       <FaChartLine size={20} color="white" />
                     </div>
                   </div>
-                  <h2 className="mb-1" style={{
-                    fontSize: '2rem',
-                    fontWeight: '700',
+                  <h2 className="mb-1" style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700', 
                     color: '#2c3e50'
                   }}>
                     {domainLoading ? (
@@ -761,7 +763,7 @@ export default function EmployeeDashboard() {
               </div>
             </div>
           </div>
-
+          
           {/* Problem Management Stats - Compact */}
           {/* {stats && (
             <div className="row g-2 mb-3">
@@ -923,8 +925,8 @@ export default function EmployeeDashboard() {
                                   className="btn btn-sm btn-outline-primary"
                                   onClick={() => viewProblemDetails(issue)}
                                   title="View Problem Details"
-                                  style={{
-                                    padding: '4px 8px',
+                                  style={{ 
+                                    padding: '4px 8px', 
                                     fontSize: '0.75rem',
                                     borderWidth: '1px'
                                   }}
@@ -968,7 +970,7 @@ export default function EmployeeDashboard() {
                     <h5 className="card-title mb-3" style={{ color: '#2c3e50', fontWeight: '600', fontSize: '1rem' }}>
                       Analytics Overview
                     </h5>
-
+                    
                     <div className="row">
                       {/* Progress Chart */}
                       <div className="col-md-6">
@@ -978,7 +980,7 @@ export default function EmployeeDashboard() {
                         <div className="progress mb-3" style={{ height: '25px', borderRadius: '6px' }}>
                           <div
                             className="progress-bar"
-                            style={{
+                            style={{ 
                               width: analytics.total > 0 ? `${(analytics.pending / analytics.total) * 100}%` : '0%',
                               backgroundColor: '#f6c23e',
                               fontSize: '0.7rem',
@@ -989,7 +991,7 @@ export default function EmployeeDashboard() {
                           </div>
                           <div
                             className="progress-bar"
-                            style={{
+                            style={{ 
                               width: analytics.total > 0 ? `${(analytics.in_progress / analytics.total) * 100}%` : '0%',
                               backgroundColor: '#36b9cc',
                               fontSize: '0.7rem',
@@ -1000,7 +1002,7 @@ export default function EmployeeDashboard() {
                           </div>
                           <div
                             className="progress-bar"
-                            style={{
+                            style={{ 
                               width: analytics.total > 0 ? `${(analytics.done / analytics.total) * 100}%` : '0%',
                               backgroundColor: '#1cc88a',
                               fontSize: '0.7rem',
@@ -1010,7 +1012,7 @@ export default function EmployeeDashboard() {
                             {analytics.done > 0 && `Solved: ${analytics.done}`}
                           </div>
                         </div>
-
+                        
                         {/* Status counts */}
                         <div className="row text-center">
                           <div className="col-4">
@@ -1071,7 +1073,7 @@ export default function EmployeeDashboard() {
                             </div>
                           </div>
                         </div>
-
+                        
                         {/* Department Stats */}
                         {/* <h6 className="mb-2" style={{ color: '#495057', fontWeight: '500', fontSize: '0.9rem' }}>
                           Department Distribution
@@ -1122,8 +1124,8 @@ export default function EmployeeDashboard() {
                   <FaExclamationTriangle className="me-2" />
                   Problem Details - ID:{selectedProblem.id || selectedProblem.problem_id || 'N/A'}
                 </h6>
-                <button
-                  type="button"
+                <button 
+                  type="button" 
                   className="btn-close btn-close-white btn-sm"
                   onClick={() => {
                     setShowProblemModal(false);
@@ -1168,16 +1170,16 @@ export default function EmployeeDashboard() {
                     )}
                   </div>
                 </div>
-
+                
                 <div className="p-3 bg-light rounded">
                   <h6 className="mb-2">Problem Statement:</h6>
                   <p className="mb-0" style={{ fontSize: '1.05rem', lineHeight: '1.6' }}>
                     {selectedProblemStatement}
                   </p>
                 </div>
-
+                
                 <div className="text-center mt-3">
-                  <button
+                  <button 
                     className="btn btn-primary btn-sm"
                     onClick={() => {
                       setShowProblemModal(false);

@@ -798,110 +798,121 @@ const toggleSidebar = () => {
       <div className="d-flex flex-grow-1">
         {/* Sidebar - Same as Dashboard */}
         <div 
-          className="bg-dark text-white position-relative"
-          style={{ 
-            width: sidebarMinimized ? '70px' : '250px',
-            minHeight: '100%',
-            transition: 'width 0.3s ease'
-          }}
-        >
-          <button
-            onClick={toggleSidebar}
-            className="position-absolute d-flex align-items-center justify-content-center"
-            style={{
-              top: '10px',
-              right: '-12px',
-              borderRadius: '50%',
-              width: '28px',
-              height: '28px',
-              backgroundColor: '#fff',
-              border: '1px solid #ccc',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-              zIndex: 1000,
-              cursor: 'pointer',
-            }}
-          >
-            {sidebarMinimized 
-              ? <FaChevronRight size={14} color="#333" /> 
-              : <FaChevronLeft size={14} color="#333" />
-            }
-          </button>
+  className="bg-dark text-white position-relative"
+  style={{ 
+    width: sidebarMinimized ? '70px' : '250px',
+    minHeight: '100%',
+    transition: 'width 0.3s ease'
+  }}
+>
+  <button
+    onClick={toggleSidebar}
+    className="position-absolute d-flex align-items-center justify-content-center"
+    style={{
+      top: '10px',
+      right: '-12px',
+      borderRadius: '50%',
+      width: '28px',
+      height: '28px',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+      zIndex: 1000,
+      cursor: 'pointer',
+    }}
+  >
+    {sidebarMinimized 
+      ? <FaChevronRight size={14} color="#333" /> 
+      : <FaChevronLeft size={14} color="#333" />}
+  </button>
 
-          <div className="p-3">
-            {!sidebarMinimized && (
-              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
-                Navigation
-              </h5>
-            )}
-            <ul className="nav flex-column">
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/dashboard" 
-                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
-                  title="Dashboard"
-                >
-                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
-                </Link>
-              </li>
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/problem/create" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  title="Create Problem"
-                >
-                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
-                </Link>
-              </li>
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/problems" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  title="All Problems"
-                >
-                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-                </Link>
-              </li>
-              <li className="nav-item mb-2">
-                <Link 
-                  to="/reports" 
-                  className="nav-link text-white rounded d-flex align-items-center"
-                  title="Reports"
-                >
-                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
-                </Link>
-              </li>              {(user?.role === 'admin' || user?.role === 'team_leader') && (
-                <>
-                  <li className="nav-item mb-2">
-                    <Link 
-                      to="/admin" 
-                      className="nav-link text-white rounded d-flex align-items-center"
-                      style={{ transition: 'all 0.2s ease' }}
-                      title="Admin Panel"
-                    >
-                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
-                    </Link>
-                  </li>
-                  <li className="nav-item mb-2">
-                    <Link 
-                      to="/domain-status" 
-                      className="nav-link text-white rounded d-flex align-items-center"
-                      style={{ transition: 'all 0.2s ease' }}
-                      title="Domain Status"
-                    >
-                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
-                    </Link>
-                  </li>
-                </>
-              )}
-            </ul>
-          </div>
-        </div>
+  <div className="p-3">
+    {!sidebarMinimized && (
+      <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+        Navigation
+      </h5>
+    )}
+    <ul className="nav flex-column">
+      <li className="nav-item mb-2">
+        <Link 
+          to="/dashboard" 
+          className="nav-link text-white rounded d-flex align-items-center"
+          title="Dashboard"
+        >
+          <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+        </Link>
+      </li>
+      <li className="nav-item mb-2">
+        <Link 
+          to="/problem/create" 
+          className="nav-link text-white rounded d-flex align-items-center"
+          title="Create Problem"
+        >
+          <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+        </Link>
+      </li>
+      <li className="nav-item mb-2">
+        <Link 
+          to="/problems" 
+          className="nav-link text-white rounded d-flex align-items-center"
+          title="All Problems"
+        >
+          <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+        </Link>
+      </li>
+      <li className="nav-item mb-2">
+        <Link 
+          to="/reports" 
+          className="nav-link text-white rounded d-flex align-items-center"
+          title="Reports"
+        >
+          <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+        </Link>
+      </li>
+      
+      {(user?.role === 'admin' || user?.role === 'team_leader') && (
+        <>
+          <li className="nav-item mb-2">
+            <Link 
+              to="/admin" 
+              className="nav-link text-white rounded d-flex align-items-center"
+              title="User Management"
+            >
+              <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+              {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+            </Link>
+          </li>
+          
+          <li className="nav-item mb-2">
+            <Link 
+              to="/domain-status" 
+              className="nav-link text-white rounded d-flex align-items-center"
+              title="Domain Status"
+            >
+              <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+              {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+            </Link>
+          </li>
+          
+          <li className="nav-item mb-2">
+            <Link 
+              to="/roles" 
+              className="nav-link text-white rounded d-flex align-items-center"
+              title="Role Management"
+            >
+              <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+              {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
+            </Link>
+          </li>
+        </>
+      )}
+    </ul>
+  </div>
+</div>
 
         {/* Main Content */}
         <div 

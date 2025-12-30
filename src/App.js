@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./pages/Login";
@@ -34,7 +34,28 @@ function App() {
     <AuthProvider>
       <NotificationProvider>
         <Router>
-          <ToastContainer position="top-right" autoClose={3000} pauseOnHover={false} pauseOnFocusLoss={false} closeOnClick={true} draggable={false} newestOnTop closeButton={true} hideProgressBar={false} limit={5} toastClassName="custom-toast" progressClassName="custom-progress" />
+          {/* ✅ FIXED: Toast Container with proper configuration */}
+          <ToastContainer 
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop={true}
+            closeOnClick={true}
+            rtl={false}
+            pauseOnFocusLoss={false}
+            draggable={false}
+            pauseOnHover={false}
+            theme="light"
+            limit={5}
+            style={{
+              zIndex: 9999
+            }}
+            toastStyle={{
+              fontSize: '14px',
+              borderRadius: '8px'
+            }}
+          />
+
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<Login />} />

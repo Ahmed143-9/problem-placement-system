@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -16,8 +16,11 @@ import {
     FaChevronLeft,
     FaChevronRight,
     FaPlusCircle,
-    FaEllipsisV,
-    FaCheck
+    FaCheck,
+    FaSync,
+    FaSpinner,
+    FaInfoCircle,
+    FaExclamationCircle
 } from 'react-icons/fa';
 
 export default function RoleManagement() {
@@ -33,11 +36,8 @@ export default function RoleManagement() {
     const [permissionsLoading, setPermissionsLoading] = useState(false);
     const [modalLoading, setModalLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [actionMenuId, setActionMenuId] = useState(null);
-
-    // Pagination State
-    const [currentPage, setCurrentPage] = useState(1);
-    const ITEMS_PER_PAGE = 10;
+    const [deletingRoleId, setDeletingRoleId] = useState(null);
+    const [permissionError, setPermissionError] = useState(null);
 
     // Modal State
     const [showModal, setShowModal] = useState(false);
@@ -45,22 +45,43 @@ export default function RoleManagement() {
     const [selectedRoleId, setSelectedRoleId] = useState(null);
     const [name, setName] = useState('');
     const [selectedPermissions, setSelectedPermissions] = useState([]);
+    const [fetchingPermissions, setFetchingPermissions] = useState(false);
+    const [initialPermissionsLoaded, setInitialPermissionsLoaded] = useState(false);
 
-    // Close dropdowns on click outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (actionMenuId !== null && !event.target.closest('.action-menu-container')) {
-                setActionMenuId(null);
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [actionMenuId]);
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+
+    // Default permissions (fallback if API fails)
+    const defaultPermissions = [
+        { id: 1, name: 'create user' },
+        { id: 2, name: 'edit user' },
+        { id: 3, name: 'delete user' },
+        { id: 4, name: 'view user' },
+        { id: 5, name: 'create role' },
+        { id: 6, name: 'edit role' },
+        { id: 7, name: 'delete role' },
+        { id: 8, name: 'view role' },
+        { id: 9, name: 'create problem' },
+        { id: 10, name: 'edit problem' },
+        { id: 11, name: 'delete problem' },
+        { id: 12, name: 'view problem' }
+    ];
 
     useEffect(() => {
         fetchRoles();
-        fetchPermissions();
+        fetchAllPermissions();
     }, []);
+
+    // Debug effect
+    useEffect(() => {
+        if (selectedPermissions.length > 0) {
+            console.log('🔄 Selected Permissions:', {
+                count: selectedPermissions.length,
+                ids: selectedPermissions
+            });
+        }
+    }, [selectedPermissions]);
 
     // --- API Functions ---
 
@@ -68,93 +89,221 @@ export default function RoleManagement() {
         try {
             setLoading(true);
             setError(null);
-            // Use api service which handles base URL and tokens
             const response = await api.post('/v1/role/getAllRoles');
 
             const data = response.data;
-            const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
+            console.log('📊 Roles API Response:', data);
 
+            const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
             const roleList = data?.data?.rolelist ?? data?.rolelist ?? [];
 
             if (ok) {
                 setRoles(Array.isArray(roleList) ? roleList : []);
-                console.log('Roles fetched successfully:', roleList);
+                console.log(`✅ Loaded ${roleList.length} roles`);
             } else {
                 setError(data?.message || 'Failed to fetch roles');
             }
         } catch (err) {
-            console.error('Fetch roles error:', err);
+            console.error('❌ Fetch roles error:', err);
             setError('Error connecting to server');
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchPermissions = async () => {
+    const fetchAllPermissions = async () => {
         try {
             setPermissionsLoading(true);
+            setPermissionError(null);
+            console.log('🔄 Fetching all permissions...');
+            
             const response = await api.post('/v1/permission/getAllpermissions');
-
             const data = response.data;
-            const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
+            console.log('📊 Permissions API Response:', data);
 
+            const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
             const permissionList = data?.data?.permissionlist ?? data?.permissionlist ?? [];
 
             if (ok) {
                 const permissions = Array.isArray(permissionList) ? permissionList : [];
+                console.log(`✅ Loaded ${permissions.length} permissions from API`);
                 setAllPermissions(permissions);
                 setPermissionGroups(groupPermissions(permissions));
             } else {
-                console.error('Failed to fetch permissions:', data?.message);
+                // User doesn't have permission to view permissions list
+                console.warn('⚠️ Cannot fetch permissions list. Using default permissions.');
+                setPermissionError('You do not have permission to view the permissions list. Using default permissions.');
+                setAllPermissions(defaultPermissions);
+                setPermissionGroups(groupPermissions(defaultPermissions));
+                
+                addNotification({
+                    type: 'warning',
+                    title: 'Limited Access',
+                    message: 'Using default permissions. Contact admin for full access.',
+                    color: 'warning',
+                    icon: '⚠️'
+                });
             }
         } catch (err) {
-            console.error('Fetch permissions error:', err);
+            console.error('❌ Fetch permissions error:', err);
+            setPermissionError('Failed to load permissions. Using default set.');
+            setAllPermissions(defaultPermissions);
+            setPermissionGroups(groupPermissions(defaultPermissions));
         } finally {
             setPermissionsLoading(false);
         }
     };
 
+    // Fetch permissions for a specific role
     const fetchRolePermissions = async (roleId) => {
         try {
+            console.log(`🔍 Fetching permissions for role ID: ${roleId}`);
+            
             const response = await api.post('/v1/role/getRole', { id: roleId });
             const data = response.data;
+            console.log('📊 Role Detail Response:', data);
+
             const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
 
             if (ok) {
-                // Backend returns array of permission NAMES
-                const permissionNames = data?.permissions ?? data?.data?.permissions ?? [];
-
-                // Map names to IDs for local state
-                const permissionIds = [];
-                permissionNames.forEach(permName => {
-                    const found = allPermissions.find(p => p.name === permName);
-                    if (found) {
-                        permissionIds.push(Number(found.id));
+                let permissionIds = [];
+                
+                // Try to extract permissions from various response structures
+                if (data.data?.permissions && Array.isArray(data.data.permissions)) {
+                    // Handle array of permission objects or names
+                    data.data.permissions.forEach(perm => {
+                        if (perm && typeof perm === 'object' && perm.id) {
+                            permissionIds.push(Number(perm.id));
+                        } else if (typeof perm === 'string') {
+                            // Find permission by name
+                            const foundPerm = allPermissions.find(p => 
+                                p.name === perm || 
+                                p.name.toLowerCase() === perm.toLowerCase()
+                            );
+                            if (foundPerm) {
+                                permissionIds.push(Number(foundPerm.id));
+                            }
+                        } else if (typeof perm === 'number') {
+                            permissionIds.push(Number(perm));
+                        }
+                    });
+                } else if (data.data?.role?.permissions) {
+                    // Handle nested role object
+                    const rolePerms = data.data.role.permissions;
+                    if (Array.isArray(rolePerms)) {
+                        rolePerms.forEach(perm => {
+                            if (perm && perm.id) {
+                                permissionIds.push(Number(perm.id));
+                            }
+                        });
                     }
-                });
+                } else if (data.permissions && Array.isArray(data.permissions)) {
+                    // Handle direct permissions array
+                    data.permissions.forEach(perm => {
+                        if (perm && perm.id) {
+                            permissionIds.push(Number(perm.id));
+                        } else if (typeof perm === 'number') {
+                            permissionIds.push(Number(perm));
+                        }
+                    });
+                }
+                
+                // Remove duplicates
+                permissionIds = [...new Set(permissionIds)];
+                console.log(`✅ Retrieved ${permissionIds.length} permissions for role ${roleId}`);
                 return permissionIds;
+            } else {
+                console.warn('⚠️ No permissions found for role, returning empty array');
+                return [];
             }
-            return [];
         } catch (err) {
-            console.error('Fetch role permissions error:', err);
+            console.error('❌ Fetch role permissions error:', err);
             return [];
         }
     };
 
+    // Delete Role Function
+    const handleDeleteRole = async (role) => {
+        if (!window.confirm(`Are you sure you want to delete the role "${role.name}"?\n\nThis action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            setDeletingRoleId(role.id);
+            
+            const response = await api.post('/v1/role/deleteRole', { id: role.id });
+            const data = response.data;
+            console.log('🗑️ Delete response:', data);
+
+            const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
+
+            if (ok) {
+                addNotification({
+                    type: 'success',
+                    title: 'Success',
+                    message: `Role "${role.name}" deleted successfully`,
+                    color: 'success',
+                    icon: '✅'
+                });
+                
+                // Refresh roles list
+                await fetchRoles();
+            } else {
+                addNotification({
+                    type: 'error',
+                    title: 'Error',
+                    message: data?.message || 'Failed to delete role',
+                    color: 'danger',
+                    icon: '❌'
+                });
+            }
+        } catch (err) {
+            console.error('❌ Delete role error:', err);
+            addNotification({
+                type: 'error',
+                title: 'Error',
+                message: err.message || 'Server connection error',
+                color: 'danger',
+                icon: '❌'
+            });
+        } finally {
+            setDeletingRoleId(null);
+        }
+    };
+
+    // Submit Role (Create/Update)
     const handleSubmit = async () => {
         if (!name.trim()) {
-            addNotification({ type: 'error', title: 'Error', message: 'Role name is required', color: 'danger', icon: '⚠️' });
+            addNotification({ 
+                type: 'error', 
+                title: 'Error', 
+                message: 'Role name is required', 
+                color: 'danger', 
+                icon: '⚠️' 
+            });
             return;
+        }
+
+        // Optional: Warn if no permissions selected
+        if (selectedPermissions.length === 0) {
+            if (!window.confirm('No permissions selected. Are you sure you want to create/update this role without any permissions?')) {
+                return;
+            }
         }
 
         try {
             setModalLoading(true);
 
-            // Convert IDs back to Names for backend
+            // Convert permission IDs to names for backend
             const permissionNames = selectedPermissions.map(id => {
                 const p = allPermissions.find(px => Number(px.id) === Number(id));
                 return p ? p.name : null;
             }).filter(Boolean);
+
+            console.log('📤 Submitting role:', {
+                name: name.trim(),
+                permissionCount: permissionNames.length
+            });
 
             const endpoint = isEditing ? '/v1/role/updateRole' : '/v1/role/createRole';
             const payload = {
@@ -169,18 +318,23 @@ export default function RoleManagement() {
 
             const response = await api.post(endpoint, payload);
             const data = response.data;
+            console.log('📥 Submit response:', data);
+            
             const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
 
             if (ok) {
                 addNotification({
                     type: 'success',
                     title: 'Success',
-                    message: isEditing ? 'Role updated' : 'Role created',
+                    message: isEditing 
+                        ? `Role "${name}" updated successfully` 
+                        : `Role "${name}" created successfully`,
                     color: 'success',
                     icon: '✅'
                 });
+                
                 setShowModal(false);
-                fetchRoles();
+                await fetchRoles();
             } else {
                 addNotification({
                     type: 'error',
@@ -191,7 +345,7 @@ export default function RoleManagement() {
                 });
             }
         } catch (err) {
-            console.error('Submit role error:', err);
+            console.error('❌ Submit role error:', err);
             addNotification({
                 type: 'error',
                 title: 'Error',
@@ -207,29 +361,34 @@ export default function RoleManagement() {
     // --- Helper Functions ---
 
     const groupPermissions = (permissions) => {
+        if (!Array.isArray(permissions) || permissions.length === 0) {
+            return [];
+        }
+
         const groups = {};
         permissions.forEach((p) => {
-            const rawName = (p.name || '').trim();
-            if (!rawName) return;
-            const firstToken = rawName.split(' ')[0].toLowerCase();
-            const groupKey = firstToken || 'other';
+            if (!p || !p.name) return;
+            
+            const rawName = p.name.trim();
+            // Group by first word
+            const firstWord = rawName.split(' ')[0].toLowerCase();
+            const groupKey = firstWord || 'other';
+            
             if (!groups[groupKey]) {
                 groups[groupKey] = {
                     key: groupKey,
-                    label: firstToken.charAt(0).toUpperCase() + firstToken.slice(1),
+                    label: firstWord.charAt(0).toUpperCase() + firstWord.slice(1),
                     permissions: []
                 };
             }
             groups[groupKey].permissions.push(p);
         });
 
-        // Convert to array
         const groupArray = Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
-        groupArray.forEach(g => g.permissions.sort((x, y) => x.name.localeCompare(y.name)));
         return groupArray;
     };
 
-    // Selection Logic
+    // Permission Selection Helpers
     const togglePermissionSelection = (permissionId) => {
         setSelectedPermissions(prev => {
             return prev.includes(permissionId)
@@ -243,10 +402,10 @@ export default function RoleManagement() {
         const allSelected = pIds.every(id => selectedPermissions.includes(id));
 
         if (allSelected) {
-            // Unselect all
+            // Unselect all in group
             setSelectedPermissions(prev => prev.filter(id => !pIds.includes(id)));
         } else {
-            // Select all
+            // Select all in group
             setSelectedPermissions(prev => {
                 const unique = new Set([...prev, ...pIds]);
                 return Array.from(unique);
@@ -254,35 +413,67 @@ export default function RoleManagement() {
         }
     };
 
-    const isGroupFullySelected = (group) => group.permissions.every(p => selectedPermissions.includes(Number(p.id)));
+    const isGroupFullySelected = (group) => {
+        return group.permissions.every(p => selectedPermissions.includes(Number(p.id)));
+    };
+
     const isGroupPartiallySelected = (group) => {
-        const count = group.permissions.filter(p => selectedPermissions.includes(Number(p.id))).length;
-        return count > 0 && count < group.permissions.length;
+        const selectedCount = group.permissions.filter(p => selectedPermissions.includes(Number(p.id))).length;
+        return selectedCount > 0 && selectedCount < group.permissions.length;
     };
 
     // Modal Openers
     const openCreateModal = () => {
+        console.log('📝 Opening CREATE modal');
         setIsEditing(false);
         setName('');
         setSelectedPermissions([]);
         setSelectedRoleId(null);
+        setFetchingPermissions(false);
+        setInitialPermissionsLoaded(true);
         setShowModal(true);
     };
 
     const openEditModal = async (role) => {
+        console.log(`📝 Opening EDIT modal for role "${role.name}" (ID: ${role.id})`);
+        
+        // Set basic modal state
         setIsEditing(true);
         setName(role.name);
         setSelectedRoleId(role.id);
+        setFetchingPermissions(true);
+        setInitialPermissionsLoaded(false);
+        
+        // Show modal immediately
         setShowModal(true);
-        // Fetch current permissions
-        const ids = await fetchRolePermissions(role.id);
-        setSelectedPermissions(ids);
+        
+        // Clear previous selections
+        setSelectedPermissions([]);
+        
+        // Fetch role permissions
+        try {
+            const permissionIds = await fetchRolePermissions(role.id);
+            
+            console.log(`✅ Retrieved ${permissionIds.length} permissions for editing`);
+            
+            // Set the permissions
+            setSelectedPermissions(permissionIds);
+            setInitialPermissionsLoaded(true);
+            
+            if (permissionIds.length === 0) {
+                console.log('ℹ️ No permissions found for this role');
+            }
+        } catch (error) {
+            console.error('❌ Error fetching role permissions:', error);
+            setSelectedPermissions([]); // Clear on error
+        } finally {
+            setFetchingPermissions(false);
+        }
     };
 
     // --- UI Components ---
 
     const toggleSidebar = () => setSidebarMinimized(!sidebarMinimized);
-    const sidebarLinkStyle = { transition: 'all 0.2s ease' };
 
     // Pagination logic
     const totalItems = roles.length;
@@ -326,25 +517,25 @@ export default function RoleManagement() {
                         )}
                         <ul className="nav flex-column">
                             <li className="nav-item mb-2">
-                                <Link to="/dashboard" className="nav-link text-white rounded d-flex align-items-center" style={sidebarLinkStyle} title="Dashboard">
+                                <Link to="/dashboard" className="nav-link text-white rounded d-flex align-items-center" title="Dashboard">
                                     <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
                                 </Link>
                             </li>
                             <li className="nav-item mb-2">
-                                <Link to="/problem/create" className="nav-link text-white rounded d-flex align-items-center" style={sidebarLinkStyle} title="Create Problem">
+                                <Link to="/problem/create" className="nav-link text-white rounded d-flex align-items-center" title="Create Problem">
                                     <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
                                 </Link>
                             </li>
                             <li className="nav-item mb-2">
-                                <Link to="/problems" className="nav-link text-white rounded d-flex align-items-center" style={sidebarLinkStyle} title="All Problems">
+                                <Link to="/problems" className="nav-link text-white rounded d-flex align-items-center" title="All Problems">
                                     <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                                 </Link>
                             </li>
                             <li className="nav-item mb-2">
-                                <Link to="/reports" className="nav-link text-white rounded d-flex align-items-center" style={sidebarLinkStyle} title="Reports">
+                                <Link to="/reports" className="nav-link text-white rounded d-flex align-items-center" title="Reports">
                                     <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                     {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
                                 </Link>
@@ -352,20 +543,20 @@ export default function RoleManagement() {
                             {(user?.role === 'admin' || user?.role === 'team_leader') && (
                                 <>
                                     <li className="nav-item mb-2">
-                                        <Link to="/admin" className="nav-link text-white rounded d-flex align-items-center" style={sidebarLinkStyle} title="User Management">
+                                        <Link to="/admin" className="nav-link text-white rounded d-flex align-items-center" title="User Management">
                                             <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                             {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
                                         </Link>
                                     </li>
                                     <li className="nav-item mb-2">
-                                        <Link to="/domain-status" className="nav-link text-white rounded d-flex align-items-center" style={sidebarLinkStyle} title="Domain Status">
+                                        <Link to="/domain-status" className="nav-link text-white rounded d-flex align-items-center" title="Domain Status">
                                             <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                             {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
                                         </Link>
                                     </li>
-                                    {/* Active Page Helper */}
+                                    {/* Active Page */}
                                     <li className="nav-item mb-2">
-                                        <Link to="/roles" className="nav-link text-white bg-primary rounded d-flex align-items-center" style={sidebarLinkStyle} title="Role Management">
+                                        <Link to="/roles" className="nav-link text-white bg-primary rounded d-flex align-items-center" title="Role Management">
                                             <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} />
                                             {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
                                         </Link>
@@ -378,14 +569,22 @@ export default function RoleManagement() {
 
                 {/* Main Content */}
                 <div className="flex-grow-1 p-4" style={{ overflowY: 'auto', transition: 'margin-left 0.3s ease' }}>
-
                     {/* Header */}
                     <div className="d-flex justify-content-between align-items-center mb-4">
                         <div>
                             <h1 className="h3 mb-0" style={{ color: '#333' }}>Role Management</h1>
                             <p className="text-muted mb-0 small">Manage user roles and permissions</p>
                         </div>
-                        {/* Breadcrumb replacement or actions */}
+                        <div className="d-flex gap-2">
+                            <button
+                                className="btn btn-outline-secondary btn-sm d-flex align-items-center"
+                                onClick={fetchRoles}
+                                disabled={loading}
+                            >
+                                <FaSync className={loading ? 'fa-spin me-1' : 'me-1'} size={12} />
+                                Refresh Roles
+                            </button>
+                        </div>
                     </div>
 
                     {error && (
@@ -394,7 +593,14 @@ export default function RoleManagement() {
                         </div>
                     )}
 
-                    {/* Card */}
+                    {permissionError && (
+                        <div className="alert alert-warning">
+                            <FaExclamationCircle className="me-2" />
+                            {permissionError}
+                        </div>
+                    )}
+
+                    {/* Roles Table Card */}
                     <div className="card border-0 shadow-sm">
                         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3">
                             <h5 className="mb-0" style={{ color: '#333' }}>Roles List</h5>
@@ -411,17 +617,18 @@ export default function RoleManagement() {
                         <div className="card-body p-0">
                             <div className="table-responsive">
                                 <table className="table table-hover mb-0 align-middle">
-                                    <thead className="thead-light bg-light">
+                                    <thead className="table-dark">
                                         <tr>
-                                            <th className="text-center" style={{ width: '60px' }}>S/N</th>
-                                            <th>Name</th>
-                                            <th className="text-center" style={{ width: '100px' }}>Actions</th>
+                                            <th className="text-center" style={{ width: '60px' }}>#</th>
+                                            <th>Role Name</th>
+                                            <th>ID</th>
+                                            <th className="text-center" style={{ width: '140px' }}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {loading ? (
                                             <tr>
-                                                <td colSpan="3" className="text-center py-5">
+                                                <td colSpan="4" className="text-center py-5">
                                                     <div className="spinner-border text-primary" role="status">
                                                         <span className="visually-hidden">Loading...</span>
                                                     </div>
@@ -429,43 +636,54 @@ export default function RoleManagement() {
                                             </tr>
                                         ) : currentRoles.length === 0 ? (
                                             <tr>
-                                                <td colSpan="3" className="text-center py-4 text-muted">
-                                                    No roles found.
+                                                <td colSpan="4" className="text-center py-4 text-muted">
+                                                    No roles found. Click "Create New Role" to add one.
                                                 </td>
                                             </tr>
                                         ) : (
                                             currentRoles.map((role, index) => (
                                                 <tr key={role.id}>
-                                                    <td className="text-center">
+                                                    <td className="text-center fw-medium">
                                                         {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
                                                     </td>
-                                                    <td className="fw-semibold">{role.name}</td>
-                                                    <td className="text-center action-menu-container position-relative">
-                                                        <button
-                                                            className="btn btn-link text-dark p-0"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setActionMenuId(actionMenuId === role.id ? null : role.id);
-                                                            }}
-                                                        >
-                                                            <FaEllipsisV />
-                                                        </button>
-
-                                                        {actionMenuId === role.id && (
-                                                            <div className="position-absolute bg-white border rounded shadow-sm py-1"
-                                                                style={{ top: '100%', right: '0', zIndex: 10, minWidth: '120px' }}>
-                                                                <button
-                                                                    className="dropdown-item d-flex align-items-center small py-2"
-                                                                    onClick={() => openEditModal(role)}
-                                                                >
-                                                                    <FaEdit className="me-2 text-primary" /> Edit
-                                                                </button>
-                                                                {/* Optional Delete Button */}
-                                                                {/* <button className="dropdown-item d-flex align-items-center small py-2 text-danger">
-                                   <FaTrash className="me-2" /> Delete
-                                 </button> */}
-                                                            </div>
-                                                        )}
+                                                    <td className="fw-semibold">
+                                                        {role.name}
+                                                    </td>
+                                                    <td>
+                                                        <code className="bg-light px-2 py-1 rounded">{role.id}</code>
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <div className="d-flex justify-content-center gap-2">
+                                                            <button
+                                                                className="btn btn-sm btn-outline-primary d-flex align-items-center"
+                                                                onClick={() => openEditModal(role)}
+                                                                title="Edit Role"
+                                                                style={{ padding: '5px 10px', fontSize: '0.85rem' }}
+                                                                disabled={permissionsLoading}
+                                                            >
+                                                                <FaEdit className="me-1" size={12} />
+                                                                Edit
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-sm btn-outline-danger d-flex align-items-center"
+                                                                onClick={() => handleDeleteRole(role)}
+                                                                title="Delete Role"
+                                                                style={{ padding: '5px 10px', fontSize: '0.85rem' }}
+                                                                disabled={deletingRoleId === role.id || loading}
+                                                            >
+                                                                {deletingRoleId === role.id ? (
+                                                                    <>
+                                                                        <span className="spinner-border spinner-border-sm me-1" />
+                                                                        Deleting...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <FaTrash className="me-1" size={12} />
+                                                                        Delete
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))
@@ -520,92 +738,244 @@ export default function RoleManagement() {
                 }}>
                     <div className="bg-white rounded shadow-lg d-flex flex-column" style={{ width: '95%', maxWidth: '800px', maxHeight: '90vh' }}>
                         {/* Modal Header */}
-                        <div className="border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
-                            <h5 className="mb-0">{isEditing ? 'Edit Role' : 'Create New Role'}</h5>
+                        <div className="border-bottom px-4 py-3 d-flex justify-content-between align-items-center bg-primary text-white">
+                            <h5 className="mb-0">
+                                {isEditing ? 'Edit Role' : 'Create New Role'}
+                                {isEditing && fetchingPermissions && (
+                                    <span className="badge bg-warning text-dark ms-2">
+                                        <FaSpinner className="fa-spin me-1" /> Loading...
+                                    </span>
+                                )}
+                            </h5>
                             <button
-                                className="btn-close"
+                                className="btn-close btn-close-white"
                                 onClick={() => setShowModal(false)}
                                 aria-label="Close"
+                                disabled={modalLoading}
                             ></button>
                         </div>
 
                         {/* Modal Body */}
                         <div className="p-4 overflow-auto">
+                            {/* Role Name Input */}
                             <div className="mb-4">
                                 <label className="form-label fw-bold">Role Name <span className="text-danger">*</span></label>
                                 <input
                                     type="text"
                                     className="form-control"
-                                    placeholder="Enter role name"
+                                    placeholder="Enter role name (e.g., admin, team_leader, user)"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
+                                    disabled={modalLoading}
                                 />
                             </div>
 
-                            <div>
-                                <label className="form-label fw-bold">Permissions</label>
+                            {/* Permission Status Section */}
+                            <div className="mb-4">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <label className="form-label fw-bold">Permissions</label>
+                                        {isEditing && (
+                                            <div className="text-muted small">
+                                                {fetchingPermissions ? (
+                                                    <span className="text-warning">
+                                                        <FaSpinner className="fa-spin me-1" /> Loading previous permissions...
+                                                    </span>
+                                                ) : initialPermissionsLoaded ? (
+                                                    <span className="text-success">
+                                                        <FaCheck className="me-1" /> {selectedPermissions.length} previous permissions loaded
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Permission Summary */}
+                                {selectedPermissions.length > 0 && (
+                                    <div className="alert alert-info py-2 mb-3">
+                                        <div className="d-flex align-items-center">
+                                            <FaInfoCircle className="me-2" />
+                                            <div>
+                                                <strong>{selectedPermissions.length} permission(s) selected</strong>
+                                                <div className="small mt-1">
+                                                    {selectedPermissions.slice(0, 3).map(id => {
+                                                        const perm = allPermissions.find(p => Number(p.id) === Number(id));
+                                                        return perm ? (
+                                                            <span key={id} className="badge bg-primary bg-opacity-25 text-primary me-1 mb-1">
+                                                                {perm.name}
+                                                            </span>
+                                                        ) : null;
+                                                    })}
+                                                    {selectedPermissions.length > 3 && (
+                                                        <span className="badge bg-secondary">
+                                                            +{selectedPermissions.length - 3} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Permissions Container */}
                                 <div className="border rounded bg-light p-3" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                     {permissionsLoading ? (
-                                        <div className="text-center py-3">Loading permissions...</div>
-                                    ) : permissionGroups.length === 0 ? (
-                                        <p className="text-muted text-center mb-0">No permissions found.</p>
+                                        <div className="text-center py-5">
+                                            <FaSpinner className="fa-spin text-primary mb-3" size={24} />
+                                            <p className="text-muted">Loading permissions...</p>
+                                        </div>
+                                    ) : allPermissions.length === 0 ? (
+                                        <div className="text-center py-4">
+                                            <FaExclamationCircle className="text-warning mb-2" size={24} />
+                                            <p className="text-muted">No permissions available</p>
+                                            <small className="text-muted d-block">
+                                                Contact administrator to configure permissions
+                                            </small>
+                                        </div>
+                                    ) : fetchingPermissions ? (
+                                        <div className="text-center py-4">
+                                            <div className="d-flex align-items-center justify-content-center">
+                                                <FaSpinner className="fa-spin text-primary me-2" />
+                                                <span>Loading previously granted permissions...</span>
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="row g-3">
-                                            {permissionGroups.map(group => (
-                                                <div key={group.key} className="col-md-6 col-lg-4">
-                                                    <div className="card h-100 shadow-sm border-0">
-                                                        <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-                                                            <span className="fw-bold small">{group.label}</span>
-                                                            <div className="form-check m-0">
-                                                                <input
-                                                                    className="form-check-input"
-                                                                    type="checkbox"
-                                                                    checked={isGroupFullySelected(group)}
-                                                                    ref={el => { if (el) el.indeterminate = isGroupPartiallySelected(group); }}
-                                                                    onChange={() => handleGroupToggle(group)}
-                                                                    style={{ cursor: 'pointer' }}
-                                                                />
+                                            {permissionGroups.map(group => {
+                                                const selectedCount = group.permissions.filter(p => 
+                                                    selectedPermissions.includes(Number(p.id))
+                                                ).length;
+                                                const totalCount = group.permissions.length;
+                                                
+                                                return (
+                                                    <div key={group.key} className="col-md-6 col-lg-4">
+                                                        <div className="card h-100 shadow-sm border-0">
+                                                            {/* Group Header */}
+                                                            <div className="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                                                                <span className="fw-bold small">{group.label}</span>
+                                                                <div className="d-flex align-items-center">
+                                                                    <div className="form-check m-0 position-relative">
+                                                                        <input
+                                                                            className="form-check-input"
+                                                                            type="checkbox"
+                                                                            checked={isGroupFullySelected(group)}
+                                                                            ref={el => {
+                                                                                if (el) {
+                                                                                    el.indeterminate = isGroupPartiallySelected(group);
+                                                                                }
+                                                                            }}
+                                                                            onChange={() => handleGroupToggle(group)}
+                                                                            style={{ cursor: 'pointer' }}
+                                                                            disabled={modalLoading}
+                                                                        />
+                                                                    </div>
+                                                                    <span className={`badge ${selectedCount > 0 ? 'bg-success' : 'bg-secondary'} ms-2`} style={{ fontSize: '0.7rem' }}>
+                                                                        {selectedCount}/{totalCount}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {/* Group Permissions */}
+                                                            <div className="card-body p-2 bg-light">
+                                                                {group.permissions.map(perm => {
+                                                                    const isSelected = selectedPermissions.includes(Number(perm.id));
+                                                                    return (
+                                                                        <div key={perm.id} className="form-check mb-1 d-flex align-items-center">
+                                                                            <input
+                                                                                className="form-check-input"
+                                                                                type="checkbox"
+                                                                                id={`perm-${perm.id}`}
+                                                                                checked={isSelected}
+                                                                                onChange={() => togglePermissionSelection(Number(perm.id))}
+                                                                                style={{ cursor: 'pointer' }}
+                                                                                disabled={modalLoading}
+                                                                            />
+                                                                            <label 
+                                                                                className={`form-check-label small ms-2 flex-grow-1 ${isSelected ? 'fw-semibold text-primary' : ''}`}
+                                                                                htmlFor={`perm-${perm.id}`}
+                                                                                style={{ cursor: 'pointer' }}
+                                                                            >
+                                                                                {perm.name}
+                                                                            </label>
+                                                                            {isSelected && (
+                                                                                <FaCheck className="text-success ms-2" size={12} />
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
-                                                        <div className="card-body p-2 bg-light">
-                                                            {group.permissions.map(perm => (
-                                                                <div key={perm.id} className="form-check mb-1">
-                                                                    <input
-                                                                        className="form-check-input"
-                                                                        type="checkbox"
-                                                                        id={`perm-${perm.id}`}
-                                                                        checked={selectedPermissions.includes(Number(perm.id))}
-                                                                        onChange={() => togglePermissionSelection(Number(perm.id))}
-                                                                        style={{ cursor: 'pointer' }}
-                                                                    />
-                                                                    <label className="form-check-label small" htmlFor={`perm-${perm.id}`} style={{ cursor: 'pointer' }}>
-                                                                        {perm.name}
-                                                                    </label>
-                                                                </div>
-                                                            ))}
-                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
-                                <div className="mt-2 small text-muted">
-                                    {selectedPermissions.length} permissions selected.
+                                
+                                {/* Permission Actions */}
+                                <div className="mt-3 d-flex justify-content-between align-items-center">
+                                    <div className="small text-muted">
+                                        Total permissions: {allPermissions.length} • Selected: {selectedPermissions.length}
+                                    </div>
+                                    <div>
+                                        <button 
+                                            className="btn btn-sm btn-outline-primary me-2"
+                                            onClick={() => {
+                                                if (selectedPermissions.length === allPermissions.length) {
+                                                    setSelectedPermissions([]);
+                                                } else {
+                                                    setSelectedPermissions(allPermissions.map(p => Number(p.id)));
+                                                }
+                                            }}
+                                            disabled={modalLoading || permissionsLoading || allPermissions.length === 0}
+                                        >
+                                            {selectedPermissions.length === allPermissions.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                        <button 
+                                            className="btn btn-sm btn-outline-secondary"
+                                            onClick={() => setSelectedPermissions([])}
+                                            disabled={modalLoading || selectedPermissions.length === 0}
+                                        >
+                                            Clear All
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+
+                            {/* Warning for Edit Mode */}
+                            {isEditing && initialPermissionsLoaded && (
+                                <div className="alert alert-warning">
+                                    <FaInfoCircle className="me-2" />
+                                    <strong>Note:</strong> You are viewing previously granted permissions. 
+                                    Any changes will update the role's permissions.
+                                </div>
+                            )}
                         </div>
 
                         {/* Modal Footer */}
                         <div className="border-top px-4 py-3 d-flex justify-content-end bg-light rounded-bottom">
-                            <button className="btn btn-secondary me-2" onClick={() => setShowModal(false)}>Cancel</button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleSubmit}
+                            <button 
+                                className="btn btn-secondary me-2" 
+                                onClick={() => setShowModal(false)}
                                 disabled={modalLoading}
                             >
-                                {modalLoading ? <span className="spinner-border spinner-border-sm me-2" /> : null}
-                                {isEditing ? 'Update Role' : 'Create Role'}
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary d-flex align-items-center"
+                                onClick={handleSubmit}
+                                disabled={modalLoading || (isEditing && fetchingPermissions)}
+                            >
+                                {modalLoading ? (
+                                    <>
+                                        <FaSpinner className="fa-spin me-2" />
+                                        {isEditing ? 'Updating...' : 'Creating...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        {isEditing ? 'Update Role' : 'Create Role'}
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

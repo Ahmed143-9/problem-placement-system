@@ -1,8 +1,7 @@
 // src/pages/ProblemList.js - COMPLETE BACKEND API VERSION
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { useNavigate, Link } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import { 
@@ -11,7 +10,8 @@ import {
   FaFileAlt, FaUsersCog, FaChevronLeft, FaChevronRight, FaArrowRight,
   FaCheckCircle, FaTimesCircle, FaSync, FaEllipsisH, FaSort, FaSortUp,
   FaSortDown, FaDownload, FaPrint, FaEnvelope, FaBell, FaCalendar,
-  FaChartBar, FaUserCheck, FaUserTimes, FaBuilding, FaTag
+  FaChartBar, FaUserCheck, FaUserTimes, FaBuilding, FaTag,
+  FaGlobe // Added FaGlobe
 } from 'react-icons/fa';
 
 export default function ProblemList() {
@@ -40,13 +40,8 @@ export default function ProblemList() {
 
   const itemsPerPage = 15;
 
-  useEffect(() => {
-    loadProblems();
-    loadStats();
-  }, [filter, currentPage, sortField, sortOrder]);
-
-  // Load problems from backend API
-  const loadProblems = async () => {
+  // Load problems from backend API - wrapped in useCallback
+  const loadProblems = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -130,10 +125,10 @@ export default function ProblemList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, searchTerm, sortField, sortOrder, currentPage]); // Added dependencies
 
   // Load statistics
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('https://ticketapi.wineds.com/api/problems/getAll', {
@@ -161,14 +156,19 @@ export default function ProblemList() {
     } catch (error) {
       console.error('Failed to load stats:', error);
     }
-  };
+  }, []);
 
-  // Handle search
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setCurrentPage(1);
+  useEffect(() => {
     loadProblems();
-  };
+    loadStats();
+  }, [filter, currentPage, sortField, sortOrder, loadProblems, loadStats]); // Added dependencies
+
+  // Handle search - REMOVED OR FIXED
+  // const handleSearch = (e) => {
+  //   e.preventDefault();
+  //   setCurrentPage(1);
+  //   loadProblems();
+  // };
 
   // Handle delete problem
   const handleDeleteProblem = async (id) => {
@@ -304,18 +304,18 @@ export default function ProblemList() {
     });
   };
 
-  // Get time elapsed
-  const getTimeElapsed = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${Math.floor(diffHours / 24)}d ago`;
-  };
+  // Get time elapsed - REMOVED OR COMMENTED OUT
+  // const getTimeElapsed = (dateString) => {
+  //   if (!dateString) return '';
+  //   const date = new Date(dateString);
+  //   const now = new Date();
+  //   const diffMs = now - date;
+  //   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  //   
+  //   if (diffHours < 1) return 'Just now';
+  //   if (diffHours < 24) return `${diffHours}h ago`;
+  //   return `${Math.floor(diffHours / 24)}d ago`;
+  // };
 
   // Toggle sidebar
   const toggleSidebar = () => {
@@ -407,6 +407,7 @@ export default function ProblemList() {
                   className="nav-link text-white bg-primary rounded d-flex align-items-center"
                   title="All Problems"
                 >
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
                 </Link>
               </li>
@@ -423,16 +424,40 @@ export default function ProblemList() {
               </li>
               
               {(user?.role === 'admin' || user?.role === 'team_leader') && (
-                <li className="nav-item mb-2">
-                  <Link 
-                    to="/admin" 
-                    className="nav-link text-white rounded d-flex align-items-center"
-                    title="Admin Panel"
-                  >
-                    <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-                    {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
-                  </Link>
-                </li>
+                <>
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/admin" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      title="User Management"
+                    >
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+                    </Link>
+                  </li>
+                  
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/domain-status" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      title="Domain Status"
+                    >
+                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+                    </Link>
+                  </li>
+                  
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/roles" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      title="Role Management"
+                    >
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
+                    </Link>
+                  </li>
+                </>
               )}
             </ul>
           </div>
@@ -446,6 +471,7 @@ export default function ProblemList() {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <h4 className="mb-1 fw-semibold">
+                    <FaExclamationTriangle className="me-2" />
                     All Problems
                   </h4>
                   <small className="opacity-75">Manage and track all reported problems</small>
@@ -519,6 +545,105 @@ export default function ProblemList() {
                       <h3 className="mb-0 text-dark">{totalProblems}</h3>
                       <small className="text-muted">Showing</small>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters and Actions - UNCOMMENTED VERSION */}
+            <div className="p-3 border-bottom">
+              <div className="row g-3">
+                <div className="col-md-4">
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(1);
+                    loadProblems();
+                  }} className="input-group">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Search problems..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <button 
+                      className="btn btn-outline-primary"
+                      type="submit"
+                    >
+                      <FaSearch />
+                    </button>
+                    {searchTerm && (
+                      <button 
+                        className="btn btn-outline-secondary"
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setCurrentPage(1);
+                          loadProblems();
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </form>
+                </div>
+                <div className="col-md-3">
+                  <select
+                    className="form-select"
+                    value={filter}
+                    onChange={(e) => {
+                      setFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="pending_approval">Pending Approval</option>
+                    <option value="done">Resolved</option>
+                  </select>
+                </div>
+                <div className="col-md-3">
+                  <select
+                    className="form-select"
+                    value={sortField}
+                    onChange={(e) => {
+                      setSortField(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="created_at">Sort by: Date Created</option>
+                    <option value="priority">Sort by: Priority</option>
+                    <option value="status">Sort by: Status</option>
+                    <option value="department">Sort by: Department</option>
+                    <option value="assigned_to">Sort by: Assigned To</option>
+                  </select>
+                </div>
+                <div className="col-md-2">
+                  <div className="d-flex gap-2">
+                    <button 
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                    >
+                      {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
+                    </button>
+                    {selectedProblems.length > 0 && (
+                      <button 
+                        className="btn btn-outline-success btn-sm"
+                        onClick={handleExportProblems}
+                        disabled={loadingExport}
+                      >
+                        {loadingExport ? (
+                          <FaSpinner className="fa-spin" />
+                        ) : (
+                          <>
+                            <FaDownload className="me-1" />
+                            Export ({selectedProblems.length})
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -625,6 +750,11 @@ export default function ProblemList() {
                               onClick={() => handleSort('assigned_to')}
                             >
                               Assigned To
+                              {sortField === 'assigned_to' && (
+                                <span className="ms-1">
+                                  {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
+                                </span>
+                              )}
                             </button>
                           </th>
                           <th style={{ width: '120px' }}>
@@ -646,6 +776,11 @@ export default function ProblemList() {
                               onClick={() => handleSort('created_at')}
                             >
                               Created
+                              {sortField === 'created_at' && (
+                                <span className="ms-1">
+                                  {sortOrder === 'asc' ? <FaSortUp /> : <FaSortDown />}
+                                </span>
+                              )}
                             </button>
                           </th>
                           <th style={{ width: '100px' }} className="text-center">Actions</th>
@@ -850,6 +985,7 @@ export default function ProblemList() {
           <div className="card shadow-sm border-0 mt-4">
             <div className="card-header bg-white">
               <h6 className="mb-0">
+                <FaExclamationTriangle className="me-2" />
                 Quick Tips
               </h6>
             </div>
@@ -899,18 +1035,6 @@ export default function ProblemList() {
           </div>
         </div>
       </div>
-      <ToastContainer 
-        position="bottom-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
     </div>
   );
 }
