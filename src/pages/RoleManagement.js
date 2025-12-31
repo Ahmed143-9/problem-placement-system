@@ -38,6 +38,8 @@ export default function RoleManagement() {
     const [error, setError] = useState(null);
     const [deletingRoleId, setDeletingRoleId] = useState(null);
     const [permissionError, setPermissionError] = useState(null);
+    const [meData, setMeData] = useState(null);
+    const [mePermissions, setMePermissions] = useState([]);
 
     // Modal State
     const [showModal, setShowModal] = useState(false);
@@ -69,8 +71,19 @@ export default function RoleManagement() {
     ];
 
     useEffect(() => {
-        fetchRoles();
-        fetchAllPermissions();
+        const init = async () => {
+            try {
+                await fetchMe();
+            } catch (e) {
+                console.warn('Could not fetch /me', e);
+            }
+
+            // fetch permissions and roles after /me so we can use role-based permissions if needed
+            await fetchAllPermissions();
+            await fetchRoles();
+        };
+
+        init();
     }, []);
 
     // Debug effect
@@ -132,9 +145,20 @@ export default function RoleManagement() {
             } else {
                 // User doesn't have permission to view permissions list
                 console.warn('⚠️ Cannot fetch permissions list. Using default permissions.');
-                setPermissionError('You do not have permission to view the permissions list. Using default permissions.');
-                setAllPermissions(defaultPermissions);
-                setPermissionGroups(groupPermissions(defaultPermissions));
+                setPermissionError('You do not have permission to view the permissions list. Using available permissions.');
+
+                // Prefer permissions from /me if present
+                if (mePermissions && mePermissions.length > 0) {
+                    const mapped = mePermissions.map((p, i) => {
+                        if (typeof p === 'object' && (p.id || p.name)) return { id: p.id ?? 1000 + i, name: p.name ?? String(p) };
+                        return { id: 1000 + i, name: String(p) };
+                    });
+                    setAllPermissions(mapped);
+                    setPermissionGroups(groupPermissions(mapped));
+                } else {
+                    setAllPermissions(defaultPermissions);
+                    setPermissionGroups(groupPermissions(defaultPermissions));
+                }
                 
                 addNotification({
                     type: 'warning',
@@ -146,11 +170,53 @@ export default function RoleManagement() {
             }
         } catch (err) {
             console.error('❌ Fetch permissions error:', err);
-            setPermissionError('Failed to load permissions. Using default set.');
-            setAllPermissions(defaultPermissions);
-            setPermissionGroups(groupPermissions(defaultPermissions));
+            setPermissionError('Failed to load permissions. Using available permissions.');
+
+            if (mePermissions && mePermissions.length > 0) {
+                const mapped = mePermissions.map((p, i) => {
+                    if (typeof p === 'object' && (p.id || p.name)) return { id: p.id ?? 2000 + i, name: p.name ?? String(p) };
+                    return { id: 2000 + i, name: String(p) };
+                });
+                setAllPermissions(mapped);
+                setPermissionGroups(groupPermissions(mapped));
+            } else {
+                setAllPermissions(defaultPermissions);
+                setPermissionGroups(groupPermissions(defaultPermissions));
+            }
         } finally {
             setPermissionsLoading(false);
+        }
+    };
+
+    // Fetch current authenticated user (and their permissions)
+    const fetchMe = async () => {
+        try {
+            const response = await api.post('/v1/me');
+            const data = response.data;
+            console.log('📥 /me response:', data);
+
+            // store me data
+            setMeData(data?.data ?? data ?? null);
+
+            // extract permissions from possible shapes
+            let perms = [];
+            if (data?.data) {
+                const d = data.data;
+                if (Array.isArray(d.permissions)) perms = d.permissions;
+                else if (d.user && Array.isArray(d.user.permissions)) perms = d.user.permissions;
+                else if (d.role && Array.isArray(d.role.permissions)) perms = d.role.permissions;
+            } else if (Array.isArray(data?.permissions)) {
+                perms = data.permissions;
+            }
+
+            // normalize permission entries to strings or objects
+            setMePermissions(perms);
+            return perms;
+        } catch (err) {
+            console.error('❌ Fetch /me error:', err);
+            setMeData(null);
+            setMePermissions([]);
+            return [];
         }
     };
 
@@ -166,52 +232,114 @@ export default function RoleManagement() {
             const ok = data?.status === 'success' || data?.status === 200 || data?.code === 200;
 
             if (ok) {
-                let permissionIds = [];
-                
-                // Try to extract permissions from various response structures
-                if (data.data?.permissions && Array.isArray(data.data.permissions)) {
-                    // Handle array of permission objects or names
-                    data.data.permissions.forEach(perm => {
-                        if (perm && typeof perm === 'object' && perm.id) {
-                            permissionIds.push(Number(perm.id));
-                        } else if (typeof perm === 'string') {
-                            // Find permission by name
-                            const foundPerm = allPermissions.find(p => 
-                                p.name === perm || 
-                                p.name.toLowerCase() === perm.toLowerCase()
-                            );
-                            if (foundPerm) {
-                                permissionIds.push(Number(foundPerm.id));
-                            }
-                        } else if (typeof perm === 'number') {
-                            permissionIds.push(Number(perm));
-                        }
-                    });
-                } else if (data.data?.role?.permissions) {
-                    // Handle nested role object
-                    const rolePerms = data.data.role.permissions;
-                    if (Array.isArray(rolePerms)) {
-                        rolePerms.forEach(perm => {
-                            if (perm && perm.id) {
-                                permissionIds.push(Number(perm.id));
-                            }
-                        });
-                    }
-                } else if (data.permissions && Array.isArray(data.permissions)) {
-                    // Handle direct permissions array
-                    data.permissions.forEach(perm => {
-                        if (perm && perm.id) {
-                            permissionIds.push(Number(perm.id));
-                        } else if (typeof perm === 'number') {
-                            permissionIds.push(Number(perm));
+                // Gather candidate permission entries from known/unknown shapes
+                let rawPerms = [];
+                const pushIfArray = (v) => { if (Array.isArray(v)) rawPerms.push(...v); };
+
+                pushIfArray(data.data?.permissions);
+                pushIfArray(data.data?.role?.permissions);
+                pushIfArray(data.permissions);
+                pushIfArray(data.data?.role?.permissions?.data);
+                // try some other possible shapes
+                if (data.data && typeof data.data === 'object') {
+                    Object.keys(data.data).forEach(k => {
+                        if (Array.isArray(data.data[k]) && data.data[k].length && typeof data.data[k][0] !== 'object') {
+                            // ignore primitive arrays
                         }
                     });
                 }
-                
+
+                // Helper: normalize strings for comparison
+                const normalize = (s) => String(s || '').toLowerCase().trim().replace(/[_-]+/g, ' ').replace(/[^a-z0-9 ]+/g, '').replace(/\s+/g, ' ');
+
+                const permissionIds = [];
+                const unmatched = [];
+
+                for (const perm of rawPerms) {
+                    if (perm == null) continue;
+
+                    // numeric id
+                    if (typeof perm === 'number' || (!isNaN(Number(perm)) && String(perm).trim() !== '')) {
+                        const idNum = Number(perm);
+                        if (!isNaN(idNum)) permissionIds.push(idNum);
+                        continue;
+                    }
+
+                    // object with id
+                    if (typeof perm === 'object') {
+                        if (perm.id || perm.permission_id || perm.permissionId) {
+                            const id = Number(perm.id ?? perm.permission_id ?? perm.permissionId);
+                            if (!isNaN(id)) { permissionIds.push(id); continue; }
+                        }
+
+                        // nested permission object
+                        if (perm.permission && typeof perm.permission === 'object' && perm.permission.id) {
+                            permissionIds.push(Number(perm.permission.id));
+                            continue;
+                        }
+
+                        // has name — try to match by name
+                        if (perm.name) {
+                            const n = normalize(perm.name);
+                            const found = allPermissions.find(p => normalize(p.name) === n || normalize(p.name).includes(n) || n.includes(normalize(p.name)));
+                            if (found) { permissionIds.push(Number(found.id)); continue; }
+                            unmatched.push(perm.name);
+                            continue;
+                        }
+
+                        // fallback: try to find any numeric property
+                        const keys = Object.keys(perm);
+                        let foundNum = false;
+                        for (const k of keys) {
+                            if (!isNaN(Number(perm[k]))) { permissionIds.push(Number(perm[k])); foundNum = true; break; }
+                        }
+                        if (foundNum) continue;
+                        unmatched.push(JSON.stringify(perm));
+                        continue;
+                    }
+
+                    // string — treat as permission name
+                    if (typeof perm === 'string') {
+                        const n = normalize(perm);
+                        const found = allPermissions.find(p => normalize(p.name) === n || normalize(p.name).includes(n) || n.includes(normalize(p.name)));
+                        if (found) { permissionIds.push(Number(found.id)); continue; }
+                        // try replacing dots, slashes etc
+                        const alt = n.replace(/\./g, ' ').replace(/\//g, ' ');
+                        const found2 = allPermissions.find(p => normalize(p.name) === alt || normalize(p.name).includes(alt) || alt.includes(normalize(p.name)));
+                        if (found2) { permissionIds.push(Number(found2.id)); continue; }
+                        unmatched.push(perm);
+                        continue;
+                    }
+                }
+
+                // As a last resort, attempt to extract any ids nested deeply in data
+                if (permissionIds.length === 0) {
+                    const deepIds = [];
+                    const walk = (obj) => {
+                        if (!obj || typeof obj !== 'object') return;
+                        for (const k of Object.keys(obj)) {
+                            const v = obj[k];
+                            if (typeof v === 'number' && k.toLowerCase().includes('id')) deepIds.push(v);
+                            if (Array.isArray(v)) v.forEach(item => walk(item));
+                            if (v && typeof v === 'object') walk(v);
+                        }
+                    };
+                    walk(data);
+                    if (deepIds.length) {
+                        deepIds.forEach(id => permissionIds.push(Number(id)));
+                    }
+                }
+
                 // Remove duplicates
-                permissionIds = [...new Set(permissionIds)];
-                console.log(`✅ Retrieved ${permissionIds.length} permissions for role ${roleId}`);
-                return permissionIds;
+                const uniqueIds = [...new Set(permissionIds.map(Number).filter(n => !isNaN(n)))];
+
+                if (uniqueIds.length === 0) {
+                    console.warn('⚠️ No permissions mapped for role. Raw perms:', rawPerms, 'Unmatched:', unmatched);
+                } else {
+                    console.log(`✅ Retrieved ${uniqueIds.length} permissions for role ${roleId}:`, uniqueIds);
+                }
+
+                return uniqueIds;
             } else {
                 console.warn('⚠️ No permissions found for role, returning empty array');
                 return [];
@@ -450,16 +578,26 @@ export default function RoleManagement() {
         // Clear previous selections
         setSelectedPermissions([]);
         
-        // Fetch role permissions
+        // Ensure permissions list is available before mapping names -> ids
         try {
+            if (!permissionsLoading && allPermissions.length === 0) {
+                await fetchAllPermissions();
+            } else if (permissionsLoading) {
+                // wait until permissionsLoading clears (simple poll)
+                let attempts = 0;
+                while (permissionsLoading && attempts < 10) {
+                    // small delay
+                    // eslint-disable-next-line no-await-in-loop
+                    await new Promise(res => setTimeout(res, 150));
+                    attempts += 1;
+                }
+            }
+
             const permissionIds = await fetchRolePermissions(role.id);
-            
             console.log(`✅ Retrieved ${permissionIds.length} permissions for editing`);
-            
-            // Set the permissions
             setSelectedPermissions(permissionIds);
             setInitialPermissionsLoaded(true);
-            
+
             if (permissionIds.length === 0) {
                 console.log('ℹ️ No permissions found for this role');
             }

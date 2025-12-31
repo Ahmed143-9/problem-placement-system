@@ -1,5 +1,5 @@
-// src/pages/ProblemList.js - COMPLETE BACKEND API VERSION
-import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+// src/pages/ProblemList.js - UPDATED VERSION
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +11,7 @@ import {
   FaCheckCircle, FaTimesCircle, FaSync, FaEllipsisH, FaSort, FaSortUp,
   FaSortDown, FaDownload, FaPrint, FaEnvelope, FaBell, FaCalendar,
   FaChartBar, FaUserCheck, FaUserTimes, FaBuilding, FaTag,
-  FaGlobe // Added FaGlobe
+  FaGlobe
 } from 'react-icons/fa';
 
 export default function ProblemList() {
@@ -34,13 +34,13 @@ export default function ProblemList() {
     total: 0,
     pending: 0,
     in_progress: 0,
-    pending_approval: 0,
-    done: 0
+    resolved: 0,
+    escalated: 0
   });
 
   const itemsPerPage = 15;
 
-  // Load problems from backend API - wrapped in useCallback
+  // Load problems from backend API
   const loadProblems = useCallback(async () => {
     setLoading(true);
     try {
@@ -62,6 +62,17 @@ export default function ProblemList() {
       
       if (data.status === 'success') {
         let filteredProblems = data.data;
+        
+        // Debug: Log problems to see their status values
+        console.log('Problems loaded:', data.data);
+        console.log('Status counts:', {
+          total: data.data.length,
+          pending: data.data.filter(p => p.status === 'pending').length,
+          in_progress: data.data.filter(p => p.status === 'in_progress').length,
+          done: data.data.filter(p => p.status === 'done').length,
+          resolved: data.data.filter(p => p.status === 'resolved').length,
+          escalated: data.data.filter(p => p.status === 'escalated').length
+        });
         
         // Apply filters
         if (filter !== 'all') {
@@ -86,7 +97,6 @@ export default function ProblemList() {
           let aValue = a[sortField];
           let bValue = b[sortField];
           
-          // Handle nested fields
           if (sortField === 'assigned_to') {
             aValue = a.assigned_to?.name || '';
             bValue = b.assigned_to?.name || '';
@@ -125,9 +135,9 @@ export default function ProblemList() {
     } finally {
       setLoading(false);
     }
-  }, [filter, searchTerm, sortField, sortOrder, currentPage]); // Added dependencies
+  }, [filter, searchTerm, sortField, sortOrder, currentPage]);
 
-  // Load statistics
+  // Load statistics - UPDATED VERSION
   const loadStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -144,12 +154,27 @@ export default function ProblemList() {
         const data = await response.json();
         if (data.status === 'success') {
           const allProblems = data.data;
+          
+          // Debug log
+          console.log('All problems for stats:', allProblems);
+          console.log('Counting resolved:', allProblems.filter(p => p.status === 'done' || p.status === 'resolved'));
+          
+          // Try different status values
+          const resolvedCount = allProblems.filter(p => 
+            p.status === 'done' || 
+            p.status === 'resolved' ||
+            p.status === 'completed' ||
+            p.status === 'closed'
+          ).length;
+          
+          console.log('Resolved count:', resolvedCount);
+          
           setStats({
             total: allProblems.length,
             pending: allProblems.filter(p => p.status === 'pending').length,
             in_progress: allProblems.filter(p => p.status === 'in_progress').length,
-            pending_approval: allProblems.filter(p => p.status === 'pending_approval').length,
-            done: allProblems.filter(p => p.status === 'done').length
+            resolved: resolvedCount,
+            escalated: allProblems.filter(p => p.status === 'escalated').length
           });
         }
       }
@@ -161,14 +186,7 @@ export default function ProblemList() {
   useEffect(() => {
     loadProblems();
     loadStats();
-  }, [filter, currentPage, sortField, sortOrder, loadProblems, loadStats]); // Added dependencies
-
-  // Handle search - REMOVED OR FIXED
-  // const handleSearch = (e) => {
-  //   e.preventDefault();
-  //   setCurrentPage(1);
-  //   loadProblems();
-  // };
+  }, [filter, currentPage, sortField, sortOrder, loadProblems, loadStats]);
 
   // Handle delete problem
   const handleDeleteProblem = async (id) => {
@@ -271,13 +289,14 @@ export default function ProblemList() {
     }
   };
 
-  // Get status badge
+  // Get status badge - UPDATED
   const getStatusBadge = (status) => {
     switch (status) {
       case 'pending': return 'bg-warning text-dark';
       case 'in_progress': return 'bg-info text-white';
       case 'done': return 'bg-success text-white';
-      case 'pending_approval': return 'bg-secondary text-white';
+      case 'resolved': return 'bg-success text-white';
+      case 'escalated': return 'bg-danger text-white';
       default: return 'bg-secondary text-white';
     }
   };
@@ -304,19 +323,6 @@ export default function ProblemList() {
     });
   };
 
-  // Get time elapsed - REMOVED OR COMMENTED OUT
-  // const getTimeElapsed = (dateString) => {
-  //   if (!dateString) return '';
-  //   const date = new Date(dateString);
-  //   const now = new Date();
-  //   const diffMs = now - date;
-  //   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  //   
-  //   if (diffHours < 1) return 'Just now';
-  //   if (diffHours < 24) return `${diffHours}h ago`;
-  //   return `${Math.floor(diffHours / 24)}d ago`;
-  // };
-
   // Toggle sidebar
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
@@ -342,7 +348,7 @@ export default function ProblemList() {
       <Navbar />
       
       <div className="d-flex flex-grow-1">
-        {/* Sidebar */}
+        {/* Sidebar - Same as before */}
         <div 
           className="bg-dark text-white position-relative"
           style={{ 
@@ -379,6 +385,7 @@ export default function ProblemList() {
               </h5>
             )}
             <ul className="nav flex-column">
+              {/* Navigation items - same as before */}
               <li className="nav-item mb-2">
                 <Link 
                   to={getDashboardPath()}
@@ -496,7 +503,7 @@ export default function ProblemList() {
               </div>
             </div>
             
-            {/* Stats Cards */}
+            {/* Stats Cards - UPDATED: Removed Pending Approval, Fixed Resolved */}
             <div className="p-3 bg-light border-bottom">
               <div className="row g-3">
                 <div className="col-md-2 col-6">
@@ -526,16 +533,16 @@ export default function ProblemList() {
                 <div className="col-md-2 col-6">
                   <div className="card border-0 shadow-sm">
                     <div className="card-body text-center py-2">
-                      <h3 className="mb-0 text-secondary">{stats.pending_approval}</h3>
-                      <small className="text-muted">Pending Approval</small>
+                      <h3 className="mb-0 text-success">{stats.resolved}</h3>
+                      <small className="text-muted">Resolved</small>
                     </div>
                   </div>
                 </div>
                 <div className="col-md-2 col-6">
                   <div className="card border-0 shadow-sm">
                     <div className="card-body text-center py-2">
-                      <h3 className="mb-0 text-success">{stats.done}</h3>
-                      <small className="text-muted">Resolved</small>
+                      <h3 className="mb-0 text-danger">{stats.escalated}</h3>
+                      <small className="text-muted">Escalated</small>
                     </div>
                   </div>
                 </div>
@@ -550,7 +557,7 @@ export default function ProblemList() {
               </div>
             </div>
 
-            {/* Filters and Actions - UNCOMMENTED VERSION */}
+            {/* Filters and Actions */}
             <div className="p-3 border-bottom">
               <div className="row g-3">
                 <div className="col-md-4">
@@ -599,8 +606,8 @@ export default function ProblemList() {
                     <option value="all">All Status</option>
                     <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
-                    <option value="pending_approval">Pending Approval</option>
                     <option value="done">Resolved</option>
+                    <option value="escalated">Escalated</option>
                   </select>
                 </div>
                 <div className="col-md-3">
@@ -649,7 +656,7 @@ export default function ProblemList() {
               </div>
             </div>
 
-            {/* Problems Table */}
+            {/* Problems Table - Same as before */}
             <div className="card-body p-0">
               {loading ? (
                 <div className="text-center py-5">
@@ -832,7 +839,9 @@ export default function ProblemList() {
                             </td>
                             <td>
                               <span className={`badge ${getStatusBadge(problem.status)}`}>
-                                {problem.status === 'pending_approval' ? 'Pending Approval' : problem.status.replace('_', ' ')}
+                                {problem.status === 'done' ? 'Resolved' : 
+                                 problem.status === 'in_progress' ? 'In Progress' : 
+                                 problem.status.charAt(0).toUpperCase() + problem.status.slice(1)}
                               </span>
                             </td>
                             <td>
@@ -869,7 +878,7 @@ export default function ProblemList() {
                     </table>
                   </div>
 
-                  {/* Pagination */}
+                  {/* Pagination - Same as before */}
                   {totalPages > 1 && (
                     <div className="p-3 border-top">
                       <div className="d-flex justify-content-between align-items-center">
@@ -933,7 +942,7 @@ export default function ProblemList() {
               )}
             </div>
 
-            {/* Bulk Actions Footer */}
+            {/* Bulk Actions Footer - Same as before */}
             {selectedProblems.length > 0 && (
               <div className="card-footer bg-light">
                 <div className="d-flex justify-content-between align-items-center">
@@ -981,7 +990,7 @@ export default function ProblemList() {
             )}
           </div>
 
-          {/* Quick Tips */}
+          {/* Quick Tips - Same as before */}
           <div className="card shadow-sm border-0 mt-4">
             <div className="card-header bg-white">
               <h6 className="mb-0">
