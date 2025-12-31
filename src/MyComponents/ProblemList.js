@@ -127,11 +127,11 @@ export default function ProblemList() {
         
         setProblems(paginatedProblems);
       } else {
-        toast.error(data.messages?.[0] || 'Failed to load problems');
+        toast.error(data.messages?.[0] || 'Failed to load problems', { autoClose: 3000 });
       }
     } catch (error) {
       console.error('❌ Failed to load problems:', error);
-      toast.error('Network error while loading problems');
+      toast.error('Network error while loading problems', { autoClose: 3000 });
     } finally {
       setLoading(false);
     }
@@ -207,14 +207,14 @@ export default function ProblemList() {
       const data = await response.json();
 
       if (data.status === 'success') {
-        toast.success('🗑️ Problem deleted successfully!');
+        toast.success('🗑️ Problem deleted successfully!', { autoClose: 3000 });
         loadProblems();
         loadStats();
       } else {
-        toast.error(data.messages?.[0] || 'Failed to delete problem');
+        toast.error(data.messages?.[0] || 'Failed to delete problem', { autoClose: 3000 });
       }
     } catch (error) {
-      toast.error('Failed to delete problem');
+      toast.error('Failed to delete problem', { autoClose: 3000 });
       console.error(error);
     }
   };
@@ -250,7 +250,7 @@ export default function ProblemList() {
   // Export selected problems
   const handleExportProblems = async () => {
     if (selectedProblems.length === 0) {
-      toast.error('Please select at least one problem to export');
+      toast.error('Please select at least one problem to export', { autoClose: 3000 });
       return;
     }
 
@@ -280,10 +280,10 @@ export default function ProblemList() {
       link.download = `problems_export_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
       
-      toast.success(`✅ Exported ${selectedProblems.length} problem(s) successfully!`);
+      toast.success(`✅ Exported ${selectedProblems.length} problem(s) successfully!`, { autoClose: 3000 });
     } catch (error) {
       console.error('Export error:', error);
-      toast.error('Failed to export problems');
+      toast.error('Failed to export problems', { autoClose: 3000 });
     } finally {
       setLoadingExport(false);
     }
@@ -962,7 +962,7 @@ export default function ProblemList() {
                       className="btn btn-outline-primary btn-sm"
                       onClick={() => {
                         // Implement bulk status change
-                        toast.info('Bulk status change feature coming soon');
+                        toast.info('Bulk status change feature coming soon', { autoClose: 3000 });
                       }}
                     >
                       Change Status

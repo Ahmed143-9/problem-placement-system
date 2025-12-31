@@ -1,9 +1,11 @@
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -15,17 +17,19 @@ import MyIssues from "./pages/MyIssues";
 import ProblemDetails from "./MyComponents/ProblemDetails";
 import Reports from "./pages/Reports";
 import RoleManagement from "./pages/RoleManagement";
+import ProblemCreate from "./pages/ProblemCreate";
+import FirstFaceAssignment from "./components/FirstFaceAssignment";
+import DomainStatus from "./pages/DomainStatus";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
-import ProblemCreate from "./pages/ProblemCreate";
-import FirstFaceAssignment from "./components/FirstFaceAssignment";
+
 import { migrateExistingProblems } from './utils/migration';
-import DomainStatus from './pages/DomainStatus';
 
 function App() {
+
+  // Run migration on app load
   useEffect(() => {
-    // App load হওয়ার সময় migration run করুন
     const migrationResult = migrateExistingProblems();
     console.log('Migration result:', migrationResult);
   }, []);
@@ -33,29 +37,24 @@ function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <Router>
-          {/* ✅ FIXED: Toast Container with proper configuration */}
-          <ToastContainer 
-            position="top-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop={true}
-            closeOnClick={true}
-            rtl={false}
-            pauseOnFocusLoss={false}
-            draggable={false}
-            pauseOnHover={false}
-            theme="light"
-            limit={5}
-            style={{
-              zIndex: 9999
-            }}
-            toastStyle={{
-              fontSize: '14px',
-              borderRadius: '8px'
-            }}
-          />
 
+        {/* ✅ ToastContainer OUTSIDE Router to avoid stuck toast */}
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss={false}
+          pauseOnHover={false}
+          draggable
+          limit={5}
+          theme="light"
+          style={{ zIndex: 9999 }}
+        />
+
+        <Router>
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<Login />} />
@@ -85,6 +84,22 @@ function App() {
                 </AdminRoute>
               }
             />
+            <Route
+              path="/first-face-assignments"
+              element={
+                <AdminRoute>
+                  <FirstFaceAssignment />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/roles"
+              element={
+                <AdminRoute>
+                  <RoleManagement />
+                </AdminRoute>
+              }
+            />
 
             {/* User-only Routes */}
             <Route
@@ -103,8 +118,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* Routes accessible by both but still protected */}
             <Route
               path="/problem/create"
               element={
@@ -129,34 +142,12 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* First Face Assignment Route */}
-            <Route
-              path="/first-face-assignments"
-              element={
-                <AdminRoute>
-                  <FirstFaceAssignment />
-                </AdminRoute>
-              }
-            />
-
-            {/* Domain Status Route - শুধুমাত্র Admin এবং Team Leader এর জন্য */}
             <Route
               path="/domain-status"
               element={
                 <ProtectedRoute>
                   <DomainStatus />
                 </ProtectedRoute>
-              }
-            />
-
-            {/* Role Management Route */}
-            <Route
-              path="/roles"
-              element={
-                <AdminRoute>
-                  <RoleManagement />
-                </AdminRoute>
               }
             />
 
@@ -177,7 +168,7 @@ function App() {
               }
             />
 
-            {/* Catch all route - redirect to appropriate dashboard */}
+            {/* Catch-all route */}
             <Route
               path="*"
               element={

@@ -94,7 +94,7 @@ export default function ProblemForm() {
       }
     } catch (error) {
       console.error('❌ Failed to load team members:', error);
-      toast.error('Failed to load team members');
+      toast.error('Failed to load team members', { autoClose: 3000 });
     } finally {
       setLoadingUsers(false);
     }
@@ -111,7 +111,7 @@ export default function ProblemForm() {
     if (files.length === 0) return;
     
     if (files.length + previewImages.length > 5) {
-      toast.warning('Maximum 5 images allowed');
+      toast.warning('Maximum 5 images allowed', { autoClose: 3000 });
       e.target.value = '';
       return;
     }
@@ -122,13 +122,13 @@ export default function ProblemForm() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      if (!file.type.startsWith('image/')) {
-        toast.warning(`${file.name} is not an image file`);
+        if (!file.type.startsWith('image/')) {
+        toast.warning(`${file.name} is not an image file`, { autoClose: 3000 });
         continue;
       }
       
-      if (file.size > 5 * 1024 * 1024) {
-        toast.warning(`${file.name} exceeds 5MB limit`);
+        if (file.size > 5 * 1024 * 1024) {
+        toast.warning(`${file.name} exceeds 5MB limit`, { autoClose: 3000 });
         continue;
       }
 
@@ -171,7 +171,7 @@ export default function ProblemForm() {
         const data = await response.json();
         console.log('📥 Upload response:', data);
         
-        if (data.status === 'success') {
+          if (data.status === 'success') {
           let imageUrl = '';
           
           if (data.data?.file_path) {
@@ -219,14 +219,14 @@ export default function ProblemForm() {
             };
           });
 
-          toast.success(`${file.name} uploaded successfully`);
+          toast.success(`${file.name} uploaded successfully`, { autoClose: 3000 });
           
         } else {
           throw new Error(data.message?.[0] || 'Upload failed');
         }
       } catch (error) {
         console.error('❌ Upload error:', error);
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(`Failed to upload ${file.name}`, { autoClose: 3000 });
         
         setPreviewImages(prev => prev.filter(img => img.originalName !== file.name));
         URL.revokeObjectURL(previewUrl);
@@ -259,7 +259,7 @@ export default function ProblemForm() {
       images: newImages
     }));
     
-    toast.info('Image removed');
+    toast.info('Image removed', { autoClose: 3000 });
   };
 
   const getAutoAssignedUser = (department) => {
@@ -306,13 +306,13 @@ export default function ProblemForm() {
     e.preventDefault();
     
     if (uploadingImages) {
-      toast.warning('Please wait for images to finish uploading');
+      toast.warning('Please wait for images to finish uploading', { autoClose: 3000 });
       return;
     }
     
     const stillUploading = previewImages.some(img => img.uploading);
     if (stillUploading) {
-      toast.warning('Some images are still uploading. Please wait.');
+      toast.warning('Some images are still uploading. Please wait.', { autoClose: 3000 });
       return;
     }
 
@@ -320,7 +320,7 @@ export default function ProblemForm() {
 
     try {
       if (!formData.department || !formData.priority || !formData.statement.trim()) {
-        toast.error('Please fill all required fields (Department, Priority, Problem Statement)');
+        toast.error('Please fill all required fields (Department, Priority, Problem Statement)', { autoClose: 3000 });
         setLoading(false);
         return;
       }
@@ -340,7 +340,7 @@ export default function ProblemForm() {
           console.log('🔧 Manual assignment:', selectedUser.name);
         } else {
           console.warn('⚠️ Manual assignment failed - possibly assigning to creator');
-          toast.warning('Cannot assign problem to yourself. Please select another team member.');
+          toast.warning('Cannot assign problem to yourself. Please select another team member.', { autoClose: 3000 });
           setLoading(false);
           return;
         }
@@ -359,7 +359,7 @@ export default function ProblemForm() {
         console.error('🚨 CRITICAL: Attempted to assign problem to creator - BLOCKED');
         assignedTo = null;
         assignmentType = 'NOT_ASSIGNED';
-        toast.warning('Problem cannot be assigned to the creator. Please select another team member.');
+            toast.warning('Problem cannot be assigned to the creator. Please select another team member.', { autoClose: 3000 });
       }
 
       const problemData = {
@@ -877,18 +877,7 @@ export default function ProblemForm() {
           </div>
         </div>
       </div>
-      <ToastContainer 
-        position="bottom-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
+      {/* Removed local ToastContainer to avoid conflicting global settings in App.js */}
     </div>
   );
 }

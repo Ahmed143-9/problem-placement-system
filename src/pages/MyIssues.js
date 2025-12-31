@@ -24,7 +24,7 @@ export default function MyIssues() {
       const userProblems = allProblems.filter(p => p.createdBy === user?.name);
       setMyProblems(userProblems);
     } catch (error) {
-      toast.error('Failed to fetch your problems');
+      toast.error('Failed to fetch your problems', { autoClose: 3000 });
       console.error(error);
     } finally {
       setLoading(false);

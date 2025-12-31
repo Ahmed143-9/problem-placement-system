@@ -64,11 +64,11 @@ export default function Reports() {
         setProblems(filteredData);
         setFilteredProblems(filteredData);
       } else {
-        toast.error(data.messages?.[0] || 'Failed to load problems');
+        toast.error(data.messages?.[0] || 'Failed to load problems', { autoClose: 3000 });
       }
     } catch (error) {
       console.error('Failed to fetch problems:', error);
-      toast.error('Network error while loading problems');
+      toast.error('Network error while loading problems', { autoClose: 3000 });
     } finally {
       setLoading(false);
     }
@@ -278,7 +278,7 @@ This is an automatically generated report.
     link.click();
     window.URL.revokeObjectURL(url);
     
-    toast.success('Report downloaded! Print it as PDF from your text editor.');
+    toast.success('Report downloaded! Print it as PDF from your text editor.', { autoClose: 3000 });
   };
 
   const getResolutionDate = (problem) => {
@@ -381,7 +381,7 @@ This is an automatically generated report.
   // Fixed CSV export function
   const exportToCSV = () => {
     if (filteredProblems.length === 0) {
-      toast.warning('No data to export');
+      toast.warning('No data to export', { autoClose: 3000 });
       return;
     }
 
@@ -410,7 +410,7 @@ This is an automatically generated report.
     link.click();
     window.URL.revokeObjectURL(url);
     
-    toast.success(`CSV exported successfully! (${filteredProblems.length} records)`);
+    toast.success(`CSV exported successfully! (${filteredProblems.length} records)`, { autoClose: 3000 });
   };
 
   // Get unique values for dropdowns

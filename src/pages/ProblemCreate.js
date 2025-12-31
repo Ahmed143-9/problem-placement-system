@@ -64,7 +64,7 @@ export default function ProblemCreate() {
     
     // Check total images limit
     if (files.length + previewImages.length > 5) {
-      toast.warning('Maximum 5 images allowed');
+      toast.warning('Maximum 5 images allowed', { autoClose: 3000 });
       e.target.value = ''; // Reset file input
       return;
     }
@@ -79,14 +79,14 @@ export default function ProblemCreate() {
       const file = files[i];
       
       // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.warning(`${file.name} is not an image file`);
+        if (!file.type.startsWith('image/')) {
+        toast.warning(`${file.name} is not an image file`, { autoClose: 3000 });
         continue;
       }
 
       // Validate file size (e.g., 5MB max)
       if (file.size > 5 * 1024 * 1024) {
-        toast.warning(`${file.name} exceeds 5MB limit`);
+        toast.warning(`${file.name} exceeds 5MB limit`, { autoClose: 3000 });
         continue;
       }
 
@@ -139,13 +139,13 @@ export default function ProblemCreate() {
           }));
           
         } else {
-          toast.error(`Failed to upload ${file.name}: ${data.messages?.[0] || 'Unknown error'}`);
+          toast.error(`Failed to upload ${file.name}: ${data.messages?.[0] || 'Unknown error'}`, { autoClose: 3000 });
           // Remove failed upload from preview
           setPreviewImages(prev => prev.filter(img => img.name !== file.name));
         }
       } catch (error) {
         console.error('Upload error:', error);
-        toast.error(`Failed to upload ${file.name}: Network error`);
+        toast.error(`Failed to upload ${file.name}: Network error`, { autoClose: 3000 });
         // Remove failed upload from preview
         setPreviewImages(prev => prev.filter(img => img.name !== file.name));
       }
@@ -182,7 +182,7 @@ export default function ProblemCreate() {
     try {
       // Check if images are still uploading
       if (uploadingImages) {
-        toast.warning('Please wait for images to finish uploading');
+        toast.warning('Please wait for images to finish uploading', { autoClose: 3000 });
         setLoading(false);
         return;
       }
@@ -190,13 +190,13 @@ export default function ProblemCreate() {
       // Check if any image failed to upload
       const failedUploads = previewImages.filter(img => img.uploading);
       if (failedUploads.length > 0) {
-        toast.warning('Some images are still uploading or failed. Please try again.');
+        toast.warning('Some images are still uploading or failed. Please try again.', { autoClose: 3000 });
         setLoading(false);
         return;
       }
 
       if (!formData.statement || !formData.department || !formData.priority) {
-        toast.error('Please fill all required fields');
+        toast.error('Please fill all required fields', { autoClose: 3000 });
         setLoading(false);
         return;
       }
@@ -231,7 +231,7 @@ export default function ProblemCreate() {
       
       if (data.status === 'success') {
         const message = data.messages?.[0] || 'Problem created successfully';
-        toast.success(message);
+          toast.success(message, { autoClose: 3000 });
         
         // Clean up all preview URLs
         previewImages.forEach(img => {
@@ -259,11 +259,11 @@ export default function ProblemCreate() {
         }, 1000);
       } else {
         const errorMsg = data.messages?.[0] || 'Failed to create problem';
-        toast.error(errorMsg);
+        toast.error(errorMsg, { autoClose: 3000 });
       }
     } catch (error) {
       console.error('Submission error:', error);
-      toast.error('Failed to create problem. Please try again.');
+      toast.error('Failed to create problem. Please try again.', { autoClose: 3000 });
     } finally {
       setLoading(false);
     }

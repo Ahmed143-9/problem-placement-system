@@ -137,7 +137,7 @@ export default function AdminPanel() {
       setRoles(validRoles);
       
       if (validRoles.length === 0) {
-        toast.warning('No roles found. Please create roles in Role Management first.');
+        toast.warning('No roles found. Please create roles in Role Management first.', { autoClose: 3000 });
       }
     } else {
       console.error('❌ Invalid or empty roles data:', roleList);
@@ -156,19 +156,19 @@ export default function AdminPanel() {
             guard_name: r.guard_name || 'web'
           }));
           setRoles(altRoles);
-          toast.info('Roles loaded from alternative endpoint');
+          toast.info('Roles loaded from alternative endpoint', { autoClose: 3000 });
         }
       } catch (altError) {
         console.error('Alternative endpoint failed:', altError);
       }
       
       if (roles.length === 0) {
-        toast.error('Failed to load roles. Please check Role Management page first.');
+        toast.error('Failed to load roles. Please check Role Management page first.', { autoClose: 3000 });
       }
     }
   } catch (error) {
     console.error('❌ Failed to load roles:', error);
-    toast.error(`Error loading roles: ${error.message}`);
+    toast.error(`Error loading roles: ${error.message}`, { autoClose: 3000 });
     
     // Fallback: Use default roles if API fails
     const defaultRoles = [
@@ -177,7 +177,7 @@ export default function AdminPanel() {
       { id: 3, name: 'user', guard_name: 'web' }
     ];
     setRoles(defaultRoles);
-    toast.info('Using default roles due to API error');
+    toast.info('Using default roles due to API error', { autoClose: 3000 });
   } finally {
     setLoadingRoles(false);
   }
@@ -191,7 +191,7 @@ export default function AdminPanel() {
       console.log('✅ First Face assignments loaded from localStorage:', assignments.length);
     } catch (error) {
       console.error('❌ Error loading First Face assignments:', error);
-      toast.error('Failed to load First Face assignments');
+      toast.error('Failed to load First Face assignments', { autoClose: 3000 });
     }
   };
 
