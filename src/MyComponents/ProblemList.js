@@ -40,6 +40,22 @@ export default function ProblemList() {
 
   const itemsPerPage = 15;
 
+  // Get dashboard path based on role - UPDATED FUNCTION
+  const getDashboardPath = () => {
+    if (!user) return '/login';
+    
+    const role = user.role?.toLowerCase();
+    
+    if (role === 'admin' || role === 'team_leader' || role === 'team leader') {
+      return '/dashboard';
+    } else if (role === 'employee' || role === 'staff') {
+      return '/employee-dashboard';
+    } else if (role === 'client' || role === 'customer') {
+      return '/client-dashboard';
+    }
+    return '/dashboard'; // Default fallback
+  };
+
   // Load problems from backend API
   const loadProblems = useCallback(async () => {
     setLoading(true);
@@ -62,17 +78,6 @@ export default function ProblemList() {
       
       if (data.status === 'success') {
         let filteredProblems = data.data;
-        
-        // Debug: Log problems to see their status values
-        console.log('Problems loaded:', data.data);
-        console.log('Status counts:', {
-          total: data.data.length,
-          pending: data.data.filter(p => p.status === 'pending').length,
-          in_progress: data.data.filter(p => p.status === 'in_progress').length,
-          done: data.data.filter(p => p.status === 'done').length,
-          resolved: data.data.filter(p => p.status === 'resolved').length,
-          escalated: data.data.filter(p => p.status === 'escalated').length
-        });
         
         // Apply filters
         if (filter !== 'all') {
@@ -137,7 +142,7 @@ export default function ProblemList() {
     }
   }, [filter, searchTerm, sortField, sortOrder, currentPage]);
 
-  // Load statistics - UPDATED VERSION
+  // Load statistics
   const loadStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -155,19 +160,12 @@ export default function ProblemList() {
         if (data.status === 'success') {
           const allProblems = data.data;
           
-          // Debug log
-          console.log('All problems for stats:', allProblems);
-          console.log('Counting resolved:', allProblems.filter(p => p.status === 'done' || p.status === 'resolved'));
-          
-          // Try different status values
           const resolvedCount = allProblems.filter(p => 
             p.status === 'done' || 
             p.status === 'resolved' ||
             p.status === 'completed' ||
             p.status === 'closed'
           ).length;
-          
-          console.log('Resolved count:', resolvedCount);
           
           setStats({
             total: allProblems.length,
@@ -256,8 +254,6 @@ export default function ProblemList() {
 
     setLoadingExport(true);
     try {
-      // Here you would call your export API
-      // For now, we'll just simulate it
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       const csvContent = [
@@ -289,7 +285,7 @@ export default function ProblemList() {
     }
   };
 
-  // Get status badge - UPDATED
+  // Get status badge
   const getStatusBadge = (status) => {
     switch (status) {
       case 'pending': return 'bg-warning text-dark';
@@ -328,19 +324,21 @@ export default function ProblemList() {
     setSidebarMinimized(!sidebarMinimized);
   };
 
-  // Get dashboard path based on role
-  const getDashboardPath = () => {
-    if (user?.role === 'admin' || user?.role === 'team_leader') {
-      return '/dashboard';
-    } else {
-      return '/employee-dashboard';
-    }
-  };
-
   // Refresh data
   const refreshData = () => {
     loadProblems();
     loadStats();
+  };
+
+  // Navigate to dashboard
+  const goToDashboard = () => {
+    const dashboardPath = getDashboardPath();
+    navigate(dashboardPath);
+  };
+
+  // Navigate to create problem
+  const goToCreateProblem = () => {
+    navigate('/problem/create');
   };
 
   return (
@@ -348,7 +346,7 @@ export default function ProblemList() {
       <Navbar />
       
       <div className="d-flex flex-grow-1">
-        {/* Sidebar - Same as before */}
+        {/* Sidebar */}
         <div 
           className="bg-dark text-white position-relative"
           style={{ 
@@ -385,27 +383,26 @@ export default function ProblemList() {
               </h5>
             )}
             <ul className="nav flex-column">
-              {/* Navigation items - same as before */}
               <li className="nav-item mb-2">
-                <Link 
-                  to={getDashboardPath()}
-                  className="nav-link text-white rounded d-flex align-items-center"
+                <button 
+                  onClick={goToDashboard}
+                  className="nav-link text-white rounded d-flex align-items-center w-100 border-0 bg-transparent text-start"
                   title="Dashboard"
                 >
                   <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
-                </Link>
+                </button>
               </li>
               
               <li className="nav-item mb-2">
-                <Link 
-                  to="/problem/create" 
-                  className="nav-link text-white rounded d-flex align-items-center"
+                <button 
+                  onClick={goToCreateProblem}
+                  className="nav-link text-white rounded d-flex align-items-center w-100 border-0 bg-transparent text-start"
                   title="Create Problem"
                 >
                   <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
                   {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
-                </Link>
+                </button>
               </li>
               
               <li className="nav-item mb-2">
@@ -486,7 +483,7 @@ export default function ProblemList() {
                 <div className="d-flex gap-2">
                   <button
                     className="btn btn-light btn-sm"
-                    onClick={() => navigate('/problem/create')}
+                    onClick={goToCreateProblem}
                   >
                     <FaPlus className="me-1" />
                     New Problem
@@ -499,56 +496,55 @@ export default function ProblemList() {
                     <FaSync className={loading ? 'fa-spin me-1' : 'me-1'} />
                     Refresh
                   </button>
+                  <button
+                    className="btn btn-outline-light btn-sm"
+                    onClick={goToDashboard}
+                  >
+                    <FaHome className="me-1" />
+                    Dashboard
+                  </button>
                 </div>
               </div>
             </div>
             
-            {/* Stats Cards - UPDATED: Removed Pending Approval, Fixed Resolved */}
+            {/* Stats Cards */}
             <div className="p-3 bg-light border-bottom">
-              <div className="row g-3">
-                <div className="col-md-2 col-6">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body text-center py-2">
+              <div className="d-flex gap-3 flex-wrap">
+                <div style={{ flex: '1 1 calc(15% - 12px)', minWidth: '150px' }}>
+                  <div className="card border-0 shadow-sm h-100">
+                    <div className="card-body text-center py-2" style={{ minHeight: '60px' }}>
                       <h3 className="mb-0 text-primary">{stats.total}</h3>
                       <small className="text-muted">Total</small>
                     </div>
                   </div>
                 </div>
-                <div className="col-md-2 col-6">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body text-center py-2">
+                <div style={{ flex: '1 1 calc(15% - 12px)', minWidth: '150px' }}>
+                  <div className="card border-0 shadow-sm h-100">
+                    <div className="card-body text-center py-2" style={{ minHeight: '60px' }}>
                       <h3 className="mb-0 text-warning">{stats.pending}</h3>
                       <small className="text-muted">Pending</small>
                     </div>
                   </div>
                 </div>
-                <div className="col-md-2 col-6">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body text-center py-2">
+                <div style={{ flex: '1 1 calc(15% - 12px)', minWidth: '150px' }}>
+                  <div className="card border-0 shadow-sm h-100">
+                    <div className="card-body text-center py-2" style={{ minHeight: '60px' }}>
                       <h3 className="mb-0 text-info">{stats.in_progress}</h3>
                       <small className="text-muted">In Progress</small>
                     </div>
                   </div>
                 </div>
-                <div className="col-md-2 col-6">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body text-center py-2">
+                <div style={{ flex: '1 1 calc(15% - 12px)', minWidth: '150px' }}>
+                  <div className="card border-0 shadow-sm h-100">
+                    <div className="card-body text-center py-2" style={{ minHeight: '60px' }}>
                       <h3 className="mb-0 text-success">{stats.resolved}</h3>
                       <small className="text-muted">Resolved</small>
                     </div>
                   </div>
                 </div>
-                <div className="col-md-2 col-6">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body text-center py-2">
-                      <h3 className="mb-0 text-danger">{stats.escalated}</h3>
-                      <small className="text-muted">Escalated</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-2 col-6">
-                  <div className="card border-0 shadow-sm">
-                    <div className="card-body text-center py-2">
+                <div style={{ flex: '1 1 calc(15% - 12px)', minWidth: '150px' }}>
+                  <div className="card border-0 shadow-sm h-100">
+                    <div className="card-body text-center py-2" style={{ minHeight: '60px' }}>
                       <h3 className="mb-0 text-dark">{totalProblems}</h3>
                       <small className="text-muted">Showing</small>
                     </div>
@@ -656,7 +652,7 @@ export default function ProblemList() {
               </div>
             </div>
 
-            {/* Problems Table - Same as before */}
+            {/* Problems Table */}
             <div className="card-body p-0">
               {loading ? (
                 <div className="text-center py-5">
@@ -701,7 +697,7 @@ export default function ProblemList() {
                     )}
                     <button
                       className="btn btn-primary"
-                      onClick={() => navigate('/problem/create')}
+                      onClick={goToCreateProblem}
                     >
                       <FaPlusCircle className="me-2" />
                       Create Your First Problem
@@ -795,9 +791,21 @@ export default function ProblemList() {
                       </thead>
                       <tbody>
                         {problems.map(problem => (
-                          <tr key={problem.id} className={selectedProblems.includes(problem.id) ? 'table-active' : ''}>
+                          <tr 
+                            key={problem.id} 
+                            className={selectedProblems.includes(problem.id) ? 'table-active' : ''}
+                            style={{ cursor: 'pointer' }}
+                            onClick={(e) => {
+                              // Check if click was on checkbox or action buttons
+                              if (!e.target.closest('input[type="checkbox"]') && 
+                                  !e.target.closest('button') && 
+                                  !e.target.closest('.btn')) {
+                                navigate(`/problem/${problem.id}`);
+                              }
+                            }}
+                          >
                             <td>
-                              <div className="form-check">
+                              <div className="form-check" onClick={(e) => e.stopPropagation()}>
                                 <input
                                   className="form-check-input"
                                   type="checkbox"
@@ -853,7 +861,7 @@ export default function ProblemList() {
                               </div>
                             </td>
                             <td>
-                              <div className="d-flex gap-1 justify-content-center">
+                              <div className="d-flex gap-1 justify-content-center" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   className="btn btn-sm btn-outline-primary"
                                   onClick={() => navigate(`/problem/${problem.id}`)}
@@ -878,7 +886,7 @@ export default function ProblemList() {
                     </table>
                   </div>
 
-                  {/* Pagination - Same as before */}
+                  {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="p-3 border-top">
                       <div className="d-flex justify-content-between align-items-center">
@@ -942,7 +950,7 @@ export default function ProblemList() {
               )}
             </div>
 
-            {/* Bulk Actions Footer - Same as before */}
+            {/* Bulk Actions Footer */}
             {selectedProblems.length > 0 && (
               <div className="card-footer bg-light">
                 <div className="d-flex justify-content-between align-items-center">
@@ -990,7 +998,7 @@ export default function ProblemList() {
             )}
           </div>
 
-          {/* Quick Tips - Same as before */}
+          {/* Quick Tips */}
           <div className="card shadow-sm border-0 mt-4">
             <div className="card-header bg-white">
               <h6 className="mb-0">

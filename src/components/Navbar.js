@@ -20,6 +20,9 @@ export default function Navbar() {
   const { 
     notifications, 
     unreadCount, 
+    assignedProblems,
+    assignedUnreadCount,
+    markAssignedAsRead,
     markAsRead, 
     markAllAsRead, 
     clearNotifications,
@@ -271,7 +274,7 @@ export default function Navbar() {
                   id="notificationDropdown"
                   type="button"
                   data-bs-toggle="dropdown"
-                  onClick={() => loadNotifications()} // Refresh on click
+                  onClick={() => { loadNotifications(); markAllAsRead(); markAssignedAsRead(); }} // Refresh and mark all as read on open
                   style={{ 
                     width: '45px',
                     height: '45px',
@@ -281,7 +284,7 @@ export default function Navbar() {
                   }}
                 >
                   <FaBell style={{ fontSize: '1.1rem' }} />
-                  {unreadCount > 0 && (
+                  {(unreadCount + (assignedUnreadCount || 0)) > 0 && (
                     <span 
                       className="position-absolute badge rounded-pill bg-danger"
                       style={{ 
@@ -291,9 +294,9 @@ export default function Navbar() {
                         padding: '0.3em 0.5em',
                         boxShadow: '0 2px 8px rgba(220, 53, 69, 0.5)'
                       }}
-                      key={`badge-${unreadCount}`}
+                      key={`badge-${unreadCount}-${assignedUnreadCount}`}
                     >
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                      { (unreadCount + (assignedUnreadCount || 0)) > 9 ? '9+' : (unreadCount + (assignedUnreadCount || 0)) }
                     </span>
                   )}
                 </button>
@@ -351,7 +354,38 @@ export default function Navbar() {
                     )}
                   </li>
                   
-                  {notifications.length === 0 ? (
+                  {assignedProblems && assignedProblems.length > 0 ? (
+                    // Show assigned problems first
+                    assignedProblems.slice(0, 10).map((p, idx) => (
+                      <React.Fragment key={`assigned-${p.id}`}>
+                        <li>
+                          <div className="position-relative">
+                            <button
+                              className={`dropdown-item bg-light position-relative`}
+                              onClick={() => { handleNotificationClick({ id: `assigned-${p.id}`, problemId: p.id }); }}
+                              style={{ padding: '0.75rem 1rem', borderLeft: '3px solid #667eea', background: 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)', border: 'none', width: '100%', textAlign: 'left', paddingRight: '2.5rem' }}
+                            >
+                              <div className="d-flex align-items-start">
+                                <div className="d-flex align-items-center justify-content-center flex-shrink-0" style={{ fontSize: '1.2rem', marginRight: '10px', minWidth: '32px', height: '32px', background: 'rgba(102, 126, 234, 0.1)', borderRadius: '8px' }}>
+                                  📌
+                                </div>
+                                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                                  <div className="d-flex justify-content-between align-items-start mb-1">
+                                    <strong className="d-block text-truncate" style={{ fontSize: '0.85rem', lineHeight: '1.3', fontFamily: 'Poppins, sans-serif', color: '#1a202c', maxWidth: '85%' }}>
+                                      {`Assigned: ${p.statement}`}
+                                    </strong>
+                                  </div>
+                                  <small className="d-block text-muted mb-1" style={{ fontSize: '0.8rem', lineHeight: '1.4', color: '#4a5568' }}>{`${p.priority || ''} — ${p.department || ''}`}</small>
+                                  <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.7rem', color: '#718096' }}><span className="me-1" style={{ fontSize: '0.8rem' }}>🕐</span>{getTimeAgo(p.updated_at || p.created_at)}</small>
+                                </div>
+                              </div>
+                            </button>
+                          </div>
+                        </li>
+                        {idx < Math.min(assignedProblems.length, 10) - 1 && (<li><hr className="dropdown-divider my-0" style={{ opacity: '0.08' }} /></li>)}
+                      </React.Fragment>
+                    ))
+                  ) : notifications.length === 0 ? (
                     <li className="dropdown-item text-center py-5">
                       <div style={{ fontSize: '3rem', opacity: '0.3', marginBottom: '0.5rem' }}>🔕</div>
                       <p className="text-muted mb-0" style={{ fontWeight: '500', fontSize: '0.9rem' }}>No notifications yet</p>
@@ -365,108 +399,30 @@ export default function Navbar() {
                             <button
                               className={`dropdown-item ${!notification.read ? 'bg-light' : ''} position-relative`}
                               onClick={() => handleNotificationClick(notification)}
-                              style={{ 
-                                padding: '0.75rem 1rem',
-                                borderLeft: !notification.read ? '3px solid #667eea' : '3px solid transparent',
-                                background: !notification.read ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' : 'transparent',
-                                border: 'none',
-                                width: '100%',
-                                textAlign: 'left',
-                                paddingRight: '2.5rem' // Make space for dismiss button
-                              }}
+                              style={{ padding: '0.75rem 1rem', borderLeft: !notification.read ? '3px solid #667eea' : '3px solid transparent', background: !notification.read ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%)' : 'transparent', border: 'none', width: '100%', textAlign: 'left', paddingRight: '2.5rem' }}
                             >
                               <div className="d-flex align-items-start">
-                                <div 
-                                  className="d-flex align-items-center justify-content-center flex-shrink-0"
-                                  style={{ 
-                                    fontSize: '1.2rem', 
-                                    marginRight: '10px',
-                                    minWidth: '32px',
-                                    height: '32px',
-                                    background: 'rgba(102, 126, 234, 0.1)',
-                                    borderRadius: '8px'
-                                  }}
-                                >
+                                <div className="d-flex align-items-center justify-content-center flex-shrink-0" style={{ fontSize: '1.2rem', marginRight: '10px', minWidth: '32px', height: '32px', background: 'rgba(102, 126, 234, 0.1)', borderRadius: '8px' }}>
                                   {notification.icon || getNotificationIcon(notification.type)}
                                 </div>
                                 <div className="flex-grow-1" style={{ minWidth: 0 }}>
                                   <div className="d-flex justify-content-between align-items-start mb-1">
-                                    <strong 
-                                      className="d-block text-truncate" 
-                                      style={{ 
-                                        fontSize: '0.85rem', 
-                                        lineHeight: '1.3',
-                                        fontFamily: 'Poppins, sans-serif',
-                                        color: '#1a202c',
-                                        maxWidth: '85%'
-                                      }}
-                                    >
+                                    <strong className="d-block text-truncate" style={{ fontSize: '0.85rem', lineHeight: '1.3', fontFamily: 'Poppins, sans-serif', color: '#1a202c', maxWidth: '85%' }}>
                                       {notification.title}
                                     </strong>
                                     {!notification.read && (
-                                      <span 
-                                        className="badge rounded-circle flex-shrink-0" 
-                                        style={{ 
-                                          width: '8px', 
-                                          height: '8px', 
-                                          padding: '0',
-                                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                          boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)'
-                                        }}
-                                        title="Unread"
-                                      />
+                                      <span className="badge rounded-circle flex-shrink-0" style={{ width: '8px', height: '8px', padding: '0', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)' }} title="Unread" />
                                     )}
                                   </div>
-                                  <small 
-                                    className="d-block text-muted mb-1" 
-                                    style={{ 
-                                      fontSize: '0.8rem', 
-                                      lineHeight: '1.4',
-                                      color: '#4a5568',
-                                      display: '-webkit-box',
-                                      WebkitLineClamp: '2',
-                                      WebkitBoxOrient: 'vertical',
-                                      overflow: 'hidden'
-                                    }}
-                                  >
-                                    {notification.message}
-                                  </small>
-                                  <small 
-                                    className="text-muted d-flex align-items-center" 
-                                    style={{ fontSize: '0.7rem', color: '#718096' }}
-                                  >
-                                    <span className="me-1" style={{ fontSize: '0.8rem' }}>🕐</span>
-                                    {getTimeAgo(notification.timestamp)}
-                                  </small>
+                                  <small className="d-block text-muted mb-1" style={{ fontSize: '0.8rem', lineHeight: '1.4', color: '#4a5568', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{notification.message}</small>
+                                  <small className="text-muted d-flex align-items-center" style={{ fontSize: '0.7rem', color: '#718096' }}><span className="me-1" style={{ fontSize: '0.8rem' }}>🕐</span>{getTimeAgo(notification.timestamp)}</small>
                                 </div>
                               </div>
                             </button>
-                            {/* Dismiss button */}
-                            <button 
-                              className="position-absolute top-0 end-0 mt-2 me-2 btn btn-sm btn-light"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent triggering the notification click
-                                removeNotification(notification.id);
-                              }}
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '0.2rem 0.4rem',
-                                lineHeight: '1',
-                                opacity: '0.6',
-                                zIndex: '1',
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#6c757d'
-                              }}
-                              title="Dismiss notification"
-                            >
-                              ×
-                            </button>
+                            <button className="position-absolute top-0 end-0 mt-2 me-2 btn btn-sm btn-light" onClick={(e) => { e.stopPropagation(); removeNotification(notification.id); }} style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem', lineHeight: '1', opacity: '0.6', zIndex: '1', border: 'none', background: 'transparent', color: '#6c757d' }} title="Dismiss notification">×</button>
                           </div>
                         </li>
-                        {index < sortedNotifications.slice(0, 10).length - 1 && (
-                          <li><hr className="dropdown-divider my-0" style={{ opacity: '0.08' }} /></li>
-                        )}
+                        {index < sortedNotifications.slice(0, 10).length - 1 && (<li><hr className="dropdown-divider my-0" style={{ opacity: '0.08' }} /></li>)}
                       </React.Fragment>
                     ))
                   )}

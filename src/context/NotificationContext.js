@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import api from '../services/api';
 
 const NotificationContext = createContext(null);
 
@@ -397,6 +398,66 @@ export const NotificationProvider = ({ children }) => {
     });
   };
 
+  // ==================== ASSIGNED PROBLEMS (direct visualization) ====================
+  // Maintain a live list of problems assigned to the current user using
+  // the `/problems/assigned-by-user` endpoint. Provide an "assignedUnreadCount"
+  // based on `assignedSeenAt` so clicking the bell can reset the count.
+  const [assignedProblems, setAssignedProblems] = React.useState([]);
+  const [assignedSeenAt, setAssignedSeenAt] = React.useState(null);
+
+  // Load assignedSeenAt from localStorage when user changes
+  useEffect(() => {
+    if (!user) {
+      setAssignedProblems([]);
+      setAssignedSeenAt(null);
+      return;
+    }
+    const key = `assignedSeenAt_${user.id}`;
+    const stored = localStorage.getItem(key);
+    setAssignedSeenAt(stored || null);
+  }, [user]);
+
+  // Function to fetch assigned problems and keep state updated
+  const loadAssignedProblems = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await api.get('/problems/assigned-by-user');
+      const data = response.data;
+      if (data && data.status === 'success' && Array.isArray(data.data)) {
+        setAssignedProblems(data.data || []);
+      } else {
+        setAssignedProblems([]);
+      }
+    } catch (err) {
+      console.error('Failed to load assigned problems:', err);
+      setAssignedProblems([]);
+    }
+  }, [user]);
+
+  // Poll assigned problems every 10s
+  useEffect(() => {
+    if (!user) return;
+    loadAssignedProblems();
+    const id = setInterval(loadAssignedProblems, 10000);
+    return () => clearInterval(id);
+  }, [user, loadAssignedProblems]);
+
+  // Number of assigned problems that arrived after the user last viewed them
+  const assignedUnreadCount = React.useMemo(() => {
+    if (!assignedProblems || assignedProblems.length === 0) return 0;
+    if (!assignedSeenAt) return assignedProblems.length;
+    const seenDate = new Date(assignedSeenAt);
+    return assignedProblems.filter(p => new Date(p.updated_at || p.created_at) > seenDate).length;
+  }, [assignedProblems, assignedSeenAt]);
+
+  const markAssignedAsRead = () => {
+    if (!user) return;
+    const key = `assignedSeenAt_${user.id}`;
+    const now = new Date().toISOString();
+    localStorage.setItem(key, now);
+    setAssignedSeenAt(now);
+  };
+
   // Notify when multiple domains are down
   const notifyMultipleDomainsDown = (downDomains) => {
     if (downDomains.length === 0) return;
@@ -722,6 +783,11 @@ export const NotificationProvider = ({ children }) => {
         notifySystemMaintenance,
         notifySystemError,
         notifyBackupCompleted
+        ,
+        // Assigned problems (direct API visualization)
+        assignedProblems,
+        assignedUnreadCount,
+        markAssignedAsRead,
       }}
     >
       {children}

@@ -459,7 +459,7 @@ const handleStatusChange = async (newStatus) => {
       // Redirect user to dashboard after marking as resolved
       if (newStatus === 'resolved') {
         setTimeout(() => {
-          navigate('/EmployeeDashboard');
+          navigate('/problems');
         }, 2000);
       } else {
         fetchProblemDetails();

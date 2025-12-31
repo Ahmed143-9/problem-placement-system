@@ -213,11 +213,15 @@ export default function AdminPanel() {
 
               if (userDetailResponse.data.status === 'success') {
                 const userDetailData = userDetailResponse.data;
+                // Extract role name from role object or string
+                const roleObj = userDetailData.data.roles && userDetailData.data.roles.length > 0 ? userDetailData.data.roles[0] : null;
+                const roleName = roleObj && typeof roleObj === 'object' ? (roleObj.name || roleObj.role_name || 'user') : (roleObj || 'user');
+                
+                console.log(`👤 User ${user.id}: role from API =`, roleObj, '-> extracted =', roleName);
+                
                 return {
                   ...user,
-                  role: userDetailData.data.roles && userDetailData.data.roles.length > 0
-                    ? userDetailData.data.roles[0]
-                    : 'user',
+                  role: roleName,
                   username: userDetailData.data.username || user.email.split('@')[0],
                   status: userDetailData.data.status === 1 ? 'active' : 'inactive',
                   department: userDetailData.data.department || 'Not Assigned'
@@ -252,11 +256,11 @@ export default function AdminPanel() {
         setActiveUsers(activeUsersList);
 
       } else {
-        toast.error(data.message || 'Failed to load users');
+        toast.error(data.message || 'Failed to load users', { autoClose: 3000 });
       }
     } catch (error) {
       console.error('Failed to load users:', error);
-      toast.error('Network error while loading users');
+      toast.error('Network error while loading users', { autoClose: 3000 });
     } finally {
       setLoadingUsers(false);
     }
@@ -295,12 +299,12 @@ export default function AdminPanel() {
 
   const handleSaveUser = async () => {
     if (!isAdmin) {
-      toast.error('Only Admin can add or edit users!');
+      toast.error('Only Admin can add or edit users!', { autoClose: 3000 });
       return;
     }
 
     if (!formData.name || !formData.email) {
-      toast.error('Name and Email are required fields');
+      toast.error('Name and Email are required fields', { autoClose: 3000 });
       return;
     }
 
@@ -308,12 +312,12 @@ export default function AdminPanel() {
 
     // Password validation for new users
     if (!editingUser && !formData.password) {
-      toast.error('Password is required for new user');
+      toast.error('Password is required for new user', { autoClose: 3000 });
       return;
     }
 
     if (formData.password && !validatePassword(formData.password)) {
-      toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char (@$!%*?&.)');
+      toast.error('Password must be 8+ chars, include 1 uppercase, 1 number & 1 special char (@$!%*?&.)', { autoClose: 3000 });
       return;
     }
 
@@ -361,10 +365,10 @@ export default function AdminPanel() {
         // Send notification
         if (editingUser) {
           sendUserUpdateNotification(editingUser, formData);
-          toast.success('User updated successfully!');
+          toast.success('User updated successfully!', { autoClose: 3000 });
         } else {
           sendUserCreationNotification(formData);
-          toast.success('User created successfully!');
+          toast.success('User created successfully!', { autoClose: 3000 });
         }
 
         // Reset form and close modal
@@ -526,7 +530,7 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('Error loading user details:', error);
-      toast.error('Failed to load user details');
+      toast.error('Failed to load user details', { autoClose: 3000 });
     }
   };
 
@@ -592,7 +596,7 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('❌ Error loading First Face assignments:', error);
-      toast.error('Failed to load First Face assignments');
+      toast.error('Failed to load First Face assignments', { autoClose: 3000 });
     } finally {
       setLoadingFirstFace(false);
     }
@@ -601,7 +605,7 @@ export default function AdminPanel() {
   // Create First Face assignment via backend
   const handleFirstFaceAssignment = async () => {
     if (!selectedFirstFace || !selectedDepartment) {
-      toast.error('Please select both a user and a department');
+      toast.error('Please select both a user and a department', { autoClose: 3000 });
       return;
     }
 
@@ -618,13 +622,13 @@ export default function AdminPanel() {
         setSelectedDepartment('');
         setShowFirstFaceModal(false);
         loadFirstFaceAssignments();
-        toast.success(response.data.messages[0]);
+        toast.success(response.data.messages[0], { autoClose: 3000 });
       } else {
-        toast.error(response.data.messages?.[0] || 'Failed to create First Face assignment');
+        toast.error(response.data.messages?.[0] || 'Failed to create First Face assignment', { autoClose: 3000 });
       }
     } catch (error) {
       console.error('❌ Error creating First Face assignment:', error);
-      toast.error(error.message || 'Failed to create First Face assignment');
+      toast.error(error.message || 'Failed to create First Face assignment', { autoClose: 3000 });
     } finally {
       setSavingFirstFace(false);
     }
@@ -637,13 +641,13 @@ export default function AdminPanel() {
 
       if (response.data.status === 'success') {
         loadFirstFaceAssignments();
-        toast.success('First Face assignment removed!');
+        toast.success('First Face assignment removed!', { autoClose: 3000 });
       } else {
-        toast.error(response.data.messages[0] || 'Failed to remove First Face assignment');
+        toast.error(response.data.messages[0] || 'Failed to remove First Face assignment', { autoClose: 3000 });
       }
     } catch (error) {
       console.error('❌ Error removing First Face assignment:', error);
-      toast.error(error.message || 'Failed to remove First Face assignment');
+      toast.error(error.message || 'Failed to remove First Face assignment', { autoClose: 3000 });
     }
   };
 
@@ -655,7 +659,7 @@ export default function AdminPanel() {
       console.log('Active users filtered successfully:', activeUsersList.length);
     } catch (error) {
       console.error('Failed to filter active users:', error);
-      toast.error('Error while preparing active users list');
+      toast.error('Error while preparing active users list', { autoClose: 3000 });
     } finally {
       setLoadingActiveUsers(false);
     }
@@ -663,7 +667,7 @@ export default function AdminPanel() {
 
   const handleEditUser = (userId) => {
     if (!isAdmin) {
-      toast.error('Only Admin can edit users!');
+      toast.error('Only Admin can edit users!', { autoClose: 3000 });
       return;
     }
     const userToEdit = users.find(u => u.id === userId);
@@ -675,7 +679,7 @@ export default function AdminPanel() {
   // Toggle user status
   const handleToggleStatus = async (userId) => {
     if (!isAdmin) {
-      toast.error('Only Admin can change user status!');
+      toast.error('Only Admin can change user status!', { autoClose: 3000 });
       return;
     }
 
@@ -690,7 +694,7 @@ export default function AdminPanel() {
 
       if (response.data.status === 'success') {
         sendUserStatusNotification(userToUpdate, newStatus);
-        toast.success('User status updated!');
+        toast.success('User status updated!', { autoClose: 3000 });
 
         // Update local state immediately
         setUsers(prevUsers =>
@@ -709,10 +713,10 @@ export default function AdminPanel() {
         }
 
       } else {
-        toast.error(response.data.message || 'Failed to update status');
+        toast.error(response.data.message || 'Failed to update status', { autoClose: 3000 });
       }
     } catch (error) {
-      toast.error('Failed to update status');
+      toast.error('Failed to update status', { autoClose: 3000 });
       console.error(error);
     }
   };
@@ -720,7 +724,7 @@ export default function AdminPanel() {
   // Reset user password
   const handleResetPassword = async (userId, userName) => {
     if (!isAdmin) {
-      toast.error('Only Admin can reset passwords!');
+      toast.error('Only Admin can reset passwords!', { autoClose: 3000 });
       return;
     }
 
@@ -728,7 +732,7 @@ export default function AdminPanel() {
     if (!newPassword) return;
 
     if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      toast.error('Password must be at least 8 characters', { autoClose: 3000 });
       return;
     }
 
@@ -740,13 +744,13 @@ export default function AdminPanel() {
       });
 
       if (response.data.status === 'success') {
-        toast.success(`Password reset successfully for ${userName}!`);
+        toast.success(`Password reset successfully for ${userName}!`, { autoClose: 3000 });
         loadUsers();
       } else {
-        toast.error(response.data.message || 'Failed to reset password');
+        toast.error(response.data.message || 'Failed to reset password', { autoClose: 3000 });
       }
     } catch (error) {
-      toast.error('Failed to reset password');
+      toast.error('Failed to reset password', { autoClose: 3000 });
       console.error(error);
     }
   };
@@ -754,7 +758,7 @@ export default function AdminPanel() {
   // Delete user
   const handleDeleteUser = async (userId) => {
     if (!isAdmin) {
-      toast.error('Only Admin can delete users!');
+      toast.error('Only Admin can delete users!', { autoClose: 3000 });
       return;
     }
 
@@ -768,13 +772,13 @@ export default function AdminPanel() {
 
       if (response.data.status === 'success') {
         sendUserDeletionNotification(userToDelete);
-        toast.success('User deleted successfully!');
+        toast.success('User deleted successfully!', { autoClose: 3000 });
         loadUsers();
       } else {
-        toast.error(response.data.message || 'Failed to delete user');
+        toast.error(response.data.message || 'Failed to delete user', { autoClose: 3000 });
       }
     } catch (error) {
-      toast.error('Failed to delete user');
+      toast.error('Failed to delete user', { autoClose: 3000 });
       console.error(error);
     }
   };
@@ -1179,7 +1183,8 @@ export default function AdminPanel() {
                                 <span className={`badge ${getRoleBadge(u.role)}`}>
                                   {u.role === 'admin' ? ' Admin' :
                                     u.role === 'team_leader' ? ' Team Leader' :
-                                      ' User'}
+                                      u.role === 'user' ? ' User' :
+                                        ` ${u.role}`}
                                 </span>
                               </td>
                               <td>{u.department}</td>

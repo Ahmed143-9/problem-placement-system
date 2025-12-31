@@ -759,7 +759,7 @@ export default function RoleManagement() {
                                         <tr>
                                             <th className="text-center" style={{ width: '60px' }}>#</th>
                                             <th>Role Name</th>
-                                            <th>ID</th>
+                                            {/* <th>ID</th> */}
                                             <th className="text-center" style={{ width: '140px' }}>Actions</th>
                                         </tr>
                                     </thead>
@@ -787,9 +787,9 @@ export default function RoleManagement() {
                                                     <td className="fw-semibold">
                                                         {role.name}
                                                     </td>
-                                                    <td>
+                                                    {/* <td>
                                                         <code className="bg-light px-2 py-1 rounded">{role.id}</code>
-                                                    </td>
+                                                    </td> */}
                                                     <td className="text-center">
                                                         <div className="d-flex justify-content-center gap-2">
                                                             <button
@@ -802,7 +802,7 @@ export default function RoleManagement() {
                                                                 <FaEdit className="me-1" size={12} />
                                                                 Edit
                                                             </button>
-                                                            <button
+                                                            {/* <button
                                                                 className="btn btn-sm btn-outline-danger d-flex align-items-center"
                                                                 onClick={() => handleDeleteRole(role)}
                                                                 title="Delete Role"
@@ -820,7 +820,7 @@ export default function RoleManagement() {
                                                                         Delete
                                                                     </>
                                                                 )}
-                                                            </button>
+                                                            </button> */}
                                                         </div>
                                                     </td>
                                                 </tr>
