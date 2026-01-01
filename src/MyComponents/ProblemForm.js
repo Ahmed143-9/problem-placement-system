@@ -1,5 +1,4 @@
-// src/pages/ProblemForm.js - FIXED VERSION WITH CONSISTENT SIDEBAR
-
+// src/pages/ProblemForm.js - COMPLETE VERSION WITH NOTIFICATIONS
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
@@ -10,8 +9,11 @@ import {
   FaHome, FaPlusCircle, FaFileAlt, FaChevronLeft, FaChevronRight, 
   FaExclamationTriangle, FaUserPlus, FaBan, FaSpinner, FaUserTie,
   FaBuilding, FaTag, FaClock, FaUsersCog, FaArrowLeft, FaImage,
-  FaTimes, FaUpload, FaCheckCircle, FaInfoCircle, FaChevronDown,FaGlobe
+  FaTimes, FaUpload, FaCheckCircle, FaInfoCircle, FaChevronDown, FaGlobe
 } from 'react-icons/fa';
+
+// Import WebSocket service
+import webSocketService from '../services/websocket';
 
 const SERVICES = [
   'Bulk SMS -> WinText',
@@ -62,11 +64,36 @@ export default function ProblemForm() {
   const [showManualAssignment, setShowManualAssignment] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // Initialize notification system
   useEffect(() => {
     loadTeamMembers();
     if (user?.department && !formData.department) {
       setFormData(prev => ({ ...prev, department: user.department }));
     }
+
+    // Initialize notification context reference
+    if (!window.notificationContext) {
+      window.notificationContext = {
+        addNotification: (notification) => {
+          console.log('📨 Notification would be added:', notification);
+          // This will be properly set by the NotificationContext
+        },
+        addAssignedProblem: (problem) => {
+          console.log('📋 Assigned problem would be added:', problem);
+        }
+      };
+    }
+
+    // Connect WebSocket
+    setTimeout(() => {
+      if (webSocketService) {
+        webSocketService.connect();
+      }
+    }, 1500);
+
+    return () => {
+      // Cleanup if needed
+    };
   }, [user]);
 
   const loadTeamMembers = async () => {
@@ -302,145 +329,350 @@ export default function ProblemForm() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (uploadingImages) {
-      toast.warning('Please wait for images to finish uploading', { autoClose: 3000 });
-      return;
-    }
-    
-    const stillUploading = previewImages.some(img => img.uploading);
-    if (stillUploading) {
-      toast.warning('Some images are still uploading. Please wait.', { autoClose: 3000 });
-      return;
-    }
-
-    setLoading(true);
-
+  // Helper function to store notifications for polling (fallback)
+  const storeNotificationForPolling = (notification) => {
     try {
-      if (!formData.department || !formData.priority || !formData.statement.trim()) {
-        toast.error('Please fill all required fields (Department, Priority, Problem Statement)', { autoClose: 3000 });
+      // Get existing pending notifications
+      const pendingNotifications = JSON.parse(localStorage.getItem('pending_notifications') || '[]');
+      
+      // Add new notification
+      pendingNotifications.push({
+        ...notification,
+        stored_at: new Date().toISOString(),
+        attempts: 0
+      });
+      
+      // Keep only last 50 notifications
+      const trimmedNotifications = pendingNotifications.slice(-50);
+      
+      localStorage.setItem('pending_notifications', JSON.stringify(trimmedNotifications));
+      console.log('💾 Notification stored for polling delivery');
+      
+    } catch (storageError) {
+      console.error('Failed to store notification for polling:', storageError);
+    }
+  };
+
+  // Send notification to assigned user
+  const sendAssignmentNotification = async (assignedTo, assignedUser, problem, assignmentType) => {
+    try {
+      // Prepare notification data
+      const notificationPayload = {
+        type: 'assignment',
+        title: 'New Problem Assigned',
+        message: `You have been assigned to problem: "${formData.statement.substring(0, 100)}${formData.statement.length > 100 ? '...' : ''}"`,
+        problem_id: problem.id,
+        recipient_id: assignedTo,
+        sender_id: user?.id,
+        sender_name: user?.name || 'System',
+        priority: formData.priority,
+        department: formData.department,
+        assignment_type: assignmentType,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('📤 Sending assignment notification:', notificationPayload);
+      
+      // Try to send via WebSocket
+      let wsSuccess = false;
+      if (webSocketService && webSocketService.sendMessage) {
+        wsSuccess = webSocketService.sendMessage('notification', notificationPayload);
+      }
+      
+      // If WebSocket fails, store for polling
+      if (!wsSuccess) {
+        console.log('📡 WebSocket not available, storing for polling');
+        storeNotificationForPolling(notificationPayload);
+      }
+      
+      // Also store in localStorage for immediate display
+      try {
+        const localNotifications = JSON.parse(localStorage.getItem('local_notifications') || '[]');
+        localNotifications.unshift({
+          id: `assignment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          ...notificationPayload,
+          read: false,
+          timestamp: new Date().toISOString(),
+          local_stored: true
+        });
+        
+        // Keep only last 20 notifications
+        const trimmedLocalNotifications = localNotifications.slice(0, 20);
+        localStorage.setItem('local_notifications', JSON.stringify(trimmedLocalNotifications));
+        
+        // Trigger storage event to notify other tabs/components
+        window.dispatchEvent(new Event('localStorageChange'));
+        
+      } catch (localError) {
+        console.error('Failed to store notification locally:', localError);
+      }
+      
+      return true;
+      
+    } catch (notificationError) {
+      console.error('❌ Failed to send notification:', notificationError);
+      return false;
+    }
+  };
+
+  // Send notification to admins about unassigned problem
+  const sendUnassignedNotification = (problem) => {
+    try {
+      const adminNotification = {
+        type: 'new_problem',
+        title: 'New Problem Created - Needs Assignment',
+        message: `New problem created: "${formData.statement.substring(0, 80)}${formData.statement.length > 80 ? '...' : ''}" in ${formData.department}`,
+        problem_id: problem.id,
+        sender_id: user?.id,
+        sender_name: user?.name || 'Unknown',
+        priority: formData.priority,
+        department: formData.department,
+        created_at: new Date().toISOString(),
+        needs_assignment: true
+      };
+
+      console.log('📤 Notifying admins about unassigned problem:', adminNotification);
+      
+      // Store for polling (admin notifications)
+      storeNotificationForPolling({
+        ...adminNotification,
+        recipient_role: 'admin' // This would go to all admins
+      });
+      
+    } catch (error) {
+      console.error('Failed to send unassigned notification:', error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (uploadingImages) {
+    toast.warning('Please wait for images to finish uploading', { autoClose: 3000 });
+    return;
+  }
+  
+  const stillUploading = previewImages.some(img => img.uploading);
+  if (stillUploading) {
+    toast.warning('Some images are still uploading. Please wait.', { autoClose: 3000 });
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    if (!formData.department || !formData.priority || !formData.statement.trim()) {
+      toast.error('Please fill all required fields (Department, Priority, Problem Statement)', { autoClose: 3000 });
+      setLoading(false);
+      return;
+    }
+
+    console.log('🔄 Starting problem creation...');
+    console.log('👤 Problem creator:', user?.name);
+
+    let assignedTo = null;
+    let assignmentType = 'NOT_ASSIGNED';
+    let assignedUser = null;
+
+    if (formData.assigned_to) {
+      const selectedUser = teamMembers.find(member => member.id == formData.assigned_to);
+      
+      if (selectedUser && selectedUser.id !== user?.id) {
+        assignedTo = selectedUser.id;
+        assignedUser = selectedUser;
+        assignmentType = 'MANUAL_ASSIGNMENT';
+        console.log('🔧 Manual assignment:', selectedUser.name);
+      } else {
+        console.warn('⚠️ Manual assignment failed - possibly assigning to creator');
+        toast.warning('Cannot assign problem to yourself. Please select another team member.', { autoClose: 3000 });
         setLoading(false);
         return;
       }
+    }
 
-      console.log('🔄 Starting problem creation...');
-      console.log('👤 Problem creator:', user?.name);
-
-      let assignedTo = null;
-      let assignmentType = 'NOT_ASSIGNED';
-
-      if (formData.assigned_to) {
-        const selectedUser = teamMembers.find(member => member.id == formData.assigned_to);
-        
-        if (selectedUser && selectedUser.id !== user?.id) {
-          assignedTo = selectedUser.id;
-          assignmentType = 'MANUAL_ASSIGNMENT';
-          console.log('🔧 Manual assignment:', selectedUser.name);
-        } else {
-          console.warn('⚠️ Manual assignment failed - possibly assigning to creator');
-          toast.warning('Cannot assign problem to yourself. Please select another team member.', { autoClose: 3000 });
-          setLoading(false);
-          return;
-        }
+    if (!assignedTo) {
+      const autoUser = getAutoAssignedUser(formData.department);
+      if (autoUser) {
+        assignedTo = autoUser.id;
+        assignedUser = teamMembers.find(u => u.id === autoUser.id);
+        assignmentType = autoUser.type;
+        console.log('🤖 Auto assignment:', autoUser.name);
       }
+    }
 
-      if (!assignedTo) {
-        const autoUser = getAutoAssignedUser(formData.department);
-        if (autoUser) {
-          assignedTo = autoUser.id;
-          assignmentType = autoUser.type;
-          console.log('🤖 Auto assignment:', autoUser.name);
+    if (assignedTo === user?.id) {
+      console.error('🚨 CRITICAL: Attempted to assign problem to creator - BLOCKED');
+      assignedTo = null;
+      assignedUser = null;
+      assignmentType = 'NOT_ASSIGNED';
+      toast.warning('Problem cannot be assigned to the creator. Please select another team member.', { autoClose: 3000 });
+    }
+
+    const problemData = {
+      statement: formData.statement,
+      department: formData.department,
+      priority: formData.priority,
+      description: formData.description || '',
+      created_by: user?.userId || user?.id,
+      assigned_to: assignedTo || null,
+      images: formData.images
+    };
+
+    console.log('📝 Problem data for backend:', problemData);
+    console.log('🖼️ Images to send:', formData.images);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch('https://ticketapi.wineds.com/api/problems/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify(problemData),
+    });
+
+    const data = await response.json();
+    console.log('📤 Backend response:', data);
+
+    if (data.status === 'success') {
+      const problem = data.data;
+      
+      // ✅ SEND NOTIFICATION TO ASSIGNED USER
+      if (assignedTo && assignedUser) {
+        try {
+          // Create notification for assigned user
+          const notificationData = {
+            recipient_id: assignedTo,
+            recipient_name: assignedUser.name,
+            type: 'assignment',
+            title: 'New Problem Assigned',
+            message: `You have been assigned a new problem: "${formData.statement.substring(0, 80)}${formData.statement.length > 80 ? '...' : ''}"`,
+            problem_id: problem.id,
+            problem_statement: formData.statement,
+            priority: formData.priority,
+            department: formData.department,
+            sender_id: user?.id,
+            sender_name: user?.name || 'System'
+          };
+
+          // Import notification service
+          import('../services/notificationService').then(({ default: notificationService }) => {
+            // Create notification
+            const notification = notificationService.createNotification(notificationData);
+            
+            console.log('✅ Notification created for assigned user:', notification);
+            
+            // Show success message
+            toast.success(`✅ Problem submitted successfully! Assigned to ${assignedUser.name}`, { 
+              autoClose: 4000,
+              position: "top-right"
+            });
+            
+            // Also show a toast for the assigned user (if they're on the same browser)
+            if (parseInt(localStorage.getItem('current_user_id')) === assignedTo) {
+              toast.info(`📨 You have been assigned a new problem: "${formData.statement.substring(0, 50)}..."`, {
+                autoClose: 5000,
+                position: "top-right"
+              });
+            }
+            
+          }).catch(error => {
+            console.error('Failed to import notification service:', error);
+            toast.success(`✅ Problem submitted successfully! Assigned to ${assignedUser.name}`, { 
+              autoClose: 4000 
+            });
+          });
+          
+        } catch (notificationError) {
+          console.error('❌ Failed to create notification:', notificationError);
+          toast.success(`✅ Problem submitted successfully! Assigned to ${assignedUser.name}`, { 
+            autoClose: 4000 
+          });
         }
-      }
-
-      if (assignedTo === user?.id) {
-        console.error('🚨 CRITICAL: Attempted to assign problem to creator - BLOCKED');
-        assignedTo = null;
-        assignmentType = 'NOT_ASSIGNED';
-            toast.warning('Problem cannot be assigned to the creator. Please select another team member.', { autoClose: 3000 });
-      }
-
-      const problemData = {
-        statement: formData.statement,
-        department: formData.department,
-        priority: formData.priority,
-        description: formData.description || '',
-        created_by: user?.userId || user?.id,
-        assigned_to: assignedTo || null,
-        images: formData.images
-      };
-
-      console.log('📝 Problem data for backend:', problemData);
-      console.log('🖼️ Images to send:', formData.images);
-
-      const token = localStorage.getItem('token');
-      const response = await fetch('https://ticketapi.wineds.com/api/problems/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
-        body: JSON.stringify(problemData),
-      });
-
-      const data = await response.json();
-      console.log('📤 Backend response:', data);
-
-      if (data.status === 'success') {
-        const problem = data.data;
-        
-        if (assignedTo) {
-          const assignedUser = teamMembers.find(u => u.id === assignedTo);
-          if (assignmentType === 'MANUAL_ASSIGNMENT') {
-            toast.success(`Problem submitted successfully!'}`);
-          } else {
-            toast.success(`Problem submitted successfully!`);
-          }
-        } else {
-          toast.success(`Problem submitted successfully!`);
-        }
-        
-        previewImages.forEach(img => {
-          if (img.url.startsWith('blob:')) {
-            URL.revokeObjectURL(img.url);
-          }
-        });
-        
-        setFormData({ 
-          department: '', 
-          service: '', 
-          priority: 'Medium',
-          statement: '', 
-          description: '',
-          client: '', 
-          assigned_to: '',
-          images: [] 
-        });
-        setPreviewImages([]);
-        setShowManualAssignment(false);
-        
-        setTimeout(() => {
-          if (user?.role === 'admin' || user?.role === 'team_leader') {
-            navigate('/problems');
-          } else {
-            navigate('/employee-dashboard');
-          }
-        }, 1500);
-        
       } else {
-        throw new Error(data.messages?.[0] || 'Failed to submit problem');
+        // Problem created but not assigned
+        toast.success(`✅ Problem submitted successfully!`, { 
+          autoClose: 3000 
+        });
+        
+        // Notify admins about unassigned problem if creator is regular user
+        if (user?.role === 'user' || user?.role === 'employee') {
+          try {
+            import('../services/notificationService').then(({ default: notificationService }) => {
+              // Find admin users
+              const adminUsers = teamMembers.filter(member => 
+                member.role === 'admin' || member.role === 'team_leader'
+              );
+              
+              // Send notification to each admin
+              adminUsers.forEach(admin => {
+                const adminNotification = {
+                  recipient_id: admin.id,
+                  recipient_name: admin.name,
+                  type: 'new_problem',
+                  title: 'New Problem Created - Needs Assignment',
+                  message: `New problem created in ${formData.department}: "${formData.statement.substring(0, 80)}..."`,
+                  problem_id: problem.id,
+                  problem_statement: formData.statement,
+                  priority: formData.priority,
+                  department: formData.department,
+                  sender_id: user?.id,
+                  sender_name: user?.name || 'Unknown'
+                };
+                
+                notificationService.createNotification(adminNotification);
+              });
+              
+              console.log(`📨 Notified ${adminUsers.length} admins about unassigned problem`);
+            });
+          } catch (error) {
+            console.error('Failed to notify admins:', error);
+          }
+        }
       }
       
-    } catch (error) {
-      console.error('❌ Submission error:', error);
-      toast.error(error.message || 'Failed to submit problem. Please try again.');
-    } finally {
-      setLoading(false);
+      // Cleanup image previews
+      previewImages.forEach(img => {
+        if (img.url.startsWith('blob:')) {
+          URL.revokeObjectURL(img.url);
+        }
+      });
+      
+      // Reset form
+      setFormData({ 
+        department: '', 
+        service: '', 
+        priority: 'Medium',
+        statement: '', 
+        description: '',
+        client: '', 
+        assigned_to: '',
+        images: [] 
+      });
+      setPreviewImages([]);
+      setShowManualAssignment(false);
+      
+      // Navigate after delay
+      setTimeout(() => {
+        if (user?.role === 'admin' || user?.role === 'team_leader') {
+          navigate('/problems');
+        } else {
+          navigate('/employee-dashboard');
+        }
+      }, 1500);
+      
+    } else {
+      throw new Error(data.messages?.[0] || 'Failed to submit problem');
     }
-  };
+    
+  } catch (error) {
+    console.error('❌ Submission error:', error);
+    toast.error(error.message || 'Failed to submit problem. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const toggleSidebar = () => {
     setSidebarMinimized(!sidebarMinimized);
@@ -459,126 +691,126 @@ export default function ProblemForm() {
       <Navbar />
       
       <div className="d-flex flex-grow-1">
-        {/* Sidebar - FIXED */}
+        {/* Sidebar */}
         <div 
-  className="bg-dark text-white position-relative"
-  style={{ 
-    width: sidebarMinimized ? '70px' : '250px',
-    minHeight: '100%',
-    transition: 'width 0.3s ease'
-  }}
->
-  <button
-    onClick={toggleSidebar}
-    className="position-absolute d-flex align-items-center justify-content-center"
-    style={{
-      top: '10px',
-      right: '-12px',
-      borderRadius: '50%',
-      width: '28px',
-      height: '28px',
-      backgroundColor: '#fff',
-      border: '1px solid #ccc',
-      boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-      zIndex: 1000,
-      cursor: 'pointer',
-    }}
-  >
-    {sidebarMinimized 
-      ? <FaChevronRight size={14} color="#333" /> 
-      : <FaChevronLeft size={14} color="#333" />}
-  </button>
+          className="bg-dark text-white position-relative"
+          style={{ 
+            width: sidebarMinimized ? '70px' : '250px',
+            minHeight: '100%',
+            transition: 'width 0.3s ease'
+          }}
+        >
+          <button
+            onClick={toggleSidebar}
+            className="position-absolute d-flex align-items-center justify-content-center"
+            style={{
+              top: '10px',
+              right: '-12px',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              backgroundColor: '#fff',
+              border: '1px solid #ccc',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 1000,
+              cursor: 'pointer',
+            }}
+          >
+            {sidebarMinimized 
+              ? <FaChevronRight size={14} color="#333" /> 
+              : <FaChevronLeft size={14} color="#333" />}
+          </button>
 
-  <div className="p-3">
-    {!sidebarMinimized && (
-      <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
-        Navigation
-      </h5>
-    )}
-    <ul className="nav flex-column">
-      <li className="nav-item mb-2">
-        <Link 
-          to={getDashboardPath()}
-          className="nav-link text-white rounded d-flex align-items-center"
-          title="Dashboard"
-        >
-          <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
-        </Link>
-      </li>
-      
-      <li className="nav-item mb-2">
-        <Link 
-          to="/problem/create" 
-          className="nav-link text-white bg-primary rounded d-flex align-items-center"
-          title="Create Problem"
-        >
-          <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
-        </Link>
-      </li>
-      
-      <li className="nav-item mb-2">
-        <Link 
-          to="/problems" 
-          className="nav-link text-white rounded d-flex align-items-center"
-          title="All Problems"
-        >
-          <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
-        </Link>
-      </li>
-      
-      <li className="nav-item mb-2">
-        <Link 
-          to="/reports" 
-          className="nav-link text-white rounded d-flex align-items-center"
-          title="Reports"
-        >
-          <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-          {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
-        </Link>
-      </li>
-      
-      {(user?.role === 'admin' || user?.role === 'team_leader') && (
-        <>
-          <li className="nav-item mb-2">
-            <Link 
-              to="/admin" 
-              className="nav-link text-white rounded d-flex align-items-center"
-              title="User Management"
-            >
-              <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-              {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
-            </Link>
-          </li>
-          
-          <li className="nav-item mb-2">
-            <Link 
-              to="/domain-status" 
-              className="nav-link text-white rounded d-flex align-items-center"
-              title="Domain Status"
-            >
-              <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-              {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
-            </Link>
-          </li>
-          
-          <li className="nav-item mb-2">
-            <Link 
-              to="/roles" 
-              className="nav-link text-white rounded d-flex align-items-center"
-              title="Role Management"
-            >
-              <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
-              {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
-            </Link>
-          </li>
-        </>
-      )}
-    </ul>
-  </div>
-</div>
+          <div className="p-3">
+            {!sidebarMinimized && (
+              <h5 className="text-center mb-4 pb-3 border-bottom border-secondary" style={{ fontSize: '1rem', fontWeight: '500' }}>
+                Navigation
+              </h5>
+            )}
+            <ul className="nav flex-column">
+              <li className="nav-item mb-2">
+                <Link 
+                  to={getDashboardPath()}
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  title="Dashboard"
+                >
+                  <FaHome style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Dashboard</span>}
+                </Link>
+              </li>
+              
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/problem/create" 
+                  className="nav-link text-white bg-primary rounded d-flex align-items-center"
+                  title="Create Problem"
+                >
+                  <FaPlusCircle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Create Problem</span>}
+                </Link>
+              </li>
+              
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/problems" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  title="All Problems"
+                >
+                  <FaExclamationTriangle style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>All Problems</span>}
+                </Link>
+              </li>
+              
+              <li className="nav-item mb-2">
+                <Link 
+                  to="/reports" 
+                  className="nav-link text-white rounded d-flex align-items-center"
+                  title="Reports"
+                >
+                  <FaFileAlt style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                  {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Reports</span>}
+                </Link>
+              </li>
+              
+              {(user?.role === 'admin' || user?.role === 'team_leader') && (
+                <>
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/admin" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      title="User Management"
+                    >
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>User Management</span>}
+                    </Link>
+                  </li>
+                  
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/domain-status" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      title="Domain Status"
+                    >
+                      <FaGlobe style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Domain Status</span>}
+                    </Link>
+                  </li>
+                  
+                  <li className="nav-item mb-2">
+                    <Link 
+                      to="/roles" 
+                      className="nav-link text-white rounded d-flex align-items-center"
+                      title="Role Management"
+                    >
+                      <FaUsersCog style={{ fontSize: '0.9rem', minWidth: '20px' }} /> 
+                      {!sidebarMinimized && <span className="ms-2" style={{ fontSize: '0.9rem' }}>Role Management</span>}
+                    </Link>
+                  </li>
+                </>
+              )}
+            </ul>
+          </div>
+        </div>
 
         {/* Main Content */}
         <div 
@@ -877,7 +1109,6 @@ export default function ProblemForm() {
           </div>
         </div>
       </div>
-      {/* Removed local ToastContainer to avoid conflicting global settings in App.js */}
     </div>
   );
 }

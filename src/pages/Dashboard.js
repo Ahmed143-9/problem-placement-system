@@ -848,118 +848,127 @@ efresh Domains'}
 
           {/* High Priority Issues Section */}
           <div className="row mb-4">
-            <div className="col-12">
-              <div className="card border-0 shadow-sm">
-                <div className="card-header border-bottom py-2">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <h5 className="mb-0 fw-semibold text-dark">
-                      {/* <FaExclamationCircle className="me-2 text-danger" /> */}
-                      High Priority Issues - Needs Immediate Attention
-                    </h5>
-                    <span className="badge bg-danger text-white">
-                      {highPriorityIssues.length} Active
-                    </span>
-                  </div>
-                  {analytics?.by_priority?.High > 0 && (
-                    <small className="text-muted" style={{ fontSize: '0.75rem' }}>
-                      {analytics.by_priority.High} total High priority issues • Showing latest 5
-                    </small>
-                  )}
-                </div>
-                <div className="card-body p-0">
-                  {highPriorityIssues.length > 0 ? (
-                    <div className="table-responsive">
-                      <table className="table mb-0">
-                        <thead>
-                          <tr>
-                            <th style={{ width: '10%', fontSize: '0.85rem' }}>ID</th>
-                            <th style={{ width: '20%', fontSize: '0.85rem' }}>Department</th>
-                            <th style={{ width: '20%', fontSize: '0.85rem' }}>Created By</th>
-                            <th style={{ width: '15%', fontSize: '0.85rem' }}>Status</th>
-                            <th style={{ width: '20%', fontSize: '0.85rem' }}>Assigned To</th>
-                            <th style={{ width: '15%', fontSize: '0.85rem' }}>Priority</th>
-                            <th style={{ width: '10%', fontSize: '0.85rem' }}>View</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {highPriorityIssues.map((issue, index) => (
-                            <tr key={issue.id || index} className="align-middle">
-                              <td>
-                                <strong className="text-danger" style={{ fontSize: '0.85rem' }}>
-                                  #{issue.id || issue.problem_id || 'N/A'}
-                                </strong>
-                              </td>
-                              <td>
-                                <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>
-                                  {formatDepartment(issue.department)}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                  {getCreatedByName(issue)}
-                                </span>
-                              </td>
-                              <td>
-                                <span className={`badge ${getStatusBadge(issue.status)}`} style={{ fontSize: '0.75rem' }}>
-                                  {formatStatus(issue.status)}
-                                </span>
-                              </td>
-                              <td>
-                                {issue.assigned_to ? (
-                                  <span className="badge bg-info text-white" style={{ fontSize: '0.75rem' }}>
-                                    {getAssignedToName(issue)}
-                                  </span>
-                                ) : (
-                                  <span className="badge bg-warning text-dark" style={{ fontSize: '0.75rem' }}>
-                                    Unassigned
-                                  </span>
-                                )}
-                              </td>
-                              <td>
-                                <span className="badge bg-danger text-white" style={{ fontSize: '0.75rem' }}>
-                                  {issue.priority || 'High'}
-                                </span>
-                              </td>
-                              <td>
-                                <button
-                                  className="btn btn-sm btn-outline-primary"
-                                  onClick={() => viewProblemDetails(issue)}
-                                  title="View Problem Details"
-                                  style={{ 
-                                    padding: '4px 8px', 
-                                    fontSize: '0.75rem',
-                                    borderWidth: '1px'
-                                  }}
-                                >
-                                  <FaEye size={12} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-5">
-                      <FaCheckCircle size={48} className="text-success mb-3" />
-                      <h5 className="text-muted">No High Priority Issues</h5>
-                      <p className="text-muted small">All high priority issues are resolved or in progress</p>
-                    </div>
-                  )}
-                </div>
-                <div className="card-footer py-2">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <small className="text-muted" style={{ fontSize: '0.8rem' }}>
-                      Last updated: {new Date().toLocaleTimeString()} • Total problems: {problems.length}
-                    </small>
-                    <Link to="/problems" className="btn btn-sm btn-outline-primary" style={{ fontSize: '0.8rem' }}>
-                      View All Issues <FaArrowRight className="ms-1" size={10} />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
+  <div className="col-12">
+    <div className="card border-0 shadow-sm">
+      <div className="card-header border-bottom py-2">
+        <div className="d-flex justify-content-between align-items-center">
+          <h5 className="mb-0 fw-semibold text-dark">
+            High Priority Issues - Needs Immediate Attention
+          </h5>
+          <span className="badge bg-danger text-white">
+            {highPriorityIssues.length} Active
+          </span>
+        </div>
+        {analytics?.by_priority?.High > 0 && (
+          <small className="text-muted" style={{ fontSize: '0.75rem' }}>
+            {analytics.by_priority.High} total High priority issues • Showing latest 5
+          </small>
+        )}
+      </div>
+      <div className="card-body p-0">
+        {highPriorityIssues.length > 0 ? (
+          <div className="table-responsive">
+            <table className="table mb-0">
+              <thead>
+                <tr>
+                  <th style={{ width: '10%', fontSize: '0.85rem' }}>ID</th>
+                  <th style={{ width: '20%', fontSize: '0.85rem' }}>Department</th>
+                  <th style={{ width: '20%', fontSize: '0.85rem' }}>Created By</th>
+                  <th style={{ width: '15%', fontSize: '0.85rem' }}>Status</th>
+                  <th style={{ width: '20%', fontSize: '0.85rem' }}>Assigned To</th>
+                  <th style={{ width: '15%', fontSize: '0.85rem' }}>Priority</th>
+                  <th style={{ width: '10%', fontSize: '0.85rem' }}>View</th>
+                </tr>
+              </thead>
+              <tbody>
+                {highPriorityIssues.map((issue, index) => (
+                  <tr 
+                    key={issue.id || index} 
+                    className="align-middle"
+                    onClick={() => viewProblemDetails(issue)}
+                    style={{ 
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <strong className="text-danger" style={{ fontSize: '0.85rem' }}>
+                        #{issue.id || issue.problem_id || 'N/A'}
+                      </strong>
+                    </td>
+                    <td>
+                      <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>
+                        {formatDepartment(issue.department)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-muted" style={{ fontSize: '0.85rem' }}>
+                        {getCreatedByName(issue)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${getStatusBadge(issue.status)}`} style={{ fontSize: '0.75rem' }}>
+                        {formatStatus(issue.status)}
+                      </span>
+                    </td>
+                    <td>
+                      {issue.assigned_to ? (
+                        <span className="badge bg-info text-white" style={{ fontSize: '0.75rem' }}>
+                          {getAssignedToName(issue)}
+                        </span>
+                      ) : (
+                        <span className="badge bg-warning text-dark" style={{ fontSize: '0.75rem' }}>
+                          Unassigned
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="badge bg-danger text-white" style={{ fontSize: '0.75rem' }}>
+                        {issue.priority || 'High'}
+                      </span>
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => viewProblemDetails(issue)}
+                        title="View Problem Details"
+                        style={{ 
+                          padding: '4px 8px', 
+                          fontSize: '0.75rem',
+                          borderWidth: '1px'
+                        }}
+                      >
+                        <FaEye size={12} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        ) : (
+          <div className="text-center py-5">
+            <FaCheckCircle size={48} className="text-success mb-3" />
+            <h5 className="text-muted">No High Priority Issues</h5>
+            <p className="text-muted small">All high priority issues are resolved or in progress</p>
+          </div>
+        )}
+      </div>
+      <div className="card-footer py-2">
+        <div className="d-flex justify-content-between align-items-center">
+          <small className="text-muted" style={{ fontSize: '0.8rem' }}>
+            Last updated: {new Date().toLocaleTimeString()} • Total problems: {problems.length}
+          </small>
+          <Link to="/problems" className="btn btn-sm btn-outline-primary" style={{ fontSize: '0.8rem' }}>
+            View All Issues <FaArrowRight className="ms-1" size={10} />
+          </Link>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
           {/* Analytics Section - Compact */}
           {analytics && (

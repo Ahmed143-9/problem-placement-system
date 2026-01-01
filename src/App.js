@@ -1,12 +1,9 @@
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
-
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
@@ -20,24 +17,54 @@ import RoleManagement from "./pages/RoleManagement";
 import ProblemCreate from "./pages/ProblemCreate";
 import FirstFaceAssignment from "./components/FirstFaceAssignment";
 import DomainStatus from "./pages/DomainStatus";
-
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
-
 import { migrateExistingProblems } from './utils/migration';
 
-function App() {
+// Import notification service
+import notificationService from './services/notificationService';
 
+function App() {
   // Run migration on app load
   useEffect(() => {
     const migrationResult = migrateExistingProblems();
     console.log('Migration result:', migrationResult);
+    
+    // Initialize notification service when app loads
+    const initializeNotificationService = () => {
+      try {
+        // Check if user is logged in
+        const userData = JSON.parse(localStorage.getItem("current_user"));
+        const token = localStorage.getItem("token");
+        
+        if (userData && token) {
+          // Store current user ID for notification service
+          localStorage.setItem('current_user_id', userData.id || userData.userId);
+          
+          // Initialize notification service
+          notificationService.init(userData.id || userData.userId);
+          
+          console.log('🔔 Notification system initialized for user:', userData.id);
+        } else {
+          console.log('🔕 No user logged in, notification service not initialized');
+        }
+      } catch (error) {
+        console.error('Error initializing notification service:', error);
+      }
+    };
+    
+    // Initialize after a short delay to ensure everything is loaded
+    setTimeout(initializeNotificationService, 1000);
+    
+    // Cleanup on unmount
+    return () => {
+      notificationService.destroy();
+    };
   }, []);
 
   return (
     <AuthProvider>
       <NotificationProvider>
-
         {/* ✅ ToastContainer OUTSIDE Router to avoid stuck toast */}
         <ToastContainer
           position="top-right"

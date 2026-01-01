@@ -1,804 +1,274 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import { useAuth } from './AuthContext';
-import api from '../services/api';
+import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import webSocketService from '../services/websocket';
 
-const NotificationContext = createContext(null);
+const NotificationContext = createContext();
 
-// Add auto-remove delay constant
-const AUTO_REMOVE_DELAY = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-const AUTO_DISMISS_DELAY = 5000; // 5 seconds for auto-dismiss after being read
-
-export const NotificationProvider = ({ children }) => {
-  const { user } = useAuth();
+export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [assignedProblems, setAssignedProblems] = useState([]);
+  const [assignedUnreadCount, setAssignedUnreadCount] = useState(0);
 
-  // Load notifications with cleanup
+  // Load notifications from localStorage
   const loadNotifications = useCallback(() => {
-    // If no user, just load general notifications that don't require user context
-    if (!user) {
-      try {
-        const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-        
-        // Filter and clean old notifications
-        const now = new Date();
-        const filteredNotifications = allNotifications.filter(n => {
-          // Remove notifications older than 7 days
-          const notificationTime = new Date(n.timestamp);
-          if (now - notificationTime > AUTO_REMOVE_DELAY) {
-            return false;
-          }
-          
-          // For non-logged in users, only show general notifications
-          return !n.userId && !n.targetUsername && !n.forAdminOrLeader; // General notifications
-        });
-
-        setNotifications(filteredNotifications);
-        setUnreadCount(filteredNotifications.filter(n => !n.read).length);
-        setLastUpdate(Date.now()); // Trigger re-render
-        
-      } catch (error) {
-        console.error('Failed to load notifications:', error);
-        setNotifications([]);
-        setUnreadCount(0);
-      }
-      return;
-    }
-
     try {
-      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const storedNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
+      const storedAssignedProblems = JSON.parse(localStorage.getItem('assignedProblems') || '[]');
       
-      // Filter and clean old notifications
-      const now = new Date();
-      const filteredNotifications = allNotifications.filter(n => {
-        // Remove notifications older than 7 days
-        const notificationTime = new Date(n.timestamp);
-        if (now - notificationTime > AUTO_REMOVE_DELAY) {
-          return false;
-        }
-        
-        // Filter based on user role
-        if (user?.role === 'admin' || user?.role === 'team_leader') {
-          return n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name || (!n.userId && !n.targetUsername && !n.forAdminOrLeader); // Include general notifications
-        }
-              
-        // Regular users see their specific notifications and general ones
-        return (n.userId === user?.id || n.targetUsername === user?.name) || (!n.userId && !n.targetUsername && !n.forAdminOrLeader); // Include general notifications
-      });
-
-      // Save filtered notifications back to localStorage
-      if (filteredNotifications.length !== allNotifications.length) {
-        localStorage.setItem('notifications', JSON.stringify(filteredNotifications));
-      }
-
-      setNotifications(filteredNotifications);
-      setUnreadCount(filteredNotifications.filter(n => !n.read).length);
-      setLastUpdate(Date.now()); // Trigger re-render
+      setNotifications(storedNotifications);
+      setAssignedProblems(storedAssignedProblems);
+      
+      // Calculate unread counts
+      const unread = storedNotifications.filter(n => !n.read).length;
+      const assignedUnread = storedAssignedProblems.filter(p => !p.read).length;
+      
+      setUnreadCount(unread);
+      setAssignedUnreadCount(assignedUnread);
       
     } catch (error) {
       console.error('Failed to load notifications:', error);
     }
-  }, [user]);
+  }, []);
 
-  // Load notifications on mount and when user changes
+  // Save notifications to localStorage
+  const saveNotifications = useCallback((newNotifications, newAssignedProblems = null) => {
+    try {
+      localStorage.setItem('notifications', JSON.stringify(newNotifications));
+      if (newAssignedProblems !== null) {
+        localStorage.setItem('assignedProblems', JSON.stringify(newAssignedProblems));
+      }
+    } catch (error) {
+      console.error('Failed to save notifications:', error);
+    }
+  }, []);
+
+  // Initialize WebSocket connection
   useEffect(() => {
+    // Load initial notifications
     loadNotifications();
     
-    // Set up interval to periodically check for new notifications
-    const intervalId = setInterval(loadNotifications, 30000); // Check every 30 seconds
+    // Connect WebSocket
+    webSocketService.connect();
     
-    return () => clearInterval(intervalId);
+    // Subscribe to WebSocket events
+    const unsubscribeNotification = webSocketService.subscribe('notification', (data) => {
+      console.log('📨 New notification from WebSocket:', data);
+      addNotification({
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        problemId: data.problem_id,
+        senderId: data.sender_id,
+        autoDismiss: data.auto_dismiss !== false,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    const unsubscribeAssignedProblem = webSocketService.subscribe('assigned_problem', (data) => {
+      console.log('📨 New assigned problem from WebSocket:', data);
+      addAssignedProblem(data);
+    });
+    
+    const unsubscribeConnected = webSocketService.subscribe('connected', () => {
+      console.log('✅ WebSocket connected, reloading notifications');
+      loadNotifications();
+    });
+    
+    // Cleanup on unmount
+    return () => {
+      unsubscribeNotification();
+      unsubscribeAssignedProblem();
+      unsubscribeConnected();
+      webSocketService.disconnect();
+    };
   }, [loadNotifications]);
 
-  // Add notification with auto-dismiss timer
-  const addNotification = (notification) => {
-    try {
-      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const newNotification = {
-        id: Date.now() + Math.random(), // Ensure unique ID
-        timestamp: new Date().toISOString(),
-        read: false,
-        autoDismiss: notification.priority !== 'URGENT', // Only auto-dismiss non-urgent notifications
-        ...notification
-      };
-      
-      allNotifications.push(newNotification);
-      localStorage.setItem('notifications', JSON.stringify(allNotifications));
-      
-      // Reload notifications
-      loadNotifications();
-      
-      // Auto-dismiss after delay (for non-critical notifications)
-      // Only set the timeout if the notification should auto-dismiss
-      if (newNotification.autoDismiss) {
-        setTimeout(() => {
-          // Check if notification still exists before removing
-          const currentNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-          const notificationExists = currentNotifications.some(n => n.id === newNotification.id);
-          if (notificationExists) {
-            removeNotification(newNotification.id);
-          }
-        }, AUTO_DISMISS_DELAY);
-      }
-      
-      // Log for debugging
-      console.log('Notification added:', newNotification.title || 'Untitled', 'Auto-dismiss:', newNotification.autoDismiss);
-      
-    } catch (error) {
-      console.error('Failed to add notification:', error);
-    }
-  };
-
-  // Mark as read with immediate UI update
-  const markAsRead = (notificationId) => {
-    try {
-      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const notificationIndex = allNotifications.findIndex(n => n.id === notificationId);
-      
-      if (notificationIndex !== -1) {
-        allNotifications[notificationIndex] = {
-          ...allNotifications[notificationIndex],
-          read: true,
-          readAt: new Date().toISOString()
-        };
-        
-        localStorage.setItem('notifications', JSON.stringify(allNotifications));
-        
-        // Update state immediately
-        setNotifications(prev => prev.map(n => 
-          n.id === notificationId ? { ...n, read: true, readAt: new Date().toISOString() } : n
-        ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
-        setLastUpdate(Date.now());
-        
-        // Log for debugging
-        const notification = allNotifications[notificationIndex];
-        console.log('Notification marked as read:', notification.title || 'Untitled', 'ID:', notificationId);
-      }
-    } catch (error) {
-      console.error('Failed to mark as read:', error);
-    }
-  };
-
-  // Mark all as read
-  const markAllAsRead = () => {
-    try {
-      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const updatedNotifications = allNotifications.map(n => {
-        // Only mark as read if it's for current user
-        if (user?.role === 'admin' || user?.role === 'team_leader') {
-          if (n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name) {
-            return { ...n, read: true, readAt: new Date().toISOString() };
-          }
-        } else if (n.userId === user?.id || n.targetUsername === user?.name) {
-          return { ...n, read: true, readAt: new Date().toISOString() };
-        }
-        return n;
+  // Add a new notification
+  const addNotification = useCallback((notification) => {
+    const newNotification = {
+      id: Date.now() + Math.random().toString(36).substr(2, 9),
+      read: false,
+      timestamp: new Date().toISOString(),
+      ...notification
+    };
+    
+    setNotifications(prev => {
+      const updated = [newNotification, ...prev.slice(0, 49)]; // Keep last 50 notifications
+      saveNotifications(updated);
+      return updated;
+    });
+    
+    setUnreadCount(prev => prev + 1);
+    
+    // Show toast for important notifications
+    if (notification.type === 'assignment' || notification.type === 'transfer') {
+      toast.info(notification.message, {
+        position: "top-right",
+        autoClose: 5000,
       });
-      
-      localStorage.setItem('notifications', JSON.stringify(updatedNotifications));
-      
-      // Update state immediately
-      setNotifications(prev => prev.map(n => ({ ...n, read: true, readAt: new Date().toISOString() })));
-      setUnreadCount(0);
-      setLastUpdate(Date.now());
-      
-    } catch (error) {
-      console.error('Failed to mark all as read:', error);
     }
-  };
+  }, [saveNotifications]);
 
-  // Clear notifications with immediate UI update
-  const clearNotifications = () => {
-    try {
-      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const otherUserNotifications = allNotifications.filter(n => {
-        if (user?.role === 'admin' || user?.role === 'team_leader') {
-          return !(n.forAdminOrLeader || n.userId === user?.id || n.targetUsername === user?.name);
-        }
-        return !(n.userId === user?.id || n.targetUsername === user?.name);
-      });
-      
-      localStorage.setItem('notifications', JSON.stringify(otherUserNotifications));
-      
-      // Update state immediately
-      setNotifications([]);
-      setUnreadCount(0);
-      setLastUpdate(Date.now());
-      
-    } catch (error) {
-      console.error('Failed to clear notifications:', error);
-    }
-  };
-  
-  // Clear all notifications (for logout)
-  const clearAllNotifications = () => {
-    try {
-      localStorage.setItem('notifications', JSON.stringify([]));
-      
-      // Update state immediately
-      setNotifications([]);
-      setUnreadCount(0);
-      setLastUpdate(Date.now());
-      
-    } catch (error) {
-      console.error('Failed to clear all notifications:', error);
-    }
-  };
+  // Add an assigned problem
+  const addAssignedProblem = useCallback((problem) => {
+    setAssignedProblems(prev => {
+      const updated = [{ ...problem, read: false }, ...prev.slice(0, 49)];
+      saveNotifications(null, updated);
+      return updated;
+    });
+    
+    setAssignedUnreadCount(prev => prev + 1);
+    
+    // Show toast for new assignments
+    toast.info(`New problem assigned: ${problem.statement || problem.department}`, {
+      position: "top-right",
+      autoClose: 5000,
+    });
+  }, [saveNotifications]);
+
+  // Mark notification as read
+  const markAsRead = useCallback((notificationId) => {
+    setNotifications(prev => {
+      const updated = prev.map(n =>
+        n.id === notificationId ? { ...n, read: true } : n
+      );
+      saveNotifications(updated);
+      return updated;
+    });
+    
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  }, [saveNotifications]);
+
+  // Mark assigned problem as read
+  const markAssignedAsRead = useCallback((problemId) => {
+    setAssignedProblems(prev => {
+      const updated = prev.map(p =>
+        p.id === problemId ? { ...p, read: true } : p
+      );
+      saveNotifications(null, updated);
+      return updated;
+    });
+    
+    setAssignedUnreadCount(prev => Math.max(0, prev - 1));
+  }, [saveNotifications]);
+
+  // Mark all notifications as read
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      saveNotifications(updated);
+      return updated;
+    });
+    
+    setUnreadCount(0);
+  }, [saveNotifications]);
+
+  // Mark all assigned problems as read
+  const markAllAssignedAsRead = useCallback(() => {
+    setAssignedProblems(prev => {
+      const updated = prev.map(p => ({ ...p, read: true }));
+      saveNotifications(null, updated);
+      return updated;
+    });
+    
+    setAssignedUnreadCount(0);
+  }, [saveNotifications]);
+
+  // Clear all notifications
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+    setUnreadCount(0);
+    saveNotifications([]);
+  }, [saveNotifications]);
+
+  // Clear all assigned problems
+  const clearAssignedProblems = useCallback(() => {
+    setAssignedProblems([]);
+    setAssignedUnreadCount(0);
+    saveNotifications(null, []);
+  }, [saveNotifications]);
+
+  // Clear everything
+  const clearAllNotifications = useCallback(() => {
+    clearNotifications();
+    clearAssignedProblems();
+  }, [clearNotifications, clearAssignedProblems]);
 
   // Remove a specific notification
-  const removeNotification = (notificationId) => {
-    try {
-      const allNotifications = JSON.parse(localStorage.getItem('notifications') || '[]');
-      const notificationToRemove = allNotifications.find(n => n.id === notificationId);
+  const removeNotification = useCallback((notificationId) => {
+    setNotifications(prev => {
+      const notification = prev.find(n => n.id === notificationId);
+      const updated = prev.filter(n => n.id !== notificationId);
+      saveNotifications(updated);
       
-      if (!notificationToRemove) {
-        console.log('Notification not found for removal:', notificationId);
-        return; // Notification already removed
+      // Update unread count if notification was unread
+      if (notification && !notification.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
       }
       
-      const filteredNotifications = allNotifications.filter(n => n.id !== notificationId);
-      
-      localStorage.setItem('notifications', JSON.stringify(filteredNotifications));
-      
-      // Update state immediately
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      setUnreadCount(prev => {
-        return notificationToRemove && !notificationToRemove.read ? Math.max(0, prev - 1) : prev;
-      });
-      setLastUpdate(Date.now());
-      
-      // Log for debugging
-      console.log('Notification removed:', notificationToRemove.title || 'Untitled', 'ID:', notificationId);
-      
-    } catch (error) {
-      console.error('Failed to remove notification:', error);
-    }
-  };
-
-  // Get user ID by username
-  const getUserIdByUsername = (username) => {
-    try {
-      const users = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const foundUser = users.find(u => u.name === username);
-      return foundUser?.id;
-    } catch (error) {
-      return null;
-    }
-  };
-
-  // Get problem details by ID
-  const getProblemDetails = (problemId) => {
-    try {
-      const problems = JSON.parse(localStorage.getItem('problems') || '[]');
-      return problems.find(p => p.id === problemId);
-    } catch (error) {
-      return null;
-    }
-  };
-
-  // Get all users who should be notified about discussion
-  const getDiscussionParticipants = (problemId) => {
-    try {
-      const problem = getProblemDetails(problemId);
-      if (!problem) return [];
-
-      const users = JSON.parse(localStorage.getItem('system_users') || '[]');
-      const participants = new Set();
-
-      // 1. Problem Creator
-      if (problem.createdBy) {
-        participants.add(problem.createdBy);
-      }
-
-      // 2. Currently Assigned User
-      if (problem.assignedToName) {
-        participants.add(problem.assignedToName);
-      }
-
-      // 3. All users who commented on this problem
-      if (problem.comments && problem.comments.length > 0) {
-        problem.comments.forEach(comment => {
-          if (comment.author) {
-            participants.add(comment.author);
-          }
-        });
-      }
-
-      // 4. Admin and Team Leaders (if configured to receive all notifications)
-      const adminAndLeaders = users.filter(u => 
-        u.role === 'admin' || u.role === 'team_leader'
-      ).map(u => u.name);
-      
-      adminAndLeaders.forEach(admin => participants.add(admin));
-
-      // Convert to array and remove current comment author (if provided)
-      return Array.from(participants);
-    } catch (error) {
-      console.error('Error getting discussion participants:', error);
-      return [];
-    }
-  };
-
-  // ==================== DOMAIN STATUS NOTIFICATIONS ====================
-
-  // Notify when domain status changes (UP/DOWN)
-  const notifyDomainStatusChange = (domain, fromStatus, toStatus) => {
-    const priority = toStatus === 'DOWN' ? 'HIGH' : 'INFO';
-    const icon = toStatus === 'UP' ? '🟢' : '🔴';
-    const color = toStatus === 'UP' ? 'success' : 'danger';
-    
-    addNotification({
-      type: 'domain_status_change',
-      title: `${icon} Domain Status Changed`,
-      message: `${domain.replace('https://', '')} changed from ${fromStatus} to ${toStatus}`,
-      domain: domain,
-      fromStatus: fromStatus,
-      toStatus: toStatus,
-      priority: priority,
-      forAdminOrLeader: true,
-      icon: icon,
-      color: color,
-      timestamp: new Date().toISOString(),
-      isDomainNotification: true
+      return updated;
     });
+  }, [saveNotifications]);
 
-    console.log(`🔔 Domain Status Change: ${domain} - ${fromStatus} → ${toStatus}`);
-  };
-
-  // Notify when new domain is added to monitoring
-  const notifyNewDomain = (domain, isUp) => {
-    const status = isUp ? 'UP' : 'DOWN';
-    const icon = isUp ? '🟢' : '🔴';
-    
-    addNotification({
-      type: 'new_domain',
-      title: '🌐 New Domain Added',
-      message: `${domain.replace('https://', '')} is now being monitored (Status: ${status})`,
-      domain: domain,
-      isUp: isUp,
-      forAdminOrLeader: true,
-      icon: '🌐',
-      color: 'info',
-      timestamp: new Date().toISOString(),
-      isDomainNotification: true
-    });
-  };
-
-  // Notify when critical domain is down
-  const notifyCriticalDomain = (domain) => {
-    addNotification({
-      type: 'critical_domain',
-      title: '🚨 Critical Domain Alert',
-      message: `${domain.replace('https://', '')} is DOWN and requires immediate attention`,
-      domain: domain,
-      priority: 'URGENT',
-      forAdminOrLeader: true,
-      icon: '🚨',
-      color: 'danger',
-      timestamp: new Date().toISOString(),
-      isDomainNotification: true
-    });
-  };
-
-  // Manual domain check notification
-  const notifyManualDomainCheck = (domain, isUp) => {
-    addNotification({
-      type: 'manual_domain_check',
-      title: '🔍 Manual Domain Check',
-      message: `${domain.replace('https://', '')} is currently ${isUp ? 'UP' : 'DOWN'}`,
-      domain: domain,
-      isUp: isUp,
-      forAdminOrLeader: true,
-      icon: '🔍',
-      color: isUp ? 'success' : 'warning',
-      timestamp: new Date().toISOString(),
-      isDomainNotification: true
-    });
-  };
-
-  // ==================== ASSIGNED PROBLEMS (direct visualization) ====================
-  // Maintain a live list of problems assigned to the current user using
-  // the `/problems/assigned-by-user` endpoint. Provide an "assignedUnreadCount"
-  // based on `assignedSeenAt` so clicking the bell can reset the count.
-  const [assignedProblems, setAssignedProblems] = React.useState([]);
-  const [assignedSeenAt, setAssignedSeenAt] = React.useState(null);
-
-  // Load assignedSeenAt from localStorage when user changes
-  useEffect(() => {
-    if (!user) {
-      setAssignedProblems([]);
-      setAssignedSeenAt(null);
-      return;
-    }
-    const key = `assignedSeenAt_${user.id}`;
-    const stored = localStorage.getItem(key);
-    setAssignedSeenAt(stored || null);
-  }, [user]);
-
-  // Function to fetch assigned problems and keep state updated
-  const loadAssignedProblems = useCallback(async () => {
-    if (!user) return;
-    try {
-      const response = await api.get('/problems/assigned-by-user');
-      const data = response.data;
-      if (data && data.status === 'success' && Array.isArray(data.data)) {
-        setAssignedProblems(data.data || []);
-      } else {
-        setAssignedProblems([]);
-      }
-    } catch (err) {
-      console.error('Failed to load assigned problems:', err);
-      setAssignedProblems([]);
-    }
-  }, [user]);
-
-  // Poll assigned problems every 10s
-  useEffect(() => {
-    if (!user) return;
-    loadAssignedProblems();
-    const id = setInterval(loadAssignedProblems, 10000);
-    return () => clearInterval(id);
-  }, [user, loadAssignedProblems]);
-
-  // Number of assigned problems that arrived after the user last viewed them
-  const assignedUnreadCount = React.useMemo(() => {
-    if (!assignedProblems || assignedProblems.length === 0) return 0;
-    if (!assignedSeenAt) return assignedProblems.length;
-    const seenDate = new Date(assignedSeenAt);
-    return assignedProblems.filter(p => new Date(p.updated_at || p.created_at) > seenDate).length;
-  }, [assignedProblems, assignedSeenAt]);
-
-  const markAssignedAsRead = () => {
-    if (!user) return;
-    const key = `assignedSeenAt_${user.id}`;
-    const now = new Date().toISOString();
-    localStorage.setItem(key, now);
-    setAssignedSeenAt(now);
-  };
-
-  // Notify when multiple domains are down
-  const notifyMultipleDomainsDown = (downDomains) => {
-    if (downDomains.length === 0) return;
-
-    addNotification({
-      type: 'multiple_domains_down',
-      title: '⚠️ Multiple Domains Down',
-      message: `${downDomains.length} domain(s) are currently DOWN: ${downDomains.map(d => d.replace('https://', '')).join(', ')}`,
-      domains: downDomains,
-      count: downDomains.length,
-      priority: 'HIGH',
-      forAdminOrLeader: true,
-      icon: '⚠️',
-      color: 'danger',
-      timestamp: new Date().toISOString(),
-      isDomainNotification: true
-    });
-  };
-
-  // Notify when domain uptime is low
-  const notifyLowUptime = (uptimePercentage, totalDomains, downDomains) => {
-    addNotification({
-      type: 'low_uptime',
-      title: '📉 Low Uptime Alert',
-      message: `Domain uptime is ${uptimePercentage}% (${downDomains} out of ${totalDomains} domains are down)`,
-      uptimePercentage: uptimePercentage,
-      totalDomains: totalDomains,
-      downDomains: downDomains,
-      priority: 'MEDIUM',
-      forAdminOrLeader: true,
-      icon: '📉',
-      color: 'warning',
-      timestamp: new Date().toISOString(),
-      isDomainNotification: true
-    });
-  };
-
-  // ==================== PROBLEM MANAGEMENT NOTIFICATIONS ====================
-
-  // Notify about new discussion comment
-  const notifyDiscussionComment = (problemId, commentAuthor, commentText, problemDetails = null) => {
-    try {
-      console.log('🔔 Sending discussion notifications for problem:', problemId);
+  // Remove a specific assigned problem
+  const removeAssignedProblem = useCallback((problemId) => {
+    setAssignedProblems(prev => {
+      const problem = prev.find(p => p.id === problemId);
+      const updated = prev.filter(p => p.id !== problemId);
+      saveNotifications(null, updated);
       
-      const problem = problemDetails || getProblemDetails(problemId);
-      if (!problem) {
-        console.error('Problem not found for notification:', problemId);
-        return;
-      }
-
-      // Get all participants who should be notified (excluding the comment author)
-      const participants = getDiscussionParticipants(problemId).filter(
-        participant => participant !== commentAuthor
-      );
-
-      console.log('👥 Discussion participants to notify:', participants);
-
-      // Send notification to each participant
-      participants.forEach(participant => {
-        const userId = getUserIdByUsername(participant);
-        
-        if (userId) {
-          addNotification({
-            type: 'discussion_comment',
-            title: '💬 New Discussion Message',
-            message: `${commentAuthor} commented on Problem #${problemId}: "${commentText.substring(0, 50)}${commentText.length > 50 ? '...' : ''}"`,
-            problemId,
-            targetUsername: participant,
-            userId: userId,
-            commentAuthor: commentAuthor,
-            commentText: commentText,
-            problemTitle: problem.statement?.substring(0, 30) || `Problem #${problemId}`,
-            icon: '💬',
-            color: 'info',
-            isDiscussion: true
-          });
-        }
-      });
-
-      // Also notify Admin and Team Leaders (as backup)
-      addNotification({
-        type: 'discussion_comment',
-        title: '💬 New Discussion Activity',
-        message: `${commentAuthor} commented on Problem #${problemId}`,
-        problemId,
-        forAdminOrLeader: true,
-        commentAuthor: commentAuthor,
-        commentText: commentText,
-        icon: '💬',
-        color: 'info',
-        isDiscussion: true
-      });
-
-      console.log(`Discussion notifications sent to ${participants.length} participants`);
-      
-    } catch (error) {
-      console.error('❌ Failed to send discussion notifications:', error);
-    }
-  };
-
-  // Notify about solution comment (special type)
-  const notifySolutionComment = (problemId, solvedBy, solutionText, problemDetails = null) => {
-    try {
-      const problem = problemDetails || getProblemDetails(problemId);
-      if (!problem) return;
-
-      // Get problem creator and assigned user
-      const participants = new Set();
-      
-      if (problem.createdBy && problem.createdBy !== solvedBy) {
-        participants.add(problem.createdBy);
+      // Update unread count if problem was unread
+      if (problem && !problem.read) {
+        setAssignedUnreadCount(prev => Math.max(0, prev - 1));
       }
       
-      if (problem.assignedToName && problem.assignedToName !== solvedBy) {
-        participants.add(problem.assignedToName);
-      }
-
-      // Notify participants
-      participants.forEach(participant => {
-        const userId = getUserIdByUsername(participant);
-        
-        if (userId) {
-          addNotification({
-            type: 'solution_comment',
-            title: '✅ Solution Provided',
-            message: `${solvedBy} provided a solution for Problem #${problemId}`,
-            problemId,
-            targetUsername: participant,
-            userId: userId,
-            solvedBy: solvedBy,
-            solutionText: solutionText,
-            icon: '✅',
-            color: 'success',
-            isSolution: true
-          });
-        }
-      });
-
-      // Notify Admin and Team Leaders for approval
-      addNotification({
-        type: 'solution_comment',
-        title: '✅ Solution Ready for Review',
-        message: `${solvedBy} submitted a solution for Problem #${problemId}`,
-        problemId,
-        forAdminOrLeader: true,
-        solvedBy: solvedBy,
-        solutionText: solutionText,
-        icon: '✅',
-        color: 'success',
-        isSolution: true
-      });
-
-    } catch (error) {
-      console.error('Failed to send solution notification:', error);
-    }
-  };
-
-  // Existing notification helpers
-  const notifyNewProblem = (problemId, createdBy, department) => {
-    addNotification({
-      type: 'new_problem',
-      title: '🆕 New Problem Raised',
-      message: `${createdBy} raised a new problem (#${problemId}) in ${department} department`,
-      problemId,
-      forAdminOrLeader: true,
-      icon: '🆕',
-      color: 'primary'
+      return updated;
     });
-  };
+  }, [saveNotifications]);
 
-  const notifyAssignment = (problemId, assignedToUsername, assignedBy) => {
-    const userId = getUserIdByUsername(assignedToUsername);
-    
-    addNotification({
-      type: 'assignment',
-      title: '📌 Problem Assigned',
-      message: `You have been assigned problem #${problemId} by ${assignedBy}`,
-      problemId,
-      targetUsername: assignedToUsername,
-      userId: userId,
-      icon: '📌',
-      color: 'info'
-    });
-  };
+  // Send notification via WebSocket
+  const sendNotification = useCallback((data) => {
+    webSocketService.sendMessage('notification', data);
+  }, []);
 
-  const notifyStatusChange = (problemId, newStatus, changedBy, assignedToUsername) => {
-    if (assignedToUsername) {
-      const userId = getUserIdByUsername(assignedToUsername);
-      
-      addNotification({
-        type: 'status_change',
-        title: '🔄 Status Updated',
-        message: `Problem #${problemId} status changed to ${newStatus.replace('_', ' ').toUpperCase()} by ${changedBy}`,
-        problemId,
-        targetUsername: assignedToUsername,
-        userId: userId,
-        icon: '🔄',
-        color: 'warning'
-      });
-    }
-  };
+  // Send assigned problem via WebSocket
+  const sendAssignedProblem = useCallback((data) => {
+    webSocketService.sendMessage('assign_problem', data);
+  }, []);
 
-  const notifyTransfer = (problemId, fromUsername, toUsername, transferredBy) => {
-    const toUserId = getUserIdByUsername(toUsername);
-    
-    addNotification({
-      type: 'transfer',
-      title: '⇄ Problem Transferred to You',
-      message: `Problem #${problemId} has been transferred to you from ${fromUsername} by ${transferredBy}`,
-      problemId,
-      targetUsername: toUsername,
-      userId: toUserId,
-      icon: '⇄',
-      color: 'warning'
-    });
-
-    addNotification({
-      type: 'transfer',
-      title: '⇄ Problem Transferred',
-      message: `Problem #${problemId} transferred from ${fromUsername} to ${toUsername}`,
-      problemId,
-      forAdminOrLeader: true,
-      icon: '⇄',
-      color: 'secondary'
-    });
-  };
-
-  const notifyCompletion = (problemId, completedBy) => {
-    addNotification({
-      type: 'completion',
-      title: '✅ Problem Completed',
-      message: `Problem #${problemId} has been marked as completed by ${completedBy}`,
-      problemId,
-      forAdminOrLeader: true,
-      icon: '✅',
-      color: 'success'
-    });
-  };
-
-  // ==================== SYSTEM NOTIFICATIONS ====================
-
-  // System maintenance notification
-  const notifySystemMaintenance = (message, duration) => {
-    addNotification({
-      type: 'system_maintenance',
-      title: '🔧 System Maintenance',
-      message: message,
-      duration: duration,
-      forAdminOrLeader: false, // All users see this
-      icon: '🔧',
-      color: 'info',
-      isSystemNotification: true
-    });
-  };
-
-  // System error notification
-  const notifySystemError = (errorMessage, component) => {
-    addNotification({
-      type: 'system_error',
-      title: '❌ System Error',
-      message: `${component}: ${errorMessage}`,
-      component: component,
-      forAdminOrLeader: true,
-      icon: '❌',
-      color: 'danger',
-      isSystemNotification: true
-    });
-  };
-
-  // Backup completed notification
-  const notifyBackupCompleted = (backupType, size) => {
-    addNotification({
-      type: 'backup_completed',
-      title: '💾 Backup Completed',
-      message: `${backupType} backup completed successfully (${size})`,
-      backupType: backupType,
-      size: size,
-      forAdminOrLeader: true,
-      icon: '💾',
-      color: 'success',
-      isSystemNotification: true
-    });
+  const value = {
+    notifications,
+    unreadCount,
+    assignedProblems,
+    assignedUnreadCount,
+    loadNotifications,
+    addNotification,
+    addAssignedProblem,
+    markAsRead,
+    markAssignedAsRead,
+    markAllAsRead,
+    markAllAssignedAsRead,
+    clearNotifications,
+    clearAssignedProblems,
+    clearAllNotifications,
+    removeNotification,
+    removeAssignedProblem,
+    sendNotification,
+    sendAssignedProblem
   };
 
   return (
-    <NotificationContext.Provider
-      value={{
-        // Core notification functions
-        notifications,
-        unreadCount,
-        lastUpdate,
-        addNotification,
-        markAsRead,
-        markAllAsRead,
-        clearNotifications,
-        clearAllNotifications,
-        loadNotifications,
-        removeNotification,
-
-        // Helper functions
-        getUserIdByUsername,
-        getProblemDetails,
-        getDiscussionParticipants,
-
-        // 🔥 DOMAIN STATUS NOTIFICATIONS
-        notifyDomainStatusChange,
-        notifyNewDomain,
-        notifyCriticalDomain,
-        notifyManualDomainCheck,
-        notifyMultipleDomainsDown,
-        notifyLowUptime,
-
-        // 🔥 PROBLEM MANAGEMENT NOTIFICATIONS
-        notifyNewProblem,
-        notifyAssignment,
-        notifyStatusChange,
-        notifyTransfer,
-        notifyCompletion,
-        notifyDiscussionComment,
-        notifySolutionComment,
-
-        // 🔥 SYSTEM NOTIFICATIONS
-        notifySystemMaintenance,
-        notifySystemError,
-        notifyBackupCompleted
-        ,
-        // Assigned problems (direct API visualization)
-        assignedProblems,
-        assignedUnreadCount,
-        markAssignedAsRead,
-      }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );
-};
+}
 
-export const useNotifications = () => {
+export function useNotifications() {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new Error('useNotifications must be used within NotificationProvider');
+    throw new Error('useNotifications must be used within a NotificationProvider');
   }
   return context;
-};
+}
